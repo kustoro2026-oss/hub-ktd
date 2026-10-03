@@ -19,28 +19,29 @@ export default async function ConversationPage({
   await markConversationRead(wa_from);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
+    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+      {/* Kepala chat hijau ala WhatsApp */}
+      <header className="flex items-center gap-3 bg-emerald-700 px-3 py-3 sm:px-4">
         <Link
           href="/pesan"
-          className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition-colors hover:bg-slate-50"
+          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
           title="Kembali ke daftar pesan"
         >
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <div className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-200 text-sm font-semibold text-slate-600">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/20 text-sm font-semibold text-white">
           {wa_from.slice(-2)}
         </div>
-        <div>
-          <h1 className="text-base font-bold text-slate-900">
+        <div className="min-w-0">
+          <h1 className="truncate text-base font-bold text-white">
             {formatWa(wa_from)}
           </h1>
-          <p className="text-xs text-slate-400">Pelanggan</p>
+          <p className="text-xs text-emerald-100">Pelanggan</p>
         </div>
-      </div>
+      </header>
 
       {messages.length === 0 ? (
-        <p className="rounded-xl border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+        <p className="p-8 text-center text-sm text-slate-500">
           Tidak ada percakapan dengan nomor ini.
         </p>
       ) : (

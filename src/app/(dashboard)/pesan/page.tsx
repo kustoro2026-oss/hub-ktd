@@ -7,15 +7,11 @@ import { formatWa, timeHM } from "@/lib/format";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pesan Masuk" };
 
-/** Pratinjau baris: pesan keluar diawali "Anda: " seperti di WhatsApp. */
-function preview(c: {
-  direction: "in" | "out";
-  body: string;
-  reply: string;
-}): string {
-  if (c.direction === "out") return `Anda: ${c.body}`;
-  if (c.reply) return c.reply.replace(/\n/g, " ");
-  return c.body.replace(/\n/g, " ");
+/** Pratinjau baris: kata-kata pelanggan, seperti daftar chat WhatsApp —
+ *  bukan balasan bot yang teksnya selalu sama. Pesan keluar diawali "Anda: ". */
+function preview(c: { direction: "in" | "out"; body: string }): string {
+  const text = c.body.replace(/\n/g, " ");
+  return c.direction === "out" ? `Anda: ${text}` : text;
 }
 
 export default async function PesanPage() {

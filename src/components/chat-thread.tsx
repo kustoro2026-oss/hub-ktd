@@ -112,11 +112,11 @@ export default function ChatThread({
   }
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 shadow-sm">
+    <div className="flex flex-col">
       {/* Area chat */}
       <div
         ref={scrollRef}
-        className="h-[52vh] min-h-[340px] overflow-y-auto px-4 py-4"
+        className="h-[56vh] min-h-[320px] overflow-y-auto px-3 py-4 sm:px-4 md:h-[52vh] md:min-h-[340px]"
         style={{
           backgroundColor: "#efe7db",
           backgroundImage:
@@ -191,7 +191,7 @@ export default function ChatThread({
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder="Ketik balasan"
-          className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-800 outline-none focus:border-emerald-400"
+          className="flex-1 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-base text-slate-800 outline-none focus:border-emerald-400 sm:text-sm"
         />
         <button
           type="submit"

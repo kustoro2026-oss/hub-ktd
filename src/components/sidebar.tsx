@@ -14,7 +14,7 @@ import {
   Store,
 } from "lucide-react";
 
-const NAV = [
+export const NAV = [
   { href: "/", label: "Dasbor", Icon: LayoutDashboard },
   { href: "/kontak", label: "Kontak", Icon: Users },
   { href: "/broadcast", label: "Broadcast", Icon: Send },
@@ -38,7 +38,7 @@ export default function Sidebar() {
   }
 
   return (
-    <aside className="flex w-56 shrink-0 flex-col bg-slate-900 text-slate-200">
+    <aside className="hidden w-56 shrink-0 flex-col bg-slate-900 text-slate-200 md:flex">
       <div className="flex items-center gap-2 border-b border-slate-800 px-4 py-4">
         <Store className="h-6 w-6 text-emerald-400" />
         <div>
