@@ -51,6 +51,8 @@ export type InboundMessage = {
   reply: string;
   kind: "general" | "order" | "ad";
   ad_id: string;
+  direction: "in" | "out";
+  read: number;
   created_at: string;
 };
 
@@ -201,6 +203,8 @@ function migrateSqlite(db: DatabaseSync) {
       reply TEXT NOT NULL DEFAULT '',
       kind TEXT NOT NULL DEFAULT 'general',
       ad_id TEXT NOT NULL DEFAULT '',
+      direction TEXT NOT NULL DEFAULT 'in',
+      read INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
 
@@ -219,6 +223,20 @@ function migrateSqlite(db: DatabaseSync) {
     db.exec(
       "ALTER TABLE broadcast_items ADD COLUMN wa_id TEXT NOT NULL DEFAULT ''",
     );
+  }
+
+  // Migrasi DB lama: kolom arah pesan (masuk/keluar) dan status terbaca
+  // untuk tampilan daftar chat + balasan manual ala WhatsApp.
+  const mcols = db
+    .prepare("PRAGMA table_info(messages)")
+    .all() as unknown as { name: string }[];
+  if (!mcols.some((c) => c.name === "direction")) {
+    db.exec(
+      "ALTER TABLE messages ADD COLUMN direction TEXT NOT NULL DEFAULT 'in'",
+    );
+  }
+  if (!mcols.some((c) => c.name === "read")) {
+    db.exec("ALTER TABLE messages ADD COLUMN read INTEGER NOT NULL DEFAULT 0");
   }
 }
 
@@ -261,6 +279,8 @@ async function migratePg(pool: Pool) {
       reply TEXT NOT NULL DEFAULT '',
       kind TEXT NOT NULL DEFAULT 'general',
       ad_id TEXT NOT NULL DEFAULT '',
+      direction TEXT NOT NULL DEFAULT 'in',
+      read INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
@@ -269,6 +289,14 @@ async function migratePg(pool: Pool) {
     CREATE INDEX IF NOT EXISTS idx_messages_created
       ON messages (created_at DESC);
   `);
+
+  // Migrasi DB lama: kolom arah pesan (masuk/keluar) dan status terbaca.
+  await pool.query(
+    "ALTER TABLE messages ADD COLUMN IF NOT EXISTS direction TEXT NOT NULL DEFAULT 'in'",
+  );
+  await pool.query(
+    "ALTER TABLE messages ADD COLUMN IF NOT EXISTS read INTEGER NOT NULL DEFAULT 0",
+  );
 }
 
 // ---------- Kontak ----------
@@ -444,15 +472,26 @@ export async function broadcastProgress(id: number): Promise<{
 // ---------- Pesan masuk ----------
 
 export async function insertMessage(
-  m: Omit<InboundMessage, "created_at">,
+  m: Omit<InboundMessage, "created_at" | "read" | "direction"> & {
+    direction?: "in" | "out";
+  },
 ): Promise<void> {
-  const cols = "(id, wa_from, body, reply, kind, ad_id)";
-  const placeholders = "(?, ?, ?, ?, ?, ?)";
+  const direction = m.direction ?? "in";
+  const cols = "(id, wa_from, body, reply, kind, ad_id, direction)";
+  const placeholders = "(?, ?, ?, ?, ?, ?, ?)";
   const sql =
     dbMode() === "pg"
       ? `INSERT INTO messages ${cols} VALUES ${placeholders} ON CONFLICT (id) DO NOTHING`
       : `INSERT OR IGNORE INTO messages ${cols} VALUES ${placeholders}`;
-  await queryRun(sql, [m.id, m.wa_from, m.body, m.reply, m.kind, m.ad_id]);
+  await queryRun(sql, [
+    m.id,
+    m.wa_from,
+    m.body,
+    m.reply,
+    m.kind,
+    m.ad_id,
+    direction,
+  ]);
 }
 
 export async function listMessages(limit = 100): Promise<InboundMessage[]> {
@@ -467,4 +506,54 @@ export async function countMessages(): Promise<number> {
     "SELECT COUNT(*) AS n FROM messages",
   );
   return Number(row?.n ?? 0);
+}
+
+// ---------- Percakapan (tampilan chat ala WhatsApp) ----------
+
+export type ConversationSummary = {
+  wa_from: string;
+  body: string;
+  reply: string;
+  kind: string;
+  direction: "in" | "out";
+  last_at: string;
+  unread: number;
+  total: number;
+};
+
+/** Ringkasan percakapan per nomor: pesan terakhir + jumlah belum dibaca. */
+export async function listConversations(): Promise<ConversationSummary[]> {
+  return queryAll<ConversationSummary>(
+    `SELECT wa_from, body, reply, kind, direction,
+            created_at AS last_at, unread, total
+     FROM (
+       SELECT m.*,
+         ROW_NUMBER() OVER (PARTITION BY wa_from ORDER BY created_at DESC, id DESC) AS rn,
+         (SELECT COUNT(*) FROM messages m2
+           WHERE m2.wa_from = m.wa_from
+             AND m2.direction = 'in' AND m2.read = 0) AS unread,
+         (SELECT COUNT(*) FROM messages m3 WHERE m3.wa_from = m.wa_from) AS total
+       FROM messages m
+     ) sub
+     WHERE rn = 1
+     ORDER BY last_at DESC`,
+  );
+}
+
+/** Semua pesan satu percakapan, urut dari yang terlama. */
+export async function listConversationMessages(
+  waFrom: string,
+): Promise<InboundMessage[]> {
+  return queryAll<InboundMessage>(
+    "SELECT * FROM messages WHERE wa_from = ? ORDER BY created_at ASC, id ASC",
+    [waFrom],
+  );
+}
+
+/** Tandai semua pesan masuk nomor ini sebagai sudah dibaca. */
+export async function markConversationRead(waFrom: string): Promise<void> {
+  await queryRun(
+    "UPDATE messages SET read = 1 WHERE wa_from = ? AND direction = 'in' AND read = 0",
+    [waFrom],
+  );
 }

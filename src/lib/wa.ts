@@ -78,7 +78,7 @@ export async function sendTemplate(
 export async function sendText(
   to: string,
   body: string,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; waId?: string }> {
   const env = getWaEnv();
   if (!env) return { ok: false, error: "WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur" };
   const res = await fetch(
@@ -102,5 +102,6 @@ export async function sendText(
     const err = await res.text();
     return { ok: false, error: `HTTP ${res.status} ${err.slice(0, 300)}` };
   }
-  return { ok: true };
+  const data = (await res.json()) as { messages?: { id?: string }[] };
+  return { ok: true, waId: data.messages?.[0]?.id };
 }
