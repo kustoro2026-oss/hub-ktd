@@ -9,12 +9,20 @@
 // ini; endpoint lama di situs toko tetap dibiarkan sebagai cadangan.
 import {
   applyBroadcastDeliveryStatus,
+  getLatestInMessage,
   getLatestOutMessage,
   insertMessage,
   messageExists,
 } from "@/lib/db";
 import { isBotHandoverActive } from "@/lib/handover";
-import { pickReply, type WaMessage } from "@/lib/replies";
+import {
+  isProofOfTransfer,
+  paymentMethodOfOrder,
+  pickReply,
+  REPLY_ORDER,
+  type ReplyKind,
+  type WaMessage,
+} from "@/lib/replies";
 import { notifyOrderOwner, sendText } from "@/lib/wa";
 
 type WaStatusEvent = {
@@ -56,15 +64,42 @@ export async function POST(request: Request) {
       for (const change of entry.changes ?? []) {
         const messages = change.value?.messages ?? [];
         for (const m of messages) {
-          if (m.type !== "text" || !m.from || !m.id || !m.text?.body) continue;
+          const body = m.text?.body ?? "";
+          const isText = m.type === "text";
+          const isMedia = m.type === "image" || m.type === "document";
+          if ((!isText && !isMedia) || !m.from || !m.id) continue;
           // Meta kadang mengirim ulang payload — lewati bila sudah tercatat
           // supaya pelanggan/admin tidak menerima kiriman ganda.
           if (await messageExists(m.id)) continue;
-          const { kind, reply } = pickReply(m);
+
+          let kind: ReplyKind;
+          let reply: string;
+          if (isText) {
+            ({ kind, reply } = pickReply(m));
+          } else {
+            // Foto/dokumen: dicatat tanpa balasan otomatis, kecuali dianggap
+            // bukti transfer (lihat pengecekan di bawah).
+            kind = "general";
+            reply = "";
+          }
+
+          // Bukti transfer: pesan sebelumnya dari nomor ini adalah order
+          // ber-metode transfer, dan pesan sekarang berupa foto/screenshot
+          // atau teks bukti → kirim konfirmasi pesanan resmi.
+          const lastIn = await getLatestInMessage(m.from);
+          if (
+            lastIn &&
+            paymentMethodOfOrder(lastIn.body) === "transfer" &&
+            isProofOfTransfer(m)
+          ) {
+            kind = "proof";
+            reply = REPLY_ORDER;
+          }
+
           // Notifikasi pesanan ke nomor admin: tetap jalan meski bot dijeda,
           // supaya orderan tidak pernah terlewat oleh manusia.
           const notify =
-            kind === "order" ? await notifyOrderOwner(m.from, m.text.body) : "";
+            kind === "order" ? await notifyOrderOwner(m.from, body) : "";
           // Jeda bot: kalau admin baru saja membalas manual nomor ini, biarkan
           // manusia yang menangani — pesan tetap dicatat tanpa balasan otomatis.
           const lastOut = await getLatestOutMessage(m.from);
@@ -72,7 +107,20 @@ export async function POST(request: Request) {
             await insertMessage({
               id: m.id,
               wa_from: m.from,
-              body: m.text.body,
+              body,
+              reply: "",
+              kind,
+              ad_id: m.context?.ad_id ?? "",
+              notify,
+            });
+            continue;
+          }
+          if (!reply) {
+            // Media tanpa konteks bukti transfer — cukup dicatat.
+            await insertMessage({
+              id: m.id,
+              wa_from: m.from,
+              body,
               reply: "",
               kind,
               ad_id: m.context?.ad_id ?? "",
@@ -92,7 +140,7 @@ export async function POST(request: Request) {
           await insertMessage({
             id: m.id,
             wa_from: m.from,
-            body: m.text.body,
+            body,
             reply: sent ? reply : `[GAGAL KIRIM] ${reply}`,
             kind,
             ad_id: m.context?.ad_id ?? "",

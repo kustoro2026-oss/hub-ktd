@@ -17,6 +17,7 @@ const KIND_LABELS: Record<string, string> = {
   ad: "Iklan",
   faq: "FAQ",
   question: "Pertanyaan",
+  proof: "Bukti TF",
 };
 
 export default async function DashboardPage() {

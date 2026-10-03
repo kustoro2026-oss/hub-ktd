@@ -27,6 +27,19 @@ Pesanan akan segera kami proses. Nomor resi pengiriman akan dikirimkan melalui c
 Hormat kami,
 KTD Store`;
 
+// Rekening toko untuk transfer bank — SAMA dengan BANK_ACCOUNTS di situs
+// (src/lib/config.ts). Bila rekening di situs diganti, samakan di sini juga.
+export const REPLY_ORDER_TRANSFER = `Terima kasih, pesanan Anda telah kami terima.
+
+Metode pembayaran yang Anda pilih adalah Transfer Bank. Silakan transfer sesuai total pesanan ke rekening berikut:
+
+Mandiri 1340025493742 a.n. KUSTORO
+
+Setelah transfer, mohon kirim bukti transfer (foto/screenshot) ke chat ini. Pesanan akan kami proses setelah bukti kami terima, dan nomor resi pengiriman akan dikirimkan melalui chat ini setelah pesanan dikirim.
+
+Hormat kami,
+KTD Store`;
+
 export const REPLY_QUESTION = `Terima kasih atas pertanyaan Anda.
 
 Agar jawaban kami tepat, silakan sampaikan detail pertanyaan Anda di chat ini, atau hubungi CS kami di WhatsApp ${CS_NUMBER_DISPLAY} (setiap hari pukul 09:00–18:00 WIB). Pesan Anda tetap kami terima dan akan dibalas secepatnya.
@@ -97,12 +110,49 @@ export type WaMessage = {
   };
 };
 
-export type ReplyKind = "general" | "order" | "ad" | "faq" | "question";
+/** Ambil metode pembayaran dari teks pesanan order (baris "Metode
+ *  Pembayaran: Transfer Bank" / "COD (Bayar di Tempat)" dari form situs). */
+export function paymentMethodOfOrder(text: string): "transfer" | "cod" | null {
+  const t = text.toLowerCase();
+  const i = t.indexOf("metode pembayaran");
+  if (i < 0) return null;
+  const seg = t.slice(i, i + 60);
+  if (/\btransfer\b/.test(seg)) return "transfer";
+  if (/\bcod\b/.test(seg)) return "cod";
+  return null;
+}
+
+/** Pola teks yang menandakan pelanggan mengirim bukti transfer. */
+const PROOF_PATTERNS: RegExp[] = [
+  /\bbukti\b/,
+  /\bstruk\b/,
+  /\bscreens?hoot\b|\bss\b/,
+  /\b(sudah|udah|telah|barusan|tadi|baru saja)\s*(transfer|tf)\b/,
+  /\b(berhasil|sukses)\s*(transfer|tf)\b/,
+  /\btransferan(nya)?\b/,
+  /\bini\s*(transfer|tf)(nya)?\b/,
+];
+
+/** Deteksi pesan bukti transfer: foto/screenshot/dokumen, atau teks yang
+ *  menyebut bukti/struk/sudah transfer. */
+export function isProofOfTransfer(m: WaMessage): boolean {
+  if (m.type === "image" || m.type === "document") return true;
+  const body = m.text?.body ?? "";
+  return PROOF_PATTERNS.some((p) => p.test(body.toLowerCase()));
+}
+
+export type ReplyKind = "general" | "order" | "ad" | "faq" | "question" | "proof";
 
 /** Pilih balasan + klasifikasi untuk satu pesan masuk. */
 export function pickReply(m: WaMessage): { kind: ReplyKind; reply: string } {
   if (m.text?.body && isOrderMessage(m.text.body)) {
-    return { kind: "order", reply: REPLY_ORDER };
+    // Order transfer bank: minta bukti transfer dulu, konfirmasi pesanan
+    // menyusul setelah bukti masuk (lihat alur "proof" di webhook).
+    const reply =
+      paymentMethodOfOrder(m.text.body) === "transfer"
+        ? REPLY_ORDER_TRANSFER
+        : REPLY_ORDER;
+    return { kind: "order", reply };
   }
   const adId = m.context?.ad_id;
   if (adId && AD_PRODUCT_MAP[adId]) {

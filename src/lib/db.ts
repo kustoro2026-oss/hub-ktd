@@ -49,7 +49,7 @@ export type InboundMessage = {
   wa_from: string;
   body: string;
   reply: string;
-  kind: "general" | "order" | "ad" | "faq" | "question";
+  kind: "general" | "order" | "ad" | "faq" | "question" | "proof";
   ad_id: string;
   direction: "in" | "out";
   read: number;
@@ -581,6 +581,17 @@ export async function getLatestOutMessage(
 ): Promise<InboundMessage | undefined> {
   return queryOne<InboundMessage>(
     "SELECT * FROM messages WHERE wa_from = ? AND direction = 'out' ORDER BY created_at DESC, id DESC LIMIT 1",
+    [waFrom],
+  );
+}
+
+/** Pesan masuk (in) terakhir untuk satu nomor — dasar deteksi bukti
+ *  transfer (pesan sebelumnya harus order ber-metode transfer). */
+export async function getLatestInMessage(
+  waFrom: string,
+): Promise<InboundMessage | undefined> {
+  return queryOne<InboundMessage>(
+    "SELECT * FROM messages WHERE wa_from = ? AND direction = 'in' ORDER BY created_at DESC, id DESC LIMIT 1",
     [waFrom],
   );
 }

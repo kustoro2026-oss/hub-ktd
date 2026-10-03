@@ -121,6 +121,13 @@ export default function PengaturanPage() {
             dikenali diarahkan ke CS.
           </li>
           <li>
+            <strong>Bukti transfer:</strong> pesanan ber-metode Transfer Bank
+            dibalas dengan permintaan bukti transfer (rekening Mandiri toko).
+            Setelah pelanggan mengirim foto/screenshot/teks bukti, bot
+            otomatis membalas konfirmasi pesanan. Pesanan COD langsung dapat
+            konfirmasi tanpa bukti.
+          </li>
+          <li>
             <strong>Notifikasi pesanan:</strong> setiap pesan berisi data
             pesanan (alamat lengkap) otomatis diteruskan ke nomor admin di{" "}
             <code>OWNER_WA_NUMBER</code> (default nomor CS 6285171157938).

@@ -154,7 +154,7 @@ ${SIGN}`,
       /\bmetode (bayar|pembayaran)\b/,
     ],
     answer:
-      "Metode pembayaran kami: COD (bayar di tempat, biaya Rp 2.500 per paket) atau transfer bank ke rekening resmi toko.\n\nDetail rekening akan diinformasikan CS kami saat konfirmasi pesanan.\n\n" +
+      "Metode pembayaran kami: COD (bayar di tempat, biaya Rp 2.500 per paket) atau transfer bank ke rekening resmi toko:\n\nMandiri 1340025493742 a.n. KUSTORO\n\nSetelah transfer, mohon kirim bukti transfer ke chat ini agar pesanan segera kami proses.\n\n" +
       SIGN,
   },
   {
