@@ -34,7 +34,7 @@ export async function POST(request: Request) {
 
   const broadcast = await createBroadcastWithItems(
     body.name,
-    body.template?.trim() || "info_promo",
+    body.template?.trim() || "info_promo_v2",
     selected.map((c) => ({ contactId: c.id, phone: c.phone })),
   );
   return Response.json({ ok: true, broadcast }, { status: 201 });

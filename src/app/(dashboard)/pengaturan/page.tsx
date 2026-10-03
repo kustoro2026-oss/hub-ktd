@@ -92,15 +92,13 @@ export default function PengaturanPage() {
             sementara.
           </li>
           <li>
-            <strong>Webhook bot:</strong> Meta hanya mengizinkan satu Callback
-            URL per app. Setelah KTD Hub deploy, arahkan Callback URL Meta App ke{" "}
-            <code>/api/wa/webhook</code> di domain Hub dan jalankan{" "}
-            <code>Verifikasi dan simpan</code> — log chat otomatis masuk ke menu
-            Pesan Masuk.
+            <strong>Webhook bot:</strong> Callback URL Meta App sudah diarahkan
+            ke <code>/api/wa/webhook</code> di domain Hub — log chat otomatis
+            masuk ke menu Pesan Masuk.
           </li>
           <li>
             <strong>Kirim massal:</strong> wajib opt-in dan memakai template yang
-            disetujui (info_promo). Batas kirim dihitung per portofolio bisnis:{" "}
+            disetujui (info_promo_v2). Batas kirim dihitung per portofolio bisnis:{" "}
             <strong>250 nomor unik/24 jam</strong> untuk akun baru; setelah
             verifikasi bisnis naik ke <strong>2.000</strong>, lalu bisa naik
             otomatis bertahap (10.000 → 100.000 → tanpa batas) bila kualitas

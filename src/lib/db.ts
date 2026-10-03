@@ -175,7 +175,7 @@ function migrateSqlite(db: DatabaseSync) {
     CREATE TABLE IF NOT EXISTS broadcasts (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
-      template TEXT NOT NULL DEFAULT 'info_promo',
+      template TEXT NOT NULL DEFAULT 'info_promo_v2',
       total INTEGER NOT NULL DEFAULT 0,
       sent INTEGER NOT NULL DEFAULT 0,
       failed INTEGER NOT NULL DEFAULT 0,
@@ -235,7 +235,7 @@ async function migratePg(pool: Pool) {
     CREATE TABLE IF NOT EXISTS broadcasts (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
-      template TEXT NOT NULL DEFAULT 'info_promo',
+      template TEXT NOT NULL DEFAULT 'info_promo_v2',
       total INTEGER NOT NULL DEFAULT 0,
       sent INTEGER NOT NULL DEFAULT 0,
       failed INTEGER NOT NULL DEFAULT 0,

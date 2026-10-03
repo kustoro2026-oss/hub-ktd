@@ -33,7 +33,7 @@ export default async function BroadcastPage() {
         </h2>
         <BroadcastCreate contactCount={contactCount} />
         <p className="mt-3 text-xs text-slate-400">
-          Menggunakan template <code>info_promo</code> yang sudah disetujui Meta.
+          Menggunakan template <code>info_promo_v2</code> yang sudah disetujui Meta.
           Semua kontak menjadi penerima.
         </p>
       </div>

@@ -41,10 +41,10 @@ export async function getTemplateStatus(name: string): Promise<string | null> {
   return data.data?.[0]?.status ?? null;
 }
 
-/** Kirim pesan template (mis. info_promo) ke satu nomor. */
+/** Kirim pesan template (mis. info_promo_v2) ke satu nomor. */
 export async function sendTemplate(
   to: string,
-  template = "info_promo",
+  template = "info_promo_v2",
   language = "id",
 ): Promise<{ ok: boolean; error?: string; waId?: string }> {
   const env = getWaEnv();

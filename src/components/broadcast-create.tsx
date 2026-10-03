@@ -23,7 +23,7 @@ export default function BroadcastCreate({
       const res = await fetch("/api/broadcasts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, template: "info_promo" }),
+        body: JSON.stringify({ name, template: "info_promo_v2" }),
       });
       if (res.ok) {
         const data = (await res.json()) as { broadcast: { id: number } };
