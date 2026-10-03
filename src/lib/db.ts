@@ -33,8 +33,9 @@ export type BroadcastItem = {
   broadcast_id: number;
   contact_id: number | null;
   phone: string;
-  status: "pending" | "sent" | "failed";
+  status: "pending" | "sent" | "delivered" | "read" | "failed";
   error: string;
+  wa_id: string;
 };
 
 export type InboundMessage = {
@@ -93,6 +94,7 @@ function migrate(db: DatabaseSync) {
       phone TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'pending',
       error TEXT NOT NULL DEFAULT '',
+      wa_id TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
 
@@ -111,6 +113,17 @@ function migrate(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_messages_created
       ON messages (created_at DESC);
   `);
+
+  // Migrasi DB lama: tambah kolom wa_id bila belum ada (id pesan WhatsApp
+  // untuk mencocokkan event status kiriman dari webhook Meta).
+  const cols = db
+    .prepare("PRAGMA table_info(broadcast_items)")
+    .all() as unknown as { name: string }[];
+  if (!cols.some((c) => c.name === "wa_id")) {
+    db.exec(
+      "ALTER TABLE broadcast_items ADD COLUMN wa_id TEXT NOT NULL DEFAULT ''",
+    );
+  }
 }
 
 // ---------- Kontak ----------
@@ -218,10 +231,52 @@ export function markBroadcastItem(
   id: number,
   status: "sent" | "failed",
   error = "",
+  waId = "",
 ): void {
   getDb()
-    .prepare("UPDATE broadcast_items SET status = ?, error = ? WHERE id = ?")
-    .run(status, error, id);
+    .prepare(
+      "UPDATE broadcast_items SET status = ?, error = ?, wa_id = ? WHERE id = ?",
+    )
+    .run(status, error, waId, id);
+}
+
+// Urutan status pengiriman: hanya boleh naik (pending → sent → delivered →
+// read). "failed" bersifat final — tidak bisa ditimpa status lain.
+const DELIVERY_RANK: Record<string, number> = {
+  pending: 0,
+  sent: 1,
+  delivered: 2,
+  read: 3,
+  failed: 4,
+};
+
+/** Terapkan event status kiriman dari webhook Meta ke item broadcast.
+ *  Item dicari lewat wa_id (id pesan yang dikembalikan API saat kirim). */
+export function applyBroadcastDeliveryStatus(
+  waId: string,
+  status: string,
+  error = "",
+): void {
+  if (!["sent", "delivered", "read", "failed"].includes(status)) return;
+  const db = getDb();
+  const row = db
+    .prepare("SELECT id, status FROM broadcast_items WHERE wa_id = ?")
+    .get(waId) as unknown as { id: number; status: string } | undefined;
+  if (!row) return;
+  const current = DELIVERY_RANK[row.status] ?? 0;
+  if (status === "failed") {
+    if (current >= DELIVERY_RANK.delivered) return; // sudah sampai — abaikan
+    db.prepare(
+      "UPDATE broadcast_items SET status = 'failed', error = ? WHERE id = ?",
+    ).run(error || "Meta gagal mengirim pesan", row.id);
+    return;
+  }
+  const next = DELIVERY_RANK[status] ?? 0;
+  if (next <= current) return; // status tidak boleh turun
+  db.prepare("UPDATE broadcast_items SET status = ? WHERE id = ?").run(
+    status,
+    row.id,
+  );
 }
 
 export function broadcastProgress(id: number): {
@@ -232,7 +287,7 @@ export function broadcastProgress(id: number): {
   const row = getDb()
     .prepare(
       `SELECT
-        SUM(CASE WHEN status = 'sent' THEN 1 ELSE 0 END) AS sent,
+        SUM(CASE WHEN status IN ('sent', 'delivered', 'read') THEN 1 ELSE 0 END) AS sent,
         SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
         SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending
       FROM broadcast_items WHERE broadcast_id = ?`,

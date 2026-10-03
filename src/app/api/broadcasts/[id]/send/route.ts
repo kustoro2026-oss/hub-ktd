@@ -62,7 +62,7 @@ export async function POST(
   for (const item of items) {
     const res = await sendTemplate(item.phone, broadcast.template);
     if (res.ok) {
-      markBroadcastItem(item.id, "sent");
+      markBroadcastItem(item.id, "sent", "", res.waId ?? "");
       sentNow++;
     } else {
       markBroadcastItem(item.id, "failed", res.error ?? "gagal");

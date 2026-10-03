@@ -95,8 +95,11 @@ export default function PengaturanPage() {
           </li>
           <li>
             <strong>Kirim massal:</strong> wajib opt-in dan memakai template yang
-            disetujui (info_promo). Batas kirim 250 percakapan/hari sebelum
-            verifikasi bisnis WhatsApp disetujui (naik ke 1.000).
+            disetujui (info_promo). Batas kirim dihitung per portofolio bisnis:{" "}
+            <strong>250 nomor unik/24 jam</strong> untuk akun baru; setelah
+            verifikasi bisnis naik ke <strong>2.000</strong>, lalu bisa naik
+            otomatis bertahap (10.000 → 100.000 → tanpa batas) bila kualitas
+            pesan terjaga.
           </li>
           <li>
             <strong>Balasan otomatis:</strong> teks bebas gratis dalam window 24

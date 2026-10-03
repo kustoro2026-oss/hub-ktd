@@ -106,6 +106,10 @@ export default async function BroadcastDetailPage({
         <h2 className="mb-3 text-sm font-semibold text-slate-900">
           Penerima ({items.length})
         </h2>
+        <p className="mb-3 text-xs text-slate-400">
+          Terkirim = diterima API Meta · Sampai = tiba di HP penerima · Dibaca =
+          dibuka oleh penerima.
+        </p>
         <div className="max-h-96 overflow-y-auto">
           <table className="w-full text-left text-sm">
             <thead className="sticky top-0 bg-white">
@@ -121,18 +125,26 @@ export default async function BroadcastDetailPage({
                   <td className="py-1.5">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
-                        i.status === "sent"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : i.status === "failed"
-                            ? "bg-red-100 text-red-700"
-                            : "bg-slate-100 text-slate-500"
+                        i.status === "read"
+                          ? "bg-sky-100 text-sky-700"
+                          : i.status === "delivered"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : i.status === "sent"
+                              ? "bg-teal-100 text-teal-700"
+                              : i.status === "failed"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-slate-100 text-slate-500"
                       }`}
                     >
-                      {i.status === "sent"
-                        ? "Terkirim"
-                        : i.status === "failed"
-                          ? "Gagal"
-                          : "Menunggu"}
+                      {i.status === "read"
+                        ? "Dibaca"
+                        : i.status === "delivered"
+                          ? "Sampai"
+                          : i.status === "sent"
+                            ? "Terkirim"
+                            : i.status === "failed"
+                              ? "Gagal"
+                              : "Menunggu"}
                     </span>
                   </td>
                 </tr>

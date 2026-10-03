@@ -1,18 +1,26 @@
 // Webhook WhatsApp Cloud API KTD Hub — titik masuk pesan pelanggan.
 //
 // GET  : verifikasi webhook Meta (hub.mode=subscribe → kembalikan hub.challenge)
-// POST : payload pesan masuk → klasifikasi → balas otomatis + simpan ke log.
+// POST : payload pesan masuk (balas otomatis + log) dan event status kiriman
+//        (sent/delivered/read/failed) untuk pelacakan broadcast.
 //
 // Catatan: Meta hanya mengizinkan SATU callback URL per app. Saat KTD Hub
 // siap produksi, ganti Callback URL di Meta App ke domain Hub dan endpoint
 // ini; endpoint lama di situs toko tetap dibiarkan sebagai cadangan.
-import { insertMessage } from "@/lib/db";
+import { applyBroadcastDeliveryStatus, insertMessage } from "@/lib/db";
 import { pickReply, type WaMessage } from "@/lib/replies";
 import { sendText } from "@/lib/wa";
+
+type WaStatusEvent = {
+  id?: string;
+  status?: string;
+  errors?: { message?: string }[];
+};
 
 type WaValue = {
   metadata?: { phone_number_id?: string };
   messages?: WaMessage[];
+  statuses?: WaStatusEvent[];
 };
 
 type WaEntry = { changes?: { field?: string; value?: WaValue }[] };
@@ -61,6 +69,19 @@ export async function POST(request: Request) {
             kind,
             ad_id: m.context?.ad_id ?? "",
           });
+        }
+
+        // Event status pesan keluar (sent / delivered / read / failed) —
+        // cocokkan dengan item broadcast lewat wa_id agar status per
+        // penerima naik bertahap sampai "Dibaca".
+        const statuses = change.value?.statuses ?? [];
+        for (const s of statuses) {
+          if (!s.id || !s.status) continue;
+          applyBroadcastDeliveryStatus(
+            s.id,
+            s.status,
+            s.errors?.[0]?.message ?? "",
+          );
         }
       }
     }
