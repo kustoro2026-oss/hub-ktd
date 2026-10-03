@@ -10,6 +10,15 @@ import { Users, Send, MessageSquare, Megaphone } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
+// Label ramah untuk klasifikasi balasan bot di badge pesan masuk.
+const KIND_LABELS: Record<string, string> = {
+  general: "Umum",
+  order: "Pesanan",
+  ad: "Iklan",
+  faq: "FAQ",
+  question: "Pertanyaan",
+};
+
 export default async function DashboardPage() {
   const [contacts, messages, broadcasts, latest] = await Promise.all([
     countContacts(),
@@ -83,7 +92,7 @@ export default async function DashboardPage() {
             {latest.map((m) => (
               <li key={m.id} className="flex items-start gap-3 py-2 text-sm">
                 <span className="mt-0.5 shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium uppercase text-slate-500">
-                  {m.kind}
+                  {KIND_LABELS[m.kind] ?? m.kind}
                 </span>
                 <div className="min-w-0">
                   <div className="font-mono text-xs text-slate-400">{m.wa_from}</div>

@@ -18,6 +18,7 @@ type Node =
       body: string;
       time: string;
       failed: boolean;
+      notify?: string;
     };
 
 function buildNodes(messages: InboundMessage[]): Node[] {
@@ -31,7 +32,15 @@ function buildNodes(messages: InboundMessage[]): Node[] {
     }
     const hm = timeHM(m.created_at);
     if (m.direction === "in") {
-      nodes.push({ kind: "bubble", key: `${m.id}-in`, side: "in", body: m.body, time: hm, failed: false });
+      nodes.push({
+        kind: "bubble",
+        key: `${m.id}-in`,
+        side: "in",
+        body: m.body,
+        time: hm,
+        failed: false,
+        notify: m.notify || undefined,
+      });
       if (m.reply) {
         nodes.push({
           kind: "bubble",
@@ -102,6 +111,7 @@ export default function ChatThread({
           ad_id: "",
           direction: "out",
           read: 1,
+          notify: "",
           created_at: stamp,
         },
       ]);
@@ -146,6 +156,18 @@ export default function ChatThread({
                     <p className="whitespace-pre-line break-words text-sm leading-relaxed text-slate-800">
                       {n.body}
                     </p>
+                    {n.notify && (
+                      <div
+                        className={`mt-1 text-[10px] font-medium ${
+                          n.notify === "ok" ? "text-emerald-600" : "text-red-600"
+                        }`}
+                        title="Status notifikasi pesanan ke admin"
+                      >
+                        {n.notify === "ok"
+                          ? "Notif pesanan terkirim ke admin"
+                          : "Notif pesanan ke admin gagal"}
+                      </div>
+                    )}
                     <div className="mt-1 text-right text-[10px] text-slate-400">
                       {n.time}
                     </div>

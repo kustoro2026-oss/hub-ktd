@@ -1,11 +1,16 @@
 // Logika balasan otomatis bot WhatsApp — sama dengan bot di situs toko
 // (src/app/api/wa/webhook/route.ts), dipindahkan ke KTD Hub agar semua
-// pesan terpusat. Tiga cabang balasan:
+// pesan terpusat. Lima cabang balasan berurutan:
 //   1. Pesan berbentuk order (alamat lengkap) → konfirmasi + janji resi
 //   2. Chat dari iklan CTWA produk tertentu → link produk iklan + tutorial
-//   3. Chat biasa / balasan broadcast → katalog + tutorial pemesanan
+//   3. Pertanyaan yang cocok FAQ (cara pesan, ongkir, COD, stok, jam CS,
+//      retur, reseller, dll) → jawaban sesuai FAQ situs /bantuan
+//   4. Pertanyaan lain yang belum terjawab FAQ → ajakan hubungi CS
+//   5. Chat biasa / balasan broadcast → katalog + tutorial pemesanan
 
-export const CATALOG_URL = "https://toko.kustoro2026.com/";
+import { CATALOG_URL, CS_NUMBER_DISPLAY, looksLikeQuestion, matchFaq } from "./faq";
+
+export { CATALOG_URL } from "./faq";
 
 /**
  * Pemetaan ID iklan CTWA (Meta Ads) → URL produk yang diiklankan.
@@ -18,6 +23,13 @@ export const AD_PRODUCT_MAP: Record<string, string> = {};
 
 export const REPLY_ORDER = `Terima kasih, pesanan Anda telah kami terima.
 Pesanan akan segera kami proses. Nomor resi pengiriman akan dikirimkan melalui chat ini setelah pesanan dikirim.
+
+Hormat kami,
+KTD Store`;
+
+export const REPLY_QUESTION = `Terima kasih atas pertanyaan Anda.
+
+Agar jawaban kami tepat, silakan sampaikan detail pertanyaan Anda di chat ini, atau hubungi CS kami di WhatsApp ${CS_NUMBER_DISPLAY} (setiap hari pukul 09:00–18:00 WIB). Pesan Anda tetap kami terima dan akan dibalas secepatnya.
 
 Hormat kami,
 KTD Store`;
@@ -85,7 +97,7 @@ export type WaMessage = {
   };
 };
 
-export type ReplyKind = "general" | "order" | "ad";
+export type ReplyKind = "general" | "order" | "ad" | "faq" | "question";
 
 /** Pilih balasan + klasifikasi untuk satu pesan masuk. */
 export function pickReply(m: WaMessage): { kind: ReplyKind; reply: string } {
@@ -95,6 +107,14 @@ export function pickReply(m: WaMessage): { kind: ReplyKind; reply: string } {
   const adId = m.context?.ad_id;
   if (adId && AD_PRODUCT_MAP[adId]) {
     return { kind: "ad", reply: replyForAd(AD_PRODUCT_MAP[adId]) };
+  }
+  const body = m.text?.body ?? "";
+  const faq = matchFaq(body);
+  if (faq) {
+    return { kind: "faq", reply: faq.answer };
+  }
+  if (looksLikeQuestion(body)) {
+    return { kind: "question", reply: REPLY_QUESTION };
   }
   return { kind: "general", reply: REPLY_GENERAL };
 }

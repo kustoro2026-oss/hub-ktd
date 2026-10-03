@@ -49,10 +49,11 @@ export type InboundMessage = {
   wa_from: string;
   body: string;
   reply: string;
-  kind: "general" | "order" | "ad";
+  kind: "general" | "order" | "ad" | "faq" | "question";
   ad_id: string;
   direction: "in" | "out";
   read: number;
+  notify: string;
   created_at: string;
 };
 
@@ -205,6 +206,7 @@ function migrateSqlite(db: DatabaseSync) {
       ad_id TEXT NOT NULL DEFAULT '',
       direction TEXT NOT NULL DEFAULT 'in',
       read INTEGER NOT NULL DEFAULT 0,
+      notify TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
@@ -237,6 +239,11 @@ function migrateSqlite(db: DatabaseSync) {
   }
   if (!mcols.some((c) => c.name === "read")) {
     db.exec("ALTER TABLE messages ADD COLUMN read INTEGER NOT NULL DEFAULT 0");
+  }
+  // Kolom status notifikasi pesanan ke admin ('' = tidak berlaku,
+  // 'ok' = terkirim, 'gagal: ...' = gagal).
+  if (!mcols.some((c) => c.name === "notify")) {
+    db.exec("ALTER TABLE messages ADD COLUMN notify TEXT NOT NULL DEFAULT ''");
   }
 }
 
@@ -281,6 +288,7 @@ async function migratePg(pool: Pool) {
       ad_id TEXT NOT NULL DEFAULT '',
       direction TEXT NOT NULL DEFAULT 'in',
       read INTEGER NOT NULL DEFAULT 0,
+      notify TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
@@ -296,6 +304,9 @@ async function migratePg(pool: Pool) {
   );
   await pool.query(
     "ALTER TABLE messages ADD COLUMN IF NOT EXISTS read INTEGER NOT NULL DEFAULT 0",
+  );
+  await pool.query(
+    "ALTER TABLE messages ADD COLUMN IF NOT EXISTS notify TEXT NOT NULL DEFAULT ''",
   );
 }
 
@@ -472,13 +483,15 @@ export async function broadcastProgress(id: number): Promise<{
 // ---------- Pesan masuk ----------
 
 export async function insertMessage(
-  m: Omit<InboundMessage, "created_at" | "read" | "direction"> & {
+  m: Omit<InboundMessage, "created_at" | "read" | "direction" | "notify"> & {
     direction?: "in" | "out";
+    notify?: string;
   },
 ): Promise<void> {
   const direction = m.direction ?? "in";
-  const cols = "(id, wa_from, body, reply, kind, ad_id, direction)";
-  const placeholders = "(?, ?, ?, ?, ?, ?, ?)";
+  const notify = m.notify ?? "";
+  const cols = "(id, wa_from, body, reply, kind, ad_id, direction, notify)";
+  const placeholders = "(?, ?, ?, ?, ?, ?, ?, ?)";
   const sql =
     dbMode() === "pg"
       ? `INSERT INTO messages ${cols} VALUES ${placeholders} ON CONFLICT (id) DO NOTHING`
@@ -491,7 +504,19 @@ export async function insertMessage(
     m.kind,
     m.ad_id,
     direction,
+    notify,
   ]);
+}
+
+/** True bila pesan dengan id ini sudah tercatat — Meta kadang mengirim
+ *  ulang payload yang sama, dan guard ini mencegah balasan/notifikasi
+ *  ganda ke pelanggan maupun ke nomor admin. */
+export async function messageExists(id: string): Promise<boolean> {
+  const row = await queryOne<{ x: number }>(
+    "SELECT 1 AS x FROM messages WHERE id = ?",
+    [id],
+  );
+  return !!row;
 }
 
 export async function listMessages(limit = 100): Promise<InboundMessage[]> {

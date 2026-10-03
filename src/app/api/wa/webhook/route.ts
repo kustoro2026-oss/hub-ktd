@@ -7,10 +7,15 @@
 // Catatan: Meta hanya mengizinkan SATU callback URL per app. Saat KTD Hub
 // siap produksi, ganti Callback URL di Meta App ke domain Hub dan endpoint
 // ini; endpoint lama di situs toko tetap dibiarkan sebagai cadangan.
-import { applyBroadcastDeliveryStatus, getLatestOutMessage, insertMessage } from "@/lib/db";
+import {
+  applyBroadcastDeliveryStatus,
+  getLatestOutMessage,
+  insertMessage,
+  messageExists,
+} from "@/lib/db";
 import { isBotHandoverActive } from "@/lib/handover";
 import { pickReply, type WaMessage } from "@/lib/replies";
-import { sendText } from "@/lib/wa";
+import { notifyOrderOwner, sendText } from "@/lib/wa";
 
 type WaStatusEvent = {
   id?: string;
@@ -52,7 +57,14 @@ export async function POST(request: Request) {
         const messages = change.value?.messages ?? [];
         for (const m of messages) {
           if (m.type !== "text" || !m.from || !m.id || !m.text?.body) continue;
+          // Meta kadang mengirim ulang payload — lewati bila sudah tercatat
+          // supaya pelanggan/admin tidak menerima kiriman ganda.
+          if (await messageExists(m.id)) continue;
           const { kind, reply } = pickReply(m);
+          // Notifikasi pesanan ke nomor admin: tetap jalan meski bot dijeda,
+          // supaya orderan tidak pernah terlewat oleh manusia.
+          const notify =
+            kind === "order" ? await notifyOrderOwner(m.from, m.text.body) : "";
           // Jeda bot: kalau admin baru saja membalas manual nomor ini, biarkan
           // manusia yang menangani — pesan tetap dicatat tanpa balasan otomatis.
           const lastOut = await getLatestOutMessage(m.from);
@@ -64,6 +76,7 @@ export async function POST(request: Request) {
               reply: "",
               kind,
               ad_id: m.context?.ad_id ?? "",
+              notify,
             });
             continue;
           }
@@ -83,6 +96,7 @@ export async function POST(request: Request) {
             reply: sent ? reply : `[GAGAL KIRIM] ${reply}`,
             kind,
             ad_id: m.context?.ad_id ?? "",
+            notify,
           });
         }
 

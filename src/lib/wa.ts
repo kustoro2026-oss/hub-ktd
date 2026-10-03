@@ -105,3 +105,35 @@ export async function sendText(
   const data = (await res.json()) as { messages?: { id?: string }[] };
   return { ok: true, waId: data.messages?.[0]?.id };
 }
+
+// ---------- Notifikasi pesanan ke admin toko ----------
+
+/** Nomor admin penerima notifikasi pesanan baru — default nomor CS toko
+ *  085171157938; bisa diganti lewat env OWNER_WA_NUMBER (format 62...). */
+export function ownerNumber(): string | null {
+  return normalizePhone(process.env.OWNER_WA_NUMBER ?? "6285171157938");
+}
+
+/** Susun teks notifikasi pesanan untuk dikirim ke nomor admin. */
+export function buildOrderNotification(from: string, body: string): string {
+  return `Pesanan baru masuk — KTD Hub
+Dari: ${from}
+Lihat & balas: https://admin.kustoro2026.com/pesan/${from}
+
+${body}`;
+}
+
+/** Teruskan pesan berisi data pesanan pelanggan ke nomor admin toko.
+ *  Hasil: "" bila dilewati (env kosong / pengirim = admin), "ok" bila
+ *  terkirim, atau "gagal: ..." bila Meta menolak (mis. window 24 jam
+ *  habis karena nomor admin belum pernah chat ke nomor bot). */
+export async function notifyOrderOwner(
+  from: string,
+  body: string,
+): Promise<string> {
+  const owner = ownerNumber();
+  if (!owner) return "";
+  if (owner === normalizePhone(from)) return ""; // jangan kirim ke diri sendiri
+  const res = await sendText(owner, buildOrderNotification(from, body));
+  return res.ok ? "ok" : `gagal: ${res.error ?? "Meta menolak kiriman"}`;
+}

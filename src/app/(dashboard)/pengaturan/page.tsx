@@ -37,6 +37,11 @@ export default function PengaturanPage() {
       label: "WA_VERIFY_TOKEN (verifikasi webhook)",
       ok: !!process.env.WA_VERIFY_TOKEN,
     },
+    {
+      label: "OWNER_WA_NUMBER (penerima notif pesanan, default 6285171157938)",
+      ok: true,
+      detail: process.env.OWNER_WA_NUMBER ?? "6285171157938",
+    },
     { label: "AUTH_PASSWORD (kata sandi admin)", ok: !!process.env.AUTH_PASSWORD },
     { label: "AUTH_SECRET (penanda cookie sesi)", ok: !!process.env.AUTH_SECRET },
     {
@@ -107,6 +112,21 @@ export default function PengaturanPage() {
           <li>
             <strong>Balasan otomatis:</strong> teks bebas gratis dalam window 24
             jam sejak pesan terakhir pelanggan — tanpa template.
+          </li>
+          <li>
+            <strong>FAQ bot:</strong> pertanyaan umum pelanggan (cara pesan,
+            ongkir, COD, pembayaran, stok, pengiriman, resi, jam CS, retur,
+            reseller, dll) dijawab otomatis sesuai FAQ situs — jawaban
+            dikelola di <code>src/lib/faq.ts</code>. Pertanyaan lain yang tidak
+            dikenali diarahkan ke CS.
+          </li>
+          <li>
+            <strong>Notifikasi pesanan:</strong> setiap pesan berisi data
+            pesanan (alamat lengkap) otomatis diteruskan ke nomor admin di{" "}
+            <code>OWNER_WA_NUMBER</code> (default nomor CS 6285171157938).
+            Status notifikasi tampil di riwayat chat. Catatan: pengiriman teks
+            bebas ke nomor admin hanya sah bila nomor tersebut pernah chat ke
+            nomor bot dalam 24 jam terakhir.
           </li>
           <li>
             <strong>Jeda bot:</strong> setelah admin membalas manual, bot tidak
