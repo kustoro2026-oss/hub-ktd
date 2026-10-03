@@ -4,6 +4,11 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import { listConversationMessages, markConversationRead } from "@/lib/db";
 import { formatWa } from "@/lib/format";
+import {
+  handoverUntilLabel,
+  isBotHandoverActive,
+  lastManualOut,
+} from "@/lib/handover";
 import ChatThread from "@/components/chat-thread";
 
 export const dynamic = "force-dynamic";
@@ -17,6 +22,8 @@ export default async function ConversationPage({
   const { wa_from } = await params;
   const messages = await listConversationMessages(wa_from);
   await markConversationRead(wa_from);
+  const lastOut = lastManualOut(messages);
+  const botPaused = isBotHandoverActive(lastOut);
 
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
@@ -39,6 +46,14 @@ export default async function ConversationPage({
           <p className="text-xs text-emerald-100">Pelanggan</p>
         </div>
       </header>
+
+      {botPaused && lastOut && (
+        <div className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+          <span className="font-semibold">Bot dijeda.</span> Percakapan ini sedang
+          ditangani manual — bot tidak membalas otomatis sampai pukul{" "}
+          {handoverUntilLabel(lastOut)} (selama tidak ada balasan manual baru).
+        </div>
+      )}
 
       {messages.length === 0 ? (
         <p className="p-8 text-center text-sm text-slate-500">

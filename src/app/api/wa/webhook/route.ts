@@ -7,7 +7,8 @@
 // Catatan: Meta hanya mengizinkan SATU callback URL per app. Saat KTD Hub
 // siap produksi, ganti Callback URL di Meta App ke domain Hub dan endpoint
 // ini; endpoint lama di situs toko tetap dibiarkan sebagai cadangan.
-import { applyBroadcastDeliveryStatus, insertMessage } from "@/lib/db";
+import { applyBroadcastDeliveryStatus, getLatestOutMessage, insertMessage } from "@/lib/db";
+import { isBotHandoverActive } from "@/lib/handover";
 import { pickReply, type WaMessage } from "@/lib/replies";
 import { sendText } from "@/lib/wa";
 
@@ -52,6 +53,20 @@ export async function POST(request: Request) {
         for (const m of messages) {
           if (m.type !== "text" || !m.from || !m.id || !m.text?.body) continue;
           const { kind, reply } = pickReply(m);
+          // Jeda bot: kalau admin baru saja membalas manual nomor ini, biarkan
+          // manusia yang menangani — pesan tetap dicatat tanpa balasan otomatis.
+          const lastOut = await getLatestOutMessage(m.from);
+          if (isBotHandoverActive(lastOut)) {
+            await insertMessage({
+              id: m.id,
+              wa_from: m.from,
+              body: m.text.body,
+              reply: "",
+              kind,
+              ad_id: m.context?.ad_id ?? "",
+            });
+            continue;
+          }
           // Kirim balasan, tapi tetap catat pesan masuk meski kiriman gagal
           // (mis. nomor tidak valid atau window 24 jam habis).
           let sent = false;

@@ -108,6 +108,13 @@ export default function PengaturanPage() {
             <strong>Balasan otomatis:</strong> teks bebas gratis dalam window 24
             jam sejak pesan terakhir pelanggan — tanpa template.
           </li>
+          <li>
+            <strong>Jeda bot:</strong> setelah admin membalas manual, bot tidak
+            membalas otomatis ke nomor itu selama 30 menit (atur lewat{" "}
+            <code>BOT_HANDOVER_MINUTES</code>) — percakapan dianggap sedang
+            ditangani manusia, lalu bot aktif kembali bila tidak ada balasan
+            manual baru.
+          </li>
         </ul>
       </div>
     </div>

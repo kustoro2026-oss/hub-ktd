@@ -205,7 +205,7 @@ function migrateSqlite(db: DatabaseSync) {
       ad_id TEXT NOT NULL DEFAULT '',
       direction TEXT NOT NULL DEFAULT 'in',
       read INTEGER NOT NULL DEFAULT 0,
-      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
 
     CREATE INDEX IF NOT EXISTS idx_broadcast_items_broadcast
@@ -546,6 +546,16 @@ export async function listConversationMessages(
 ): Promise<InboundMessage[]> {
   return queryAll<InboundMessage>(
     "SELECT * FROM messages WHERE wa_from = ? ORDER BY created_at ASC, id ASC",
+    [waFrom],
+  );
+}
+
+/** Pesan manual (out) terakhir untuk satu nomor — dasar kebijakan jeda bot. */
+export async function getLatestOutMessage(
+  waFrom: string,
+): Promise<InboundMessage | undefined> {
+  return queryOne<InboundMessage>(
+    "SELECT * FROM messages WHERE wa_from = ? AND direction = 'out' ORDER BY created_at DESC, id DESC LIMIT 1",
     [waFrom],
   );
 }
