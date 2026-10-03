@@ -108,6 +108,10 @@ export async function sendText(
 
 // ---------- Notifikasi pesanan ke admin toko ----------
 
+/** Template utility notifikasi pesanan (bebas window 24 jam) — dibuat
+ *  melalui WhatsApp Manager / API dan menunggu persetujuan Meta. */
+const NOTIF_TEMPLATE = "order_alert_ktd2";
+
 /** Nomor admin penerima notifikasi pesanan baru — default nomor CS toko
  *  085171157938; bisa diganti lewat env OWNER_WA_NUMBER (format 62...). */
 export function ownerNumber(): string | null {
@@ -123,17 +127,68 @@ Lihat & balas: https://admin.kustoro2026.com/pesan/${from}
 ${body}`;
 }
 
+/** Kirim pesan template dengan parameter teks (untuk body berisi {{1}} dst). */
+export async function sendTemplateParams(
+  to: string,
+  template: string,
+  params: string[],
+  language = "id",
+): Promise<{ ok: boolean; error?: string; waId?: string }> {
+  const env = getWaEnv();
+  if (!env) return { ok: false, error: "WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur" };
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${env.phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: withPlus(to),
+        type: "template",
+        template: {
+          name: template,
+          language: { code: language },
+          components: [
+            {
+              type: "body",
+              parameters: params.map((p) => ({ type: "text", text: p })),
+            },
+          ],
+        },
+      }),
+    },
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    return { ok: false, error: `HTTP ${res.status} ${err.slice(0, 200)}` };
+  }
+  const data = (await res.json()) as { messages?: { id?: string }[] };
+  return { ok: true, waId: data.messages?.[0]?.id };
+}
+
 /** Teruskan pesan berisi data pesanan pelanggan ke nomor admin toko.
- *  Hasil: "" bila dilewati (env kosong / pengirim = admin), "ok" bila
- *  terkirim, atau "gagal: ..." bila Meta menolak (mis. window 24 jam
- *  habis karena nomor admin belum pernah chat ke nomor bot). */
+ *  Jalur: teks bebas dulu (membawa tautan Hub, sah 24 jam setelah admin
+ *  chat ke bot); bila ditolak Meta, coba template utility (bebas window).
+ *  Hasil: "skip" bila pengirim adalah nomor admin sendiri, "ok" / "ok
+ *  (template)" bila terkirim, atau "gagal: ..." bila kedua jalur ditolak. */
 export async function notifyOrderOwner(
   from: string,
   body: string,
 ): Promise<string> {
   const owner = ownerNumber();
   if (!owner) return "";
-  if (owner === normalizePhone(from)) return ""; // jangan kirim ke diri sendiri
+  if (owner === normalizePhone(from)) return "skip"; // pengirim = nomor admin sendiri
   const res = await sendText(owner, buildOrderNotification(from, body));
-  return res.ok ? "ok" : `gagal: ${res.error ?? "Meta menolak kiriman"}`;
+  if (res.ok) return "ok";
+  // Window 24 jam tidak terbuka — template utility tetap bisa masuk kapan saja.
+  const detail = `Dari: ${from}\n\n${body}`;
+  const tpl = await sendTemplateParams(owner, NOTIF_TEMPLATE, [
+    detail.length > 900 ? `${detail.slice(0, 900)}...` : detail,
+  ]);
+  if (tpl.ok) return "ok (template)";
+  return `gagal: ${res.error ?? "teks ditolak"} | template: ${tpl.error ?? "ditolak"}`;
 }

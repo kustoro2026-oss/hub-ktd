@@ -156,18 +156,34 @@ export default function ChatThread({
                     <p className="whitespace-pre-line break-words text-sm leading-relaxed text-slate-800">
                       {n.body}
                     </p>
-                    {n.notify && (
-                      <div
-                        className={`mt-1 text-[10px] font-medium ${
-                          n.notify === "ok" ? "text-emerald-600" : "text-red-600"
-                        }`}
-                        title="Status notifikasi pesanan ke admin"
-                      >
-                        {n.notify === "ok"
-                          ? "Notif pesanan terkirim ke admin"
-                          : "Notif pesanan ke admin gagal"}
-                      </div>
-                    )}
+                    {n.notify && (() => {
+                      if (n.notify === "ok")
+                        return (
+                          <div className="mt-1 text-[10px] font-medium text-emerald-600">
+                            Notif pesanan terkirim ke admin
+                          </div>
+                        );
+                      if (n.notify === "ok (template)")
+                        return (
+                          <div className="mt-1 text-[10px] font-medium text-emerald-600">
+                            Notif pesanan terkirim ke admin (template)
+                          </div>
+                        );
+                      if (n.notify === "skip")
+                        return (
+                          <div className="mt-1 text-[10px] font-medium text-slate-400">
+                            Notif dilewati: pengirim adalah nomor admin
+                          </div>
+                        );
+                      return (
+                        <div
+                          className="mt-1 text-[10px] font-medium text-red-600"
+                          title={n.notify}
+                        >
+                          Notif pesanan ke admin gagal
+                        </div>
+                      );
+                    })()}
                     <div className="mt-1 text-right text-[10px] text-slate-400">
                       {n.time}
                     </div>

@@ -124,9 +124,11 @@ export default function PengaturanPage() {
             <strong>Notifikasi pesanan:</strong> setiap pesan berisi data
             pesanan (alamat lengkap) otomatis diteruskan ke nomor admin di{" "}
             <code>OWNER_WA_NUMBER</code> (default nomor CS 6285171157938).
-            Status notifikasi tampil di riwayat chat. Catatan: pengiriman teks
-            bebas ke nomor admin hanya sah bila nomor tersebut pernah chat ke
-            nomor bot dalam 24 jam terakhir.
+            Dikirim sebagai teks bebas; bila window 24 jam tidak terbuka,
+            otomatis memakai template utility <code>order_alert_ktd2</code>
+            yang bisa masuk kapan saja. Status tampil di riwayat chat (hijau =
+            terkirim, abu-abu = dilewati karena pengirim adalah nomor admin,
+            merah = gagal).
           </li>
           <li>
             <strong>Jeda bot:</strong> setelah admin membalas manual, bot tidak
