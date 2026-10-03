@@ -61,7 +61,7 @@ export async function POST(request: Request) {
           } catch (e) {
             console.error(`[wa-webhook] gagal kirim balasan ke ${m.from}:`, e);
           }
-          insertMessage({
+          await insertMessage({
             id: m.id,
             wa_from: m.from,
             body: m.text.body,
@@ -77,7 +77,7 @@ export async function POST(request: Request) {
         const statuses = change.value?.statuses ?? [];
         for (const s of statuses) {
           if (!s.id || !s.status) continue;
-          applyBroadcastDeliveryStatus(
+          await applyBroadcastDeliveryStatus(
             s.id,
             s.status,
             s.errors?.[0]?.message ?? "",

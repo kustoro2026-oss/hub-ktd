@@ -11,11 +11,13 @@ import { Users, Send, MessageSquare, Megaphone } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const contacts = countContacts();
-  const messages = countMessages();
-  const broadcasts = listBroadcasts();
+  const [contacts, messages, broadcasts, latest] = await Promise.all([
+    countContacts(),
+    countMessages(),
+    listBroadcasts(),
+    listMessages(5),
+  ]);
   const sentTotal = broadcasts.reduce((a, b) => a + b.sent, 0);
-  const latest = listMessages(5);
 
   const stats = [
     { label: "Kontak", value: contacts, Icon: Users, href: "/kontak" },

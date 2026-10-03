@@ -17,11 +17,11 @@ export default async function BroadcastDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const broadcast = getBroadcast(Number(id));
+  const broadcast = await getBroadcast(Number(id));
   if (!broadcast) notFound();
 
-  const progress = broadcastProgress(broadcast.id);
-  const items = listBroadcastItems(broadcast.id);
+  const progress = await broadcastProgress(broadcast.id);
+  const items = await listBroadcastItems(broadcast.id);
   const envReady = getWaEnv() !== null;
   const templateStatus = envReady
     ? await getTemplateStatus(broadcast.template)

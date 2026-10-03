@@ -25,7 +25,7 @@ export async function POST(
     return Response.json({ error: "Belum masuk" }, { status: 401 });
   }
   const { id } = await params;
-  const broadcast = getBroadcast(Number(id));
+  const broadcast = await getBroadcast(Number(id));
   if (!broadcast) {
     return Response.json({ error: "Broadcast tidak ditemukan" }, { status: 404 });
   }
@@ -49,30 +49,44 @@ export async function POST(
     );
   }
 
-  const items = pendingBroadcastItems(broadcast.id, BATCH_SIZE);
+  const items = await pendingBroadcastItems(broadcast.id, BATCH_SIZE);
   if (items.length === 0) {
-    setBroadcastStatus(broadcast.id, "done", broadcast.sent, broadcast.failed);
-    return Response.json({ ok: true, sentNow: 0, ...broadcastProgress(broadcast.id) });
+    await setBroadcastStatus(
+      broadcast.id,
+      "done",
+      broadcast.sent,
+      broadcast.failed,
+    );
+    return Response.json({
+      ok: true,
+      sentNow: 0,
+      ...(await broadcastProgress(broadcast.id)),
+    });
   }
 
-  setBroadcastStatus(broadcast.id, "sending", broadcast.sent, broadcast.failed);
+  await setBroadcastStatus(
+    broadcast.id,
+    "sending",
+    broadcast.sent,
+    broadcast.failed,
+  );
 
   let sentNow = 0;
   let failedNow = 0;
   for (const item of items) {
     const res = await sendTemplate(item.phone, broadcast.template);
     if (res.ok) {
-      markBroadcastItem(item.id, "sent", "", res.waId ?? "");
+      await markBroadcastItem(item.id, "sent", "", res.waId ?? "");
       sentNow++;
     } else {
-      markBroadcastItem(item.id, "failed", res.error ?? "gagal");
+      await markBroadcastItem(item.id, "failed", res.error ?? "gagal");
       failedNow++;
     }
     await new Promise((r) => setTimeout(r, DELAY_MS));
   }
 
-  const progress = broadcastProgress(broadcast.id);
-  setBroadcastStatus(
+  const progress = await broadcastProgress(broadcast.id);
+  await setBroadcastStatus(
     broadcast.id,
     progress.pending === 0 ? "done" : "sending",
     progress.sent,

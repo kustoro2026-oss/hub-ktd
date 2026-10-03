@@ -12,9 +12,11 @@ const STATUS_LABEL: Record<string, string> = {
   done: "Selesai",
 };
 
-export default function BroadcastPage() {
-  const broadcasts = listBroadcasts();
-  const contactCount = countContacts();
+export default async function BroadcastPage() {
+  const [broadcasts, contactCount] = await Promise.all([
+    listBroadcasts(),
+    countContacts(),
+  ]);
 
   return (
     <div className="space-y-6">

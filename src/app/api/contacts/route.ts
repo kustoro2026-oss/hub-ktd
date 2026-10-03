@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     );
   }
   try {
-    const contact = addContact(body.name ?? "", phone, body.note ?? "");
+    const contact = await addContact(body.name ?? "", phone, body.note ?? "");
     return Response.json({ ok: true, contact }, { status: 201 });
   } catch {
     return Response.json({ error: "Nomor sudah ada di daftar" }, { status: 409 });
@@ -41,6 +41,6 @@ export async function DELETE(request: Request) {
   if (!body.id) {
     return Response.json({ error: "id kontak wajib diisi" }, { status: 400 });
   }
-  deleteContact(body.id);
+  await deleteContact(body.id);
   return Response.json({ ok: true });
 }

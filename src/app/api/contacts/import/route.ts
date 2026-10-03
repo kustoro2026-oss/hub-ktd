@@ -35,7 +35,7 @@ export async function POST(request: Request) {
       continue;
     }
     try {
-      addContact(name, phone);
+      await addContact(name, phone);
       added++;
     } catch {
       skipped.push(line); // duplikat

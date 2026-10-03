@@ -10,8 +10,8 @@ const KIND_LABEL: Record<string, string> = {
   ad: "Dari iklan",
 };
 
-export default function PesanPage() {
-  const messages = listMessages(200);
+export default async function PesanPage() {
+  const messages = await listMessages(200);
 
   return (
     <div className="space-y-6">

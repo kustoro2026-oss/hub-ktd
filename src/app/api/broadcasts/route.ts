@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Nama kampanye wajib diisi" }, { status: 400 });
   }
 
-  const all = listContacts();
+  const all = await listContacts();
   const selected = body.contactIds?.length
     ? all.filter((c) => body.contactIds!.includes(c.id))
     : all;
@@ -32,7 +32,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const broadcast = createBroadcastWithItems(
+  const broadcast = await createBroadcastWithItems(
     body.name,
     body.template?.trim() || "info_promo",
     selected.map((c) => ({ contactId: c.id, phone: c.phone })),

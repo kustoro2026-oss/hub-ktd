@@ -7,8 +7,8 @@ import ContactsTable from "@/components/contacts-table";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Kontak" };
 
-export default function KontakPage() {
-  const contacts = listContacts();
+export default async function KontakPage() {
+  const contacts = await listContacts();
 
   return (
     <div className="space-y-6">
