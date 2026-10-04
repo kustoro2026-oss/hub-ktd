@@ -254,6 +254,14 @@ function migrateSqlite(db: DatabaseSync) {
       expires_at TEXT NOT NULL DEFAULT '',
       updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
+
+    CREATE TABLE IF NOT EXISTS tiktok_order_seen (
+      order_id TEXT PRIMARY KEY,
+      shop_id TEXT NOT NULL DEFAULT '',
+      first_seen_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      notify TEXT NOT NULL DEFAULT '',
+      attempts INTEGER NOT NULL DEFAULT 0
+    );
   `);
 
   // Migrasi DB lama: kolom shop_cipher untuk panggilan API pesanan.
@@ -413,6 +421,14 @@ async function migratePg(pool: Pool) {
       refresh_token TEXT NOT NULL DEFAULT '',
       expires_at TEXT NOT NULL DEFAULT '',
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS tiktok_order_seen (
+      order_id TEXT PRIMARY KEY,
+      shop_id TEXT NOT NULL DEFAULT '',
+      first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      notify TEXT NOT NULL DEFAULT '',
+      attempts INTEGER NOT NULL DEFAULT 0
     );
   `);
 
@@ -978,4 +994,64 @@ export async function listTiktokShopTokens(): Promise<TiktokShopToken[]> {
   return queryAll<TiktokShopToken>(
     "SELECT * FROM tiktok_shop_tokens ORDER BY updated_at DESC",
   );
+}
+
+// ---------- Riwayat resi pesanan TikTok (deteksi pesanan baru) ----------
+
+export type TiktokOrderSeen = {
+  order_id: string;
+  shop_id: string;
+  first_seen_at: string;
+  notify: string;
+  attempts: number;
+};
+
+/** Jumlah pesanan yang sudah pernah diproses. 0 berarti tabel kosong dan
+ *  pengecekan berikutnya berjalan dalam mode baseline (tandai semua pesanan
+ *  yang ada tanpa kirim resi — mencegah banjir resi pesanan lama). */
+export async function countSeenTiktokOrders(): Promise<number> {
+  const row = await queryOne<{ n: string | number }>(
+    "SELECT COUNT(*) AS n FROM tiktok_order_seen",
+  );
+  return Number(row?.n ?? 0);
+}
+
+/** Semua baris riwayat resi — untuk memfilter pesanan baru dan mencoba
+ *  ulang kiriman yang sebelumnya gagal (dibatasi kolom attempts). */
+export async function listSeenTiktokOrders(): Promise<TiktokOrderSeen[]> {
+  return queryAll<TiktokOrderSeen>("SELECT * FROM tiktok_order_seen");
+}
+
+/** Catat pesanan sebagai sudah diproses. `notify` = hasil kirim resi
+ *  ('ok', 'ok (template)', 'skip', atau 'gagal: ...') untuk riwayat. */
+export async function markTiktokOrderSeen(
+  orderId: string,
+  shopId: string,
+  notify = "",
+): Promise<void> {
+  const sql =
+    dbMode() === "pg"
+      ? "INSERT INTO tiktok_order_seen (order_id, shop_id, notify) VALUES (?, ?, ?) ON CONFLICT (order_id) DO NOTHING"
+      : "INSERT OR IGNORE INTO tiktok_order_seen (order_id, shop_id, notify) VALUES (?, ?, ?)";
+  await queryRun(sql, [orderId, shopId, notify]);
+}
+
+/** Tambah hitungan percobaan kirim resi yang gagal — pesanan yang belum
+ *  pernah tercatat otomatis dibuatkan barisnya dengan attempts = 1. */
+export async function recordTiktokOrderFailure(
+  orderId: string,
+  shopId: string,
+  notify: string,
+): Promise<void> {
+  const updated = await queryOne<{ order_id: string }>(
+    "UPDATE tiktok_order_seen SET attempts = attempts + 1, notify = ? WHERE order_id = ? RETURNING order_id",
+    [notify, orderId],
+  );
+  if (!updated) {
+    const sql =
+      dbMode() === "pg"
+        ? "INSERT INTO tiktok_order_seen (order_id, shop_id, notify, attempts) VALUES (?, ?, ?, 1) ON CONFLICT (order_id) DO NOTHING"
+        : "INSERT OR IGNORE INTO tiktok_order_seen (order_id, shop_id, notify, attempts) VALUES (?, ?, ?, 1)";
+    await queryRun(sql, [orderId, shopId, notify]);
+  }
 }

@@ -3,6 +3,7 @@
 // Bagian dari grup menu Marketplace → TikTok Shop.
 import { pullTiktokShopOrders, type TiktokShopOrders } from "@/lib/tiktok-orders";
 import RefreshButton from "@/components/refresh-button";
+import ResiCheckButton from "@/components/resi-check-button";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pesanan TikTok Shop" };
@@ -61,13 +62,14 @@ function TabelPesanan({ shop }: { shop: TiktokShopOrders }) {
 
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
-      <table className="w-full min-w-[720px] text-left text-sm">
+      <table className="w-full min-w-[820px] text-left text-sm">
         <thead>
           <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
             <th className="px-4 py-3 font-semibold">Waktu</th>
             <th className="px-4 py-3 font-semibold">Produk</th>
             <th className="px-4 py-3 font-semibold">Status</th>
             <th className="px-4 py-3 font-semibold">No. Pesanan</th>
+            <th className="px-4 py-3 font-semibold">Resi</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -94,6 +96,16 @@ function TabelPesanan({ shop }: { shop: TiktokShopOrders }) {
               <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-500">
                 {o.order_id}
               </td>
+              <td className="whitespace-nowrap px-4 py-3">
+                <a
+                  href={`/api/tiktok/resi/${o.order_id}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-slate-500 hover:bg-slate-50"
+                >
+                  Cetak Resi
+                </a>
+              </td>
             </tr>
           ))}
         </tbody>
@@ -117,7 +129,10 @@ export default async function PesananTikTokPage() {
             Pesanan terbaru ditarik langsung dari API Seller
           </p>
         </div>
-        <RefreshButton />
+        <div className="flex flex-wrap items-center gap-3">
+          <RefreshButton />
+          <ResiCheckButton />
+        </div>
       </div>
 
       {results.length === 0 ? (
@@ -154,7 +169,9 @@ export default async function PesananTikTokPage() {
       {results.length > 0 ? (
         <p className="text-xs text-slate-400">
           Menampilkan maksimal 20 pesanan terbaru (7 hari terakhir) per toko.
-          Tekan &quot;Segarkan&quot; untuk menarik data ulang.
+          Tekan &quot;Segarkan&quot; untuk menarik data ulang, atau
+          &quot;Cek Pesanan Baru&quot; untuk mengirim resi PDF otomatis ke
+          WhatsApp (085171157938) bila ada pesanan yang belum diproses.
         </p>
       ) : null}
     </div>

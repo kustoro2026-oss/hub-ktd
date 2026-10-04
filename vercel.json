@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/broadcasts",
       "schedule": "0 3 * * *"
+    },
+    {
+      "path": "/api/tiktok/resi/check",
+      "schedule": "0 4 * * *"
     }
   ]
 }

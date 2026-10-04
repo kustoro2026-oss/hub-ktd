@@ -363,3 +363,214 @@ export async function getTiktokOrders(
     };
   }
 }
+
+// ---------- Detail pesanan (untuk cetak resi) ----------
+
+export type TiktokOrderDetail = {
+  id: string;
+  status: string;
+  create_time: number;
+  paid_time: number;
+  update_time: number;
+  commerce_platform: string;
+  fulfillment_type: string;
+  shipping_type: string;
+  delivery_type: string;
+  shipping_provider: string;
+  tracking_number: string;
+  payment_method_name: string;
+  is_cod: boolean;
+  buyer_message: string;
+  user_id: string;
+  buyer_nickname: string;
+  payment: {
+    currency: string;
+    sub_total: string;
+    shipping_fee: string;
+    seller_discount: string;
+    platform_discount: string;
+    total_amount: string;
+    buyer_service_fee: string;
+    shipping_insurance_fee: string;
+    distance_shipping_fee: string;
+  };
+  recipient_address: {
+    full_address: string;
+    name: string;
+    phone_number: string;
+    region_code: string;
+    postal_code: string;
+    address_detail: string;
+    district_info: { address_level_name: string; address_name: string }[];
+  } | null;
+  line_items: {
+    id: string;
+    product_name: string;
+    sku_name: string;
+    seller_sku: string;
+    original_price: string;
+    sale_price: string;
+    seller_discount: string;
+    platform_discount: string;
+    currency: string;
+    tracking_number: string;
+    shipping_provider_name: string;
+    combined_listing_skus: { sku_count: number }[];
+  }[];
+};
+
+function str(v: unknown): string {
+  return String(v ?? "");
+}
+
+function num(v: unknown): number {
+  const n = Number(v ?? 0);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function parseDetailItem(
+  r: Record<string, unknown>,
+): TiktokOrderDetail["line_items"][number] {
+  const combos =
+    (r.combined_listing_skus as Record<string, unknown>[] | undefined) ?? [];
+  return {
+    id: str(r.id),
+    product_name: str(r.product_name),
+    sku_name: str(r.sku_name),
+    seller_sku: str(r.seller_sku),
+    original_price: str(r.original_price),
+    sale_price: str(r.sale_price),
+    seller_discount: str(r.seller_discount),
+    platform_discount: str(r.platform_discount),
+    currency: str(r.currency),
+    tracking_number: str(r.tracking_number),
+    shipping_provider_name: str(r.shipping_provider_name),
+    combined_listing_skus: combos.map((c) => ({
+      sku_count: num((c as Record<string, unknown>).sku_count),
+    })),
+  };
+}
+
+function parseDetail(o: Record<string, unknown>): TiktokOrderDetail {
+  const p = (o.payment ?? {}) as Record<string, unknown>;
+  const addr = (o.recipient_address ?? null) as Record<string, unknown> | null;
+  const dist =
+    (addr?.district_info as Record<string, unknown>[] | undefined) ?? [];
+  const lines = (o.line_items as unknown[] | undefined) ?? [];
+  return {
+    id: str(o.id),
+    status: str(o.status),
+    create_time: num(o.create_time),
+    paid_time: num(o.paid_time),
+    update_time: num(o.update_time),
+    commerce_platform: str(o.commerce_platform),
+    fulfillment_type: str(o.fulfillment_type),
+    shipping_type: str(o.shipping_type),
+    delivery_type: str(o.delivery_type),
+    shipping_provider: str(o.shipping_provider),
+    tracking_number: str(o.tracking_number),
+    payment_method_name: str(o.payment_method_name),
+    is_cod: Boolean(o.is_cod),
+    buyer_message: str(o.buyer_message),
+    user_id: str(o.user_id),
+    buyer_nickname: str(o.buyer_nickname),
+    payment: {
+      currency: str(p.currency),
+      sub_total: str(p.sub_total),
+      shipping_fee: str(p.shipping_fee),
+      seller_discount: str(p.seller_discount),
+      platform_discount: str(p.platform_discount),
+      total_amount: str(p.total_amount),
+      buyer_service_fee: str(p.buyer_service_fee),
+      shipping_insurance_fee: str(p.shipping_insurance_fee),
+      distance_shipping_fee: str(p.distance_shipping_fee),
+    },
+    recipient_address: addr
+      ? {
+          full_address: str(addr.full_address),
+          name: str(addr.name),
+          phone_number: str(addr.phone_number),
+          region_code: str(addr.region_code),
+          postal_code: str(addr.postal_code),
+          address_detail: str(addr.address_detail),
+          district_info: dist.map((d) => ({
+            address_level_name: str(
+              (d as Record<string, unknown>).address_level_name,
+            ),
+            address_name: str((d as Record<string, unknown>).address_name),
+          })),
+        }
+      : null,
+    line_items: lines.map((it) =>
+      parseDetailItem(it as Record<string, unknown>),
+    ),
+  };
+}
+
+/** GET /order/202309/orders?ids=... — detail lengkap satu/beberapa pesanan
+ *  (alamat penerima, pembayaran, item + harga). Maks. 50 ID per panggilan. */
+export async function getTiktokOrderDetail(
+  shop: { cipher: string; access_token: string },
+  orderIds: string[],
+): Promise<
+  { ok: true; orders: TiktokOrderDetail[] } | { ok: false; detail: string }
+> {
+  const { appKey, appSecret, ready } = tiktokEnv();
+  if (!ready) {
+    return {
+      ok: false,
+      detail:
+        "Kredensial aplikasi belum diatur (env TIKTOK_APP_KEY dan TIKTOK_APP_SECRET).",
+    };
+  }
+  if (shop.cipher === "") {
+    return {
+      ok: false,
+      detail: "shop_cipher belum tersimpan — coba otorisasi ulang aplikasi.",
+    };
+  }
+  const path = "/order/202309/orders";
+  const now = Math.floor(Date.now() / 1000);
+  const params: Record<string, string> = {
+    app_key: appKey,
+    shop_cipher: shop.cipher,
+    timestamp: now.toString(),
+    ids: orderIds.slice(0, 50).join(","),
+  };
+  const sign = signRequest(appSecret, path, params);
+  const qs = new URLSearchParams({ ...params, sign });
+  try {
+    const res = await fetch(`${API_HOST}${path}?${qs.toString()}`, {
+      method: "GET",
+      headers: {
+        "content-type": "application/json",
+        "x-tts-access-token": shop.access_token,
+      },
+      cache: "no-store",
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      code?: number;
+      message?: string;
+      data?: { orders?: unknown[] };
+    };
+    if (!res.ok || (data.code ?? 1) !== 0) {
+      return {
+        ok: false,
+        detail: `Gagal mengambil detail pesanan: ${String(
+          data.message ?? res.status,
+        )}`,
+      };
+    }
+    const orders = (data.data?.orders ?? []).map((o) =>
+      parseDetail(o as Record<string, unknown>),
+    );
+    return { ok: true, orders };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Gagal menghubungi server TikTok: ${
+        e instanceof Error ? e.message : "kesalahan tidak dikenal"
+      }`,
+    };
+  }
+}

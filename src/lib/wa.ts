@@ -409,7 +409,7 @@ export async function updateDisplayName(
 
 /** Template utility notifikasi pesanan (bebas window 24 jam) — dibuat
  *  melalui WhatsApp Manager / API dan menunggu persetujuan Meta. */
-const NOTIF_TEMPLATE = "order_alert_ktd2";
+export const NOTIF_TEMPLATE = "order_alert_ktd2";
 
 /** Nomor admin penerima notifikasi pesanan baru — default nomor CS toko
  *  085171157938; bisa diganti lewat env OWNER_WA_NUMBER (format 62...). */
@@ -506,6 +506,188 @@ export async function notifyOrderOwner(
   ]);
   if (tpl.ok) return "ok (template)";
   return `gagal: ${res.error ?? "teks ditolak"} | template: ${tpl.error ?? "ditolak"}`;
+}
+
+// ---------- Kirim dokumen (resi PDF) ----------
+
+/** Template utility resi dengan header DOKUMEN — bebas window 24 jam,
+ *  dibuat lewat createDocumentTemplate dan menunggu review Meta. */
+export const RESI_DOC_TEMPLATE = "resi_pesanan";
+
+/** Unggah PDF ke Graph sebagai media, kembalikan media ID. */
+async function uploadPdfMedia(
+  pdf: Buffer,
+  filename: string,
+): Promise<{ ok: true; mediaId: string } | { ok: false; detail: string }> {
+  const env = getWaEnv();
+  if (!env) return { ok: false, detail: "WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur" };
+  const form = new FormData();
+  form.append("messaging_product", "whatsapp");
+  form.append("type", "application/pdf");
+  form.append(
+    "file",
+    new Blob([new Uint8Array(pdf)], { type: "application/pdf" }),
+    filename,
+  );
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${env.phoneNumberId}/media`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${env.token}` },
+      body: form,
+    },
+  );
+  const data = (await res.json().catch(() => ({}))) as {
+    id?: string;
+    error?: { message?: string };
+  };
+  if (!res.ok || !data.id) {
+    return { ok: false, detail: data.error?.message ?? `HTTP ${res.status}` };
+  }
+  return { ok: true, mediaId: data.id };
+}
+
+/** Kirim dokumen PDF sebagai pesan bebas — hanya sah dalam window 24 jam
+ *  sejak penerima terakhir chat ke nomor API. */
+export async function sendDocument(
+  to: string,
+  pdf: Buffer,
+  filename: string,
+  caption?: string,
+): Promise<{ ok: boolean; error?: string; waId?: string }> {
+  const up = await uploadPdfMedia(pdf, filename);
+  if (!up.ok) return { ok: false, error: up.detail };
+  const env = getWaEnv();
+  if (!env) return { ok: false, error: "WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur" };
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${env.phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: withPlus(to),
+        type: "document",
+        document: {
+          id: up.mediaId,
+          filename,
+          ...(caption ? { caption } : {}),
+        },
+      }),
+    },
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    return { ok: false, error: `HTTP ${res.status} ${err.slice(0, 300)}` };
+  }
+  const data = (await res.json()) as { messages?: { id?: string }[] };
+  return { ok: true, waId: data.messages?.[0]?.id };
+}
+
+/** Kirim dokumen lewat template utility ber-header DOKUMEN — bebas window
+ *  24 jam. Gagal selama template belum APPROVED (kode #132001). */
+export async function sendDocumentTemplate(
+  to: string,
+  pdf: Buffer,
+  filename: string,
+  bodyParam: string,
+): Promise<{ ok: boolean; error?: string; waId?: string }> {
+  const up = await uploadPdfMedia(pdf, filename);
+  if (!up.ok) return { ok: false, error: up.detail };
+  const env = getWaEnv();
+  if (!env) return { ok: false, error: "WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur" };
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${env.phoneNumberId}/messages`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        messaging_product: "whatsapp",
+        recipient_type: "individual",
+        to: withPlus(to),
+        type: "template",
+        template: {
+          name: RESI_DOC_TEMPLATE,
+          language: { code: "id" },
+          components: [
+            {
+              type: "header",
+              parameters: [
+                { type: "document", document: { id: up.mediaId, filename } },
+              ],
+            },
+            {
+              type: "body",
+              parameters: [{ type: "text", text: bodyParam }],
+            },
+          ],
+        },
+      }),
+    },
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    return { ok: false, error: `HTTP ${res.status} ${err.slice(0, 300)}` };
+  }
+  const data = (await res.json()) as { messages?: { id?: string }[] };
+  return { ok: true, waId: data.messages?.[0]?.id };
+}
+
+/** Buat template utility "resi_pesanan" dengan header DOKUMEN (contoh PDF)
+ *  dan body SATU variabel — lebih dari satu variabel di body pendek
+ *  langsung ditolak INVALID_FORMAT oleh Meta. */
+export async function createDocumentTemplate(
+  samplePdf: Buffer,
+  sampleFilename: string,
+): Promise<{ ok: boolean; id?: string; detail?: string }> {
+  const up = await uploadPdfMedia(samplePdf, sampleFilename);
+  if (!up.ok) return { ok: false, detail: up.detail };
+  const env = getWaEnv();
+  const wabaId = process.env.WA_WABA_ID;
+  if (!env || !wabaId)
+    return { ok: false, detail: "WA_TOKEN / WA_WABA_ID belum diatur" };
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${wabaId}/message_templates`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: RESI_DOC_TEMPLATE,
+        category: "UTILITY",
+        language: "id",
+        components: [
+          {
+            type: "HEADER",
+            format: "DOCUMENT",
+            example: { header_handle: [up.mediaId] },
+          },
+          {
+            type: "BODY",
+            text: "Resi penjualan pesanan {{1}} KTD Store terlampir.",
+            example: { body_text: [["586360323308226013"]] },
+          },
+        ],
+      }),
+    },
+  );
+  const data = (await res.json().catch(() => ({}))) as {
+    id?: string;
+    error?: { message?: string };
+  };
+  if (!res.ok) {
+    return { ok: false, detail: data.error?.message ?? `HTTP ${res.status}` };
+  }
+  return { ok: true, id: data.id };
 }
 
 // ---------- Status nomor & batas kirim ----------
