@@ -1022,8 +1022,10 @@ export async function listSeenTiktokOrders(): Promise<TiktokOrderSeen[]> {
   return queryAll<TiktokOrderSeen>("SELECT * FROM tiktok_order_seen");
 }
 
-/** Catat pesanan sebagai sudah diproses. `notify` = hasil kirim resi
- *  ('ok', 'ok (template)', 'skip', atau 'gagal: ...') untuk riwayat. */
+/** Catat pesanan sebagai sudah diproses (upsert: notifikasi terakhir
+ *  menggantikan yang lama, mis. "menunggu" → "ok", tanpa mengubah
+ *  first_seen_at). `notify` = hasil kirim resi ('ok', 'ok (template)',
+ *  'skip', 'menunggu:<epoch_ms>', 'batal: ...', atau 'gagal: ...'). */
 export async function markTiktokOrderSeen(
   orderId: string,
   shopId: string,
@@ -1031,8 +1033,8 @@ export async function markTiktokOrderSeen(
 ): Promise<void> {
   const sql =
     dbMode() === "pg"
-      ? "INSERT INTO tiktok_order_seen (order_id, shop_id, notify) VALUES (?, ?, ?) ON CONFLICT (order_id) DO NOTHING"
-      : "INSERT OR IGNORE INTO tiktok_order_seen (order_id, shop_id, notify) VALUES (?, ?, ?)";
+      ? "INSERT INTO tiktok_order_seen (order_id, shop_id, notify) VALUES (?, ?, ?) ON CONFLICT (order_id) DO UPDATE SET notify = EXCLUDED.notify, shop_id = EXCLUDED.shop_id"
+      : "INSERT INTO tiktok_order_seen (order_id, shop_id, notify) VALUES (?, ?, ?) ON CONFLICT (order_id) DO UPDATE SET notify = excluded.notify, shop_id = excluded.shop_id";
   await queryRun(sql, [orderId, shopId, notify]);
 }
 

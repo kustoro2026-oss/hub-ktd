@@ -6,12 +6,18 @@
 //     tiktok_order_seen.
 //  3. Mode baseline: bila tabel masih kosong (pertama kali), semua pesanan
 //     lama hanya DITANDAI tanpa kirim resi — mencegah banjir 20 PDF sekaligus.
-//  4. Pesanan baru: ambil dokumen pengiriman resmi (SHIPPING_LABEL) dari
-//     API TikTok Shop — label kirim PDF persis seperti menu "Cetak Resi"
+//  4. Pesanan dibatalkan (CANCELLED): kabari admin lewat WA sekali, tandai
+//     "batal: ..." — resi tidak pernah dikirim untuk pesanan batal.
+//  5. Pesanan baru: ditahan NEW_ORDER_WAIT_MS (default 15 menit) sebelum resi
+//     dikirim — memberi kesempatan pembeli membatalkan. Selama menunggu
+//     statusnya "menunggu:<epoch_ms>"; kalau dibatalkan di tengah tunggu,
+//     notifikasi pembatalan menggantikan kirim resi.
+//  6. Setelah masa tunggu: ambil dokumen pengiriman resmi (SHIPPING_LABEL)
+//     dari API TikTok Shop — label kirim PDF persis seperti menu "Cetak Resi"
 //     aplikasi — lalu kirim ke WA admin lewat rantai: dokumen bebas (window
 //     24 jam) → template dokumen resi_pesanan (bebas window, menunggu review
 //     Meta) → template teks order_alert_ktd2 berisi tautan halaman Pesanan.
-//  5. Kirim gagal ditandai + hitungan percobaan naik — dicoba ulang pada
+//  7. Kirim gagal ditandai + hitungan percobaan naik — dicoba ulang pada
 //     pengecekan berikutnya sampai batas, lalu dihentikan (label tetap bisa
 //     dibuka manual dari halaman Pesanan).
 import {
@@ -41,10 +47,17 @@ import {
   sendDocument,
   sendDocumentTemplate,
   sendTemplateParams,
+  sendText,
 } from "@/lib/wa";
 
 /** Batas percobaan kirim ulang untuk pesanan yang resinya gagal terkirim. */
 const MAX_SEND_ATTEMPTS = 3;
+
+/** Lama pesanan baru ditahan sebelum resi dikirim (env
+ *  TIKTOK_RESI_DELAY_MINUTES, default 15 menit) — memberi kesempatan
+ *  pembeli membatalkan supaya resi tidak terkirim percuma. */
+const NEW_ORDER_WAIT_MS =
+  (Number(process.env.TIKTOK_RESI_DELAY_MINUTES) || 15) * 60 * 1000;
 
 export type ResiCheckResult = {
   ok: boolean;
@@ -186,6 +199,18 @@ export async function sendResiForOrder(
   return { ok: false, result: "Pesanan tidak ditemukan di toko terotorisasi" };
 }
 
+/** Kirim notifikasi teks ke WA admin: teks bebas (window 24 jam) → template
+ *  teks cadangan (bebas window, menunggu review Meta). */
+async function sendOwnerNotice(msg: string): Promise<string> {
+  const owner = ownerNumber();
+  if (!owner) return "gagal: OWNER_WA_NUMBER belum diatur";
+  const free = await sendText(owner, msg);
+  if (free.ok) return "ok";
+  const tpl = await sendTemplateParams(owner, NOTIF_TEMPLATE, [msg]);
+  if (tpl.ok) return "ok (template)";
+  return `gagal: ${free.error ?? "teks ditolak"} | template: ${tpl.error ?? "ditolak"}`;
+}
+
 /** Jalankan satu ronde pengecekan pesanan baru untuk semua toko terotorisasi.
  *  Idempoten — tabel tiktok_order_seen mencegah kirim ganda. */
 export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
@@ -229,6 +254,55 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
 
     for (const o of ord.orders) {
       const prev = seen.get(o.order_id);
+      const cancelled =
+        o.order_status === "CANCELLED" || o.order_status === "CANCELED";
+
+      // Sudah pernah dikabari pembatalannya — lewati.
+      if (prev && prev.notify.startsWith("batal")) continue;
+
+      // Pesanan dibatalkan: kabari admin (sekali) — resi tidak dikirim.
+      if (cancelled) {
+        const silent =
+          baseline ||
+          prev?.notify === "skip" ||
+          (prev && prev.attempts >= MAX_SEND_ATTEMPTS);
+        if (silent) {
+          await markTiktokOrderSeen(
+            o.order_id,
+            shop.shop_id,
+            "batal (tanpa kirim)",
+          );
+          continue;
+        }
+        const itemsTxt =
+          o.items.length > 0
+            ? ` — ${o.items[0].product_name}${
+                o.items.length > 1 ? ` (+${o.items.length - 1} produk lain)` : ""
+              }`
+            : "";
+        const resiTerlanjur = prev && prev.notify.startsWith("ok");
+        const msg = `Pesanan TikTok Shop dibatalkan: ${o.order_id}${itemsTxt}.${
+          resiTerlanjur
+            ? " Resi yang sudah terkirim mohon diabaikan."
+            : " Tidak perlu disiapkan/dikirim."
+        }`;
+        const res = await sendOwnerNotice(msg);
+        if (res.startsWith("ok")) {
+          const mark = `batal: ${res}${
+            resiTerlanjur ? " (resi sempat terkirim)" : ""
+          }`;
+          await markTiktokOrderSeen(o.order_id, shop.shop_id, mark);
+          sent.push(`${shop.shop_name} ${o.order_id} → ${mark}`);
+        } else {
+          errors.push(`${shop.shop_name}: ${o.order_id}: ${res}`);
+          await recordTiktokOrderFailure(
+            o.order_id,
+            shop.shop_id,
+            `gagal batal: ${res}`,
+          );
+        }
+        continue;
+      }
 
       // Mode baseline: tandai saja pesanan lama, jangan kirim resi.
       if (!prev && baseline) {
@@ -236,14 +310,32 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
         continue;
       }
 
-      // Sudah pernah berhasil dikirim — lewati.
-      if (prev && !prev.notify.startsWith("gagal")) continue;
+      // Pesanan baru: tunda kirim resi (baris "menunggu" menyimpan epoch
+      // saat pertama kali terlihat) — beri kesempatan pembeli membatalkan.
+      if (!prev) {
+        await markTiktokOrderSeen(
+          o.order_id,
+          shop.shop_id,
+          `menunggu:${Date.now()}`,
+        );
+        newOrders++;
+        continue;
+      }
+
+      // Masih dalam masa tunggu sebelum resi boleh dikirim.
+      if (prev.notify.startsWith("menunggu")) {
+        const since = Number(prev.notify.split(":")[1] ?? 0);
+        if (Date.now() - since < NEW_ORDER_WAIT_MS) continue;
+      } else if (!prev.notify.startsWith("gagal")) {
+        // Sudah pernah berhasil dikirim — lewati.
+        continue;
+      }
 
       // Sudah gagal berkali-kali — berhenti mencoba (resi tetap bisa
       // dibuka manual dari halaman Pesanan).
-      if (prev && prev.attempts >= MAX_SEND_ATTEMPTS) continue;
+      if (prev.attempts >= MAX_SEND_ATTEMPTS) continue;
 
-      // Pesanan baru, atau percobaan ulang untuk kiriman yang gagal.
+      // Masa tunggu selesai, atau percobaan ulang untuk kiriman yang gagal.
       newOrders++;
       const official = await getOfficialResiForCred(cred, o.order_id);
       if (!official.ok) {
