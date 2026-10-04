@@ -429,6 +429,27 @@ ${SIGN}`,
 
 ${SIGN}`,
   },
+  {
+    id: "siapa",
+    patterns: [
+      /\bsiapa (kamu|ini|lu|kau|anda|kalian|sih|nih|ya|tuh|dong)\b/,
+      /\b(kamu|lu|kau|ini|itu) siapa\b/,
+      /\bdengan siapa\b|\bdgn siapa\b|\bdari siapa\b/,
+      /\b(no|nomor|nomer)(nya)? siapa\b/,
+      /\b(kamu|ini|itu) (bot|robot|admin|cs|ktd)\b/,
+      /\bini toko (ktd|apa)\b|\bini (ktd|ktdstore)\b/,
+      /\bktd( ?store)? (ya|kah|aja|doang|beneran)\b|\bktdstore\b/,
+      /\b(bot|robot) (kah|ya|atau|apa)\b|\b(atau|apa) (bot|robot)\b/,
+      /\b(orang|manusia) (atau|apa) (bot|robot)\b/,
+      /\bsiapa\b/,
+    ],
+    answer: `Saya adalah asisten WhatsApp resmi KTD Store, toko online di:
+${CATALOG_URL}
+
+Pesan Anda di sini dibalas secara otomatis oleh asisten. Untuk berbicara langsung dengan tim CS kami, hubungi WhatsApp ${CS_NUMBER_DISPLAY} setiap hari pukul 09:00–18:00 WIB, atau sampaikan pertanyaan Anda di chat ini — pesan tetap kami terima dan akan dibalas.
+
+${SIGN}`,
+  },
 ];
 
 // Kata tanya umum — bila tidak ada FAQ yang cocok, pesan berisi kata tanya

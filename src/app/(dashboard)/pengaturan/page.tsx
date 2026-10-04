@@ -118,9 +118,9 @@ export default function PengaturanPage() {
             ongkir, COD, pembayaran, stok, pengiriman, resi, jam CS, retur,
             reseller, cara pakai produk, varian, detail produk, minimal beli,
             jangkauan kirim, kurir, ubah/batal pesanan, nota, rekomendasi,
-            testimoni, dll) dijawab otomatis sesuai FAQ situs — jawaban
-            dikelola di <code>src/lib/faq.ts</code>. Pertanyaan lain yang tidak
-            dikenali diarahkan ke CS.
+            testimoni, identitas bot "siapa ini", dll) dijawab otomatis sesuai
+            FAQ situs — jawaban dikelola di <code>src/lib/faq.ts</code>.
+            Pertanyaan lain yang tidak dikenali diarahkan ke CS.
           </li>
           <li>
             <strong>Bukti transfer:</strong> pesanan ber-metode Transfer Bank
