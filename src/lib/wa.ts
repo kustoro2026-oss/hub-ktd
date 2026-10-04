@@ -218,6 +218,36 @@ export async function getDisplayNameStatus(): Promise<DisplayNameStatus> {
   };
 }
 
+/** Daftarkan ulang nomor API untuk menerapkan nama tampilan baru. Menurut
+ *  dokumen Meta, setelah nama baru diproses, nomor harus di-register ulang
+ *  dengan PIN verifikasi 2 langkah (6 digit) agar nama baru tampil ke
+ *  pelanggan. Bila nomor belum pernah menyetel PIN 2 langkah, pin yang
+ *  dikirim menjadi PIN baru. PIN tidak disimpan di server — hanya
+ *  diteruskan sekali ke Graph API. */
+export async function registerApplyName(
+  pin: string,
+): Promise<{ ok: boolean; detail?: string }> {
+  const env = getWaEnv();
+  if (!env)
+    return { ok: false, detail: "WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur" };
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${env.phoneNumberId}/register`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ messaging_product: "whatsapp", pin }),
+    },
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    return { ok: false, detail: `HTTP ${res.status} ${err.slice(0, 300)}` };
+  }
+  return { ok: true };
+}
+
 // ---------- Notifikasi pesanan ke admin toko ----------
 
 /** Template utility notifikasi pesanan (bebas window 24 jam) — dibuat

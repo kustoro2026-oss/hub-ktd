@@ -62,6 +62,9 @@ export default function DisplayNameStatus() {
   const [data, setData] = useState<StatusData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [pin, setPin] = useState("");
+  const [applying, setApplying] = useState(false);
+  const [msg, setMsg] = useState("");
 
   const check = useCallback(async () => {
     setLoading(true);
@@ -84,6 +87,43 @@ export default function DisplayNameStatus() {
       setLoading(false);
     }
   }, []);
+
+  async function applyName() {
+    if (!/^\d{6,8}$/.test(pin)) {
+      setError("PIN harus 6–8 digit angka");
+      return;
+    }
+    setApplying(true);
+    setError("");
+    setMsg("");
+    try {
+      const res = await fetch("/api/wa/register-apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pin }),
+      });
+      const d = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        detail?: string;
+        error?: string;
+      };
+      if (!res.ok) {
+        setError(d.error ?? "Gagal menerapkan nama");
+        return;
+      }
+      setPin("");
+      setMsg(
+        d.ok
+          ? "Nama baru berhasil diterapkan — status di bawah diperbarui."
+          : (d.detail ?? "Gagal menerapkan nama"),
+      );
+      await check();
+    } catch {
+      setError("Jaringan bermasalah — coba lagi");
+    } finally {
+      setApplying(false);
+    }
+  }
 
   useEffect(() => {
     void check();
@@ -164,6 +204,38 @@ export default function DisplayNameStatus() {
           )}
         </ul>
       )}
+
+      {msg && (
+        <p className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-700">
+          {msg}
+        </p>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
+        <input
+          type="password"
+          inputMode="numeric"
+          autoComplete="off"
+          maxLength={8}
+          placeholder="PIN 2 langkah (6 digit)"
+          value={pin}
+          onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
+          className="w-44 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none"
+        />
+        <button
+          onClick={applyName}
+          disabled={applying}
+          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
+        >
+          {applying ? "Menerapkan…" : "Terapkan nama baru"}
+        </button>
+        <p className="w-full text-xs text-slate-500">
+          Daftarkan ulang nomor agar nama baru tampil ke pelanggan. Kalau nomor
+          ini belum pernah menyetel PIN 2 langkah, angka yang dimasukkan akan
+          menjadi PIN-nya. PIN hanya diteruskan sekali ke Meta — tidak
+          disimpan.
+        </p>
+      </div>
 
       <p className="text-xs text-slate-500">
         Catatan Meta: setelah nama baru diproses, nomor perlu{" "}
