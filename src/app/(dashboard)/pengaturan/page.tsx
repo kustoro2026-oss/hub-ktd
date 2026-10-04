@@ -116,7 +116,9 @@ export default function PengaturanPage() {
           <li>
             <strong>FAQ bot:</strong> pertanyaan umum pelanggan (cara pesan,
             ongkir, COD, pembayaran, stok, pengiriman, resi, jam CS, retur,
-            reseller, dll) dijawab otomatis sesuai FAQ situs — jawaban
+            reseller, cara pakai produk, varian, detail produk, minimal beli,
+            jangkauan kirim, kurir, ubah/batal pesanan, nota, rekomendasi,
+            testimoni, dll) dijawab otomatis sesuai FAQ situs — jawaban
             dikelola di <code>src/lib/faq.ts</code>. Pertanyaan lain yang tidak
             dikenali diarahkan ke CS.
           </li>

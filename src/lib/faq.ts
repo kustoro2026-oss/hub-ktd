@@ -281,6 +281,154 @@ Pusat bantuan lengkap juga tersedia di: ${CATALOG_URL}bantuan
 
 ${SIGN}`,
   },
+  {
+    id: "cara-pakai",
+    patterns: [
+      /\bcara (pakai|pemakaian|pemakaiannya|menggunakan|penggunaan|penggunaannya|minum|oles|aplikasi|aplikasinya|konsumsi|konsumsinya)\b/,
+      /\baturan pakai(nya)?\b/,
+      /\bdosis(nya)?\b/,
+      /\btakaran(nya)?\b/,
+      /\b(gimana|gmn) (pakai|pemakaian|penggunaannya)\b/,
+      /\b(gimana|gmn) pakai(nya)?\b/,
+      /\bpakai(nya)? gimana\b/,
+      /\bcara kerja(nya)?\b/,
+    ],
+    answer: `Cara penggunaan dan aturan pakai setiap produk tertera pada bagian deskripsi halaman produknya di katalog:
+${CATALOG_URL}
+
+Silakan buka halaman produk yang Anda maksud, lalu baca bagian deskripsi. Jika masih ada yang kurang jelas, sampaikan nama produknya di chat ini — CS kami akan membantu.
+
+${SIGN}`,
+  },
+  {
+    id: "varian",
+    patterns: [
+      /\bvarian(nya)?\b/,
+      /\bukuran(nya)? (apa|apa aja|saja|saja ya|berapa|brp)\b/,
+      /\bada ukuran (apa|berapa|brp)\b/,
+      /\bwarna(nya)? (apa|apa aja|saja)\b/,
+      /\bpilihan warna\b/,
+    ],
+    answer: `Varian yang tersedia (ukuran, warna, atau kemasan) ditampilkan pada halaman produk masing-masing di katalog:
+${CATALOG_URL}
+
+Silakan pilih varian yang diinginkan sebelum menekan tombol "Order via WhatsApp".
+
+${SIGN}`,
+  },
+  {
+    id: "detail-produk",
+    patterns: [
+      /\bisinya (berapa|brp|apa)\b/,
+      /\bisi kemasan(nya)?\b/,
+      /\b(berat|netto|nett|isi)(nya)? (berapa|brp)\b/,
+      /\bkomposisi(nya)?\b/,
+      /\b(expired|kadaluarsa|kadaluwarsa|kedaluwarsa|exp)(nya)?\b/,
+      /\bmasa simpan(nya)?\b|\btanggal expired\b/,
+      /\b(berapa|brp) lama\b/,
+      /\bbahan(nya)? (apa|dari apa)\b/,
+      /\b(berapa|brp) (gram|ml|mililiter|liter|kg|pcs)\b/,
+    ],
+    answer: `Isi kemasan, berat, komposisi, dan tanggal kedaluwarsa tertera pada halaman produk di katalog:
+${CATALOG_URL}
+
+Produk yang kami kirim adalah stok baru dengan masa simpan yang baik.
+
+${SIGN}`,
+  },
+  {
+    id: "minimal-order",
+    patterns: [
+      /\bminimal (order|beli|pembelian|pemesanan)(nya)?\b/,
+      /\bminimum (order|beli)\b/,
+      /\bmin (order|beli|pembelian|pemesanan)\b/,
+      /\border(nya)? (berapa|brp)\b/,
+      /\bbeli (sedikit|satu|1|satu dua|ecer)\b/,
+      /\btanpa minimal\b/,
+    ],
+    answer: `Tidak ada minimal pembelian di KTD Store — Anda dapat memesan mulai dari 1 produk. Ongkos kirim dihitung otomatis saat Anda mengisi form pemesanan.
+
+${SIGN}`,
+  },
+  {
+    id: "jangkauan",
+    patterns: [
+      /\bkirim ke\b/,
+      /\bbisa kirim( ke)?\b/,
+      /\bdikirim ke\b/,
+      /\bmelayani (daerah|area|wilayah|seluruh)\b/,
+      /\bsampai ke\b/,
+    ],
+    answer: `Kami melayani pengiriman ke seluruh Indonesia. Ongkos kirim ke alamat Anda dihitung otomatis saat Anda mengisi form pemesanan — pilih provinsi, kota, dan kecamatan tujuan.
+
+${SIGN}`,
+  },
+  {
+    id: "kurir",
+    patterns: [
+      /\bkurir(nya)?\b/,
+      /\bekspedisi(nya)?\b/,
+      /\b(jne|jnt|sicepat|si cepat|anteraja|anter aja|wahana|pos indonesia|ninja|grab|gosend|go ?send|tiki)\b/,
+      /\bpakai (kurir|ekspedisi|jne|jnt) apa\b/,
+    ],
+    answer: `Kurir yang tersedia untuk alamat Anda ditampilkan otomatis saat Anda mengisi form pemesanan, lengkap dengan biaya kirimnya. Silakan pilih kurir yang Anda inginkan.
+
+${SIGN}`,
+  },
+  {
+    id: "ubah-pesanan",
+    patterns: [
+      /\bubah (pesanan|alamat|order)\b/,
+      /\bsalah alamat\b|\balamat(nya)? salah\b/,
+      /\btambah (barang|produk|pesanan|item)\b/,
+      /\bbatal(kan)? (pesanan|order)\b|\bmau batal\b/,
+      /\bganti alamat\b/,
+      /\brevisi (pesanan|alamat)\b/,
+    ],
+    answer: `Untuk mengubah alamat, menambah produk, atau membatalkan pesanan, sampaikan segera di chat ini sebelum paket diserahkan ke kurir. CS kami akan membantu selama pesanan belum diproses.
+
+${SIGN}`,
+  },
+  {
+    id: "nota",
+    patterns: [
+      /\bnota(nya)?\b/,
+      /\binvoice\b|\binvois\b/,
+      /\bbukti (pembelian|bayar|pembayaran)\b/,
+      /\bstruk(nya)?\b|\bkwitansi\b|\bkuitansi\b/,
+    ],
+    answer: `Nota pembelian disertakan pada setiap paket. Jika Anda memerlukan salinan invoice, sampaikan di chat ini — CS kami akan membantu.
+
+${SIGN}`,
+  },
+  {
+    id: "rekomendasi",
+    patterns: [
+      /\brekomendasi\b|\brekomendasikan\b|\bdirekomendasi(kan)?\b/,
+      /\bbagus(nya)? yang mana\b|\byang bagus (apa|yang mana)\b/,
+      /\byang cocok (untuk|buat|dengan)\b/,
+      /\bproduk apa yang bagus\b/,
+      /\bsaran( produk|nya)?\b/,
+    ],
+    answer: `Untuk rekomendasi produk yang sesuai kebutuhan Anda, sampaikan kebutuhan atau produk yang Anda cari di chat ini — CS kami akan membantu merekomendasikan produk yang tepat.
+
+Katalog lengkap tersedia di:
+${CATALOG_URL}
+
+${SIGN}`,
+  },
+  {
+    id: "testimoni",
+    patterns: [
+      /\btestimoni\b|\btestimony\b/,
+      /\bulasan\b|\breview(nya)?\b/,
+      /\bpenilaian( pembeli|nya)?\b/,
+      /\brating(nya)?\b/,
+    ],
+    answer: `Ulasan dan penilaian pembeli dapat dilihat di toko resmi kami di Blibli, TikTok Shop, dan Lazada — tombol link tersedia di setiap halaman produk.
+
+${SIGN}`,
+  },
 ];
 
 // Kata tanya umum — bila tidak ada FAQ yang cocok, pesan berisi kata tanya
