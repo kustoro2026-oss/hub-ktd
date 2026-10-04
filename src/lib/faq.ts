@@ -443,12 +443,14 @@ ${SIGN}`,
       /\b(orang|manusia) (atau|apa) (bot|robot)\b/,
       /\bsiapa\b/,
     ],
-    answer: `Saya adalah asisten WhatsApp resmi KTD Store, toko online di:
+    answer: `Halo! , Saya adalah asisten resmi KTD Store.
+Temukan berbagai produk pilihan kami di:
 ${CATALOG_URL}
 
-Pesan Anda di sini dibalas secara otomatis oleh asisten. Untuk berbicara langsung dengan tim CS kami, hubungi WhatsApp ${CS_NUMBER_DISPLAY} setiap hari pukul 09:00–18:00 WIB, atau sampaikan pertanyaan Anda di chat ini — pesan tetap kami terima dan akan dibalas.
+Yuk, cek katalog KTD Store dan temukan produk yang sesuai untuk Anda! 🛒
 
-${SIGN}`,
+Salam,
+KTD Store`,
   },
 ];
 
