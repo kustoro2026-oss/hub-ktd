@@ -26,9 +26,9 @@ import {
   getPackageDetail,
   getPackageHandoverTimeSlots,
   getPackageShippingDocument,
-  getShippingDocument,
   getTiktokOrderDetail,
   getTiktokOrders,
+  searchPackages,
   shipPackage,
   type TiktokOrderDetail,
 } from "@/lib/tiktok";
@@ -55,9 +55,35 @@ export type ResiCheckResult = {
   detail?: string;
 };
 
-/** Ambil PDF label kirim RESMI TikTok Shop untuk satu pesanan. Coba dulu
- *  jalur logistics (per order_id, persis menu Cetak Resi aplikasi); bila
- *  gagal, coba jalur fulfillment lewat package_id dari detail pesanan. */
+/** Cari package_id milik satu pesanan: mulai dari daftar paket pada detail
+ *  pesanan (field `packages`), lalu jatuh ke API Search Package dengan
+ *  mencocokkan orders[].id. */
+async function findPackageIdForOrder(
+  cred: { cipher: string; access_token: string },
+  orderId: string,
+): Promise<{ ok: true; packageId: string } | { ok: false; detail: string }> {
+  const detail = await getTiktokOrderDetail(cred, [orderId]);
+  if (detail.ok) {
+    const order = detail.orders.find((o) => o.id === orderId);
+    const pkg = order?.package_list[0]?.id;
+    if (pkg) return { ok: true, packageId: pkg };
+  }
+  const now = Math.floor(Date.now() / 1000);
+  const found = await searchPackages(cred, {
+    update_time_ge: now - 60 * 86400,
+    update_time_lt: now + 3600,
+  });
+  if (!found.ok) return { ok: false, detail: found.detail };
+  const pkg = found.packages.find((p) => p.order_ids.includes(orderId));
+  if (!pkg) {
+    return { ok: false, detail: "Paket untuk pesanan ini tidak ditemukan" };
+  }
+  return { ok: true, packageId: pkg.id };
+}
+
+/** Ambil PDF label kirim RESMI TikTok Shop untuk satu pesanan lewat jalur
+ *  fulfillment (per package_id) — ini API yang sama dengan menu "Cetak
+ *  Resi" aplikasi. Label hanya tersedia setelah paket diatur kirimnya. */
 async function fetchOfficialResiPdf(
   cred: { cipher: string; access_token: string },
   orderId: string,
@@ -65,44 +91,16 @@ async function fetchOfficialResiPdf(
   | { ok: true; pdf: Buffer; tracking_number: string }
   | { ok: false; detail: string }
 > {
-  const doc = await getShippingDocument(cred, orderId, "SHIPPING_LABEL");
-  if (doc.ok) {
-    const dl = await downloadShippingDocument(doc.doc_url);
-    if (dl.ok) {
-      return { ok: true, pdf: dl.pdf, tracking_number: doc.tracking_number };
-    }
-    return { ok: false, detail: dl.detail };
-  }
+  const pkgId = await findPackageIdForOrder(cred, orderId);
+  if (!pkgId.ok) return { ok: false, detail: pkgId.detail };
 
-  // Jalur cadangan: cari package_id lewat detail pesanan.
-  const detail = await getTiktokOrderDetail(cred, [orderId]);
-  if (detail.ok) {
-    const order = detail.orders.find((o) => o.id === orderId);
-    const packageId = order?.package_list[0]?.id;
-    if (packageId) {
-      const pkg = await getPackageShippingDocument(cred, packageId);
-      if (pkg.ok) {
-        const dl = await downloadShippingDocument(pkg.doc_url);
-        if (dl.ok) {
-          return {
-            ok: true,
-            pdf: dl.pdf,
-            tracking_number: pkg.tracking_number,
-          };
-        }
-        return { ok: false, detail: dl.detail };
-      }
-      return {
-        ok: false,
-        detail: `Label resmi tidak tersedia (logistics: ${doc.detail}; fulfillment: ${pkg.detail})`,
-      };
-    }
-    return {
-      ok: false,
-      detail: `${doc.detail} (paket belum dibuat)`,
-    };
-  }
-  return { ok: false, detail: `${doc.detail} (detail: ${detail.detail})` };
+  const pkg = await getPackageShippingDocument(cred, pkgId.packageId);
+  if (!pkg.ok) return { ok: false, detail: pkg.detail };
+
+  const dl = await downloadShippingDocument(pkg.doc_url);
+  if (!dl.ok) return { ok: false, detail: dl.detail };
+
+  return { ok: true, pdf: dl.pdf, tracking_number: pkg.tracking_number };
 }
 
 /** Kirim resi satu pesanan ke nomor admin; kembalikan hasil untuk riwayat.
@@ -300,13 +298,9 @@ async function arrangeShipment(
   cred: { cipher: string; access_token: string },
   orderId: string,
 ): Promise<{ ok: boolean; result: string }> {
-  const detail = await getTiktokOrderDetail(cred, [orderId]);
-  if (!detail.ok) return { ok: false, result: detail.detail };
-  const order = detail.orders.find((o) => o.id === orderId);
-  const packageId = order?.package_list[0]?.id;
-  if (!packageId) {
-    return { ok: false, result: "Paket belum tersedia untuk pesanan ini" };
-  }
+  const pkgId = await findPackageIdForOrder(cred, orderId);
+  if (!pkgId.ok) return { ok: false, result: pkgId.detail };
+  const packageId = pkgId.packageId;
 
   const slots = await getPackageHandoverTimeSlots(cred, packageId);
   if (!slots.ok) return { ok: false, result: slots.detail };

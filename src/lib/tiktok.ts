@@ -459,7 +459,11 @@ function parseDetail(o: Record<string, unknown>): TiktokOrderDetail {
   const dist =
     (addr?.district_info as Record<string, unknown>[] | undefined) ?? [];
   const lines = (o.line_items as unknown[] | undefined) ?? [];
-  const pkgs = (o.package_list as Record<string, unknown>[] | undefined) ?? [];
+  // Nama field paket di respons Get Order Detail adalah `packages` (bukan
+  // package_list — salah membaca ini pernah membuat "paket belum dibuat").
+  const pkgs = ((o.packages ?? o.package_list) as
+    | Record<string, unknown>[]
+    | undefined) ?? [];
   return {
     id: str(o.id),
     status: str(o.status),
@@ -587,81 +591,6 @@ export async function getTiktokOrderDetail(
 export type TiktokShippingDocumentResult =
   | { ok: true; doc_url: string; tracking_number: string }
   | { ok: false; detail: string };
-
-/** GET /logistics/202309/orders/{order_id}/shipping_documents — URL dokumen
- *  pengiriman RESMI TikTok Shop (label kirim PDF persis seperti menu
- *  "Cetak Resi" di aplikasi). document_type: SHIPPING_LABEL | PICK_LIST. */
-export async function getShippingDocument(
-  shop: { cipher: string; access_token: string },
-  orderId: string,
-  documentType: "SHIPPING_LABEL" | "PICK_LIST" = "SHIPPING_LABEL",
-): Promise<TiktokShippingDocumentResult> {
-  const { appKey, appSecret, ready } = tiktokEnv();
-  if (!ready) {
-    return {
-      ok: false,
-      detail:
-        "Kredensial aplikasi belum diatur (env TIKTOK_APP_KEY dan TIKTOK_APP_SECRET).",
-    };
-  }
-  if (shop.cipher === "") {
-    return {
-      ok: false,
-      detail: "shop_cipher belum tersimpan — coba otorisasi ulang aplikasi.",
-    };
-  }
-  const path = `/logistics/202309/orders/${orderId}/shipping_documents`;
-  const params: Record<string, string> = {
-    app_key: appKey,
-    shop_cipher: shop.cipher,
-    timestamp: Math.floor(Date.now() / 1000).toString(),
-    document_type: documentType,
-  };
-  const sign = signRequest(appSecret, path, params);
-  const qs = new URLSearchParams({ ...params, sign });
-  try {
-    const res = await fetch(`${API_HOST}${path}?${qs.toString()}`, {
-      method: "GET",
-      headers: {
-        "content-type": "application/json",
-        "x-tts-access-token": shop.access_token,
-      },
-      cache: "no-store",
-    });
-    const data = (await res.json().catch(() => ({}))) as {
-      code?: number;
-      message?: string;
-      data?: { doc_url?: string; tracking_number?: string };
-    };
-    if (!res.ok || (data.code ?? 1) !== 0) {
-      return {
-        ok: false,
-        detail: `Gagal mengambil dokumen pengiriman: ${String(
-          data.message ?? res.status,
-        )}`,
-      };
-    }
-    const docUrl = String(data.data?.doc_url ?? "");
-    if (docUrl === "") {
-      return {
-        ok: false,
-        detail: "Dokumen pengiriman belum tersedia untuk pesanan ini",
-      };
-    }
-    return {
-      ok: true,
-      doc_url: docUrl,
-      tracking_number: String(data.data?.tracking_number ?? ""),
-    };
-  } catch (e) {
-    return {
-      ok: false,
-      detail: `Gagal menghubungi server TikTok: ${
-        e instanceof Error ? e.message : "kesalahan tidak dikenal"
-      }`,
-    };
-  }
-}
 
 /** GET /fulfillment/202309/packages/{package_id}/shipping_documents — jalur
  *  cadangan dokumen resmi per paket (butuh paket sudah diatur kirimnya). */
@@ -983,6 +912,113 @@ export async function getPackageDetail(
             available: true,
           }
         : null,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Gagal menghubungi server TikTok: ${
+        e instanceof Error ? e.message : "kesalahan tidak dikenal"
+      }`,
+    };
+  }
+}
+
+/** Ringkasan satu paket hasil pencarian. */
+export type TiktokPackageSummary = {
+  id: string;
+  order_ids: string[];
+  status: string;
+  tracking_number: string;
+};
+
+/** POST /fulfillment/202309/packages/search — cari paket berdasarkan jendela
+ *  waktu dibuat/diperbarui (dan opsional status). Dipakai untuk menemukan
+ *  package_id sebuah pesanan ketika detail pesanan tidak menyertakan daftar
+ *  paket. */
+export async function searchPackages(
+  shop: { cipher: string; access_token: string },
+  opts: {
+    create_time_ge?: number;
+    create_time_lt?: number;
+    update_time_ge?: number;
+    update_time_lt?: number;
+    package_status?: string;
+  },
+): Promise<
+  | { ok: true; packages: TiktokPackageSummary[]; total_count: number }
+  | { ok: false; detail: string }
+> {
+  const { appKey, appSecret, ready } = tiktokEnv();
+  if (!ready || shop.cipher === "") {
+    return {
+      ok: false,
+      detail: "Kredensial aplikasi atau shop_cipher belum lengkap",
+    };
+  }
+  const path = "/fulfillment/202309/packages/search";
+  const body = JSON.stringify({
+    ...(opts.create_time_ge !== undefined
+      ? { create_time_ge: opts.create_time_ge }
+      : {}),
+    ...(opts.create_time_lt !== undefined
+      ? { create_time_lt: opts.create_time_lt }
+      : {}),
+    ...(opts.update_time_ge !== undefined
+      ? { update_time_ge: opts.update_time_ge }
+      : {}),
+    ...(opts.update_time_lt !== undefined
+      ? { update_time_lt: opts.update_time_lt }
+      : {}),
+    ...(opts.package_status ? { package_status: opts.package_status } : {}),
+  });
+  const params: Record<string, string> = {
+    app_key: appKey,
+    shop_cipher: shop.cipher,
+    timestamp: Math.floor(Date.now() / 1000).toString(),
+    page_size: "50",
+    sort_field: "update_time",
+    sort_order: "DESC",
+  };
+  const sign = signRequest(appSecret, path, params, body);
+  const qs = new URLSearchParams({ ...params, sign });
+  try {
+    const res = await fetch(`${API_HOST}${path}?${qs.toString()}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-tts-access-token": shop.access_token,
+      },
+      body,
+      cache: "no-store",
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      code?: number;
+      message?: string;
+      data?: {
+        packages?: {
+          id?: string;
+          orders?: { id?: string }[];
+          status?: string;
+          tracking_number?: string;
+        }[];
+        total_count?: number;
+      };
+    };
+    if (!res.ok || (data.code ?? 1) !== 0) {
+      return {
+        ok: false,
+        detail: `Gagal mencari paket: ${String(data.message ?? res.status)}`,
+      };
+    }
+    return {
+      ok: true,
+      total_count: Number(data.data?.total_count ?? 0),
+      packages: (data.data?.packages ?? []).map((p) => ({
+        id: String(p.id ?? ""),
+        order_ids: (p.orders ?? []).map((o) => String(o.id ?? "")),
+        status: String(p.status ?? ""),
+        tracking_number: String(p.tracking_number ?? ""),
+      })),
     };
   } catch (e) {
     return {
