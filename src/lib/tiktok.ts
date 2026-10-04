@@ -5,6 +5,7 @@
 import { createHmac } from "crypto";
 
 const AUTH_URL = "https://auth.tiktok-shops.com/api/v2/token/get";
+const REFRESH_URL = "https://auth.tiktok-shops.com/api/v2/token/refresh";
 const API_HOST = "https://open-api.tiktokglobalshop.com";
 
 export type TiktokTokenResult =
@@ -170,6 +171,172 @@ export async function getAuthorizedTiktokShops(
       };
     }
     return { ok: true, shops: data.data?.shops ?? [] };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Gagal menghubungi server TikTok: ${
+        e instanceof Error ? e.message : "kesalahan tidak dikenal"
+      }`,
+    };
+  }
+}
+
+export type TiktokRefreshResult =
+  | {
+      ok: true;
+      access_token: string;
+      refresh_token: string;
+      expires_at: string;
+    }
+  | { ok: false; detail: string };
+
+/** Perbarui access token dengan refresh token (GET token/refresh). */
+export async function refreshTiktokToken(
+  refreshToken: string,
+): Promise<TiktokRefreshResult> {
+  const { appKey, appSecret, ready } = tiktokEnv();
+  if (!ready) {
+    return {
+      ok: false,
+      detail:
+        "Kredensial aplikasi belum diatur (env TIKTOK_APP_KEY dan TIKTOK_APP_SECRET).",
+    };
+  }
+  const qs = new URLSearchParams({
+    app_key: appKey,
+    app_secret: appSecret,
+    grant_type: "refresh_token",
+    refresh_token: refreshToken,
+  });
+  try {
+    const res = await fetch(`${REFRESH_URL}?${qs.toString()}`, {
+      method: "GET",
+      cache: "no-store",
+    });
+    const data = (await res.json().catch(() => ({}))) as Record<
+      string,
+      unknown
+    >;
+    const d = (data.data ?? {}) as Record<string, unknown>;
+    const accessToken = String(d.access_token ?? "");
+    if (!res.ok || accessToken === "") {
+      return {
+        ok: false,
+        detail: `Gagal memperbarui token: ${String(
+          data.message ?? res.status,
+        )}`,
+      };
+    }
+    const expireRaw = Number(d.access_token_expire_in ?? 0);
+    const expiresMs =
+      expireRaw >= 1e9 ? expireRaw * 1000 : Date.now() + expireRaw * 1000;
+    return {
+      ok: true,
+      access_token: accessToken,
+      refresh_token: String(d.refresh_token ?? refreshToken),
+      expires_at: new Date(expiresMs || Date.now() + 7 * 86400 * 1000)
+        .toISOString()
+        .slice(0, 19)
+        .replace("T", " "),
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Gagal menghubungi server TikTok: ${
+        e instanceof Error ? e.message : "kesalahan tidak dikenal"
+      }`,
+    };
+  }
+}
+
+export type TiktokOrderSummary = {
+  order_id: string;
+  order_status: string;
+  create_time: number;
+  update_time: number;
+  items: { product_name: string; sku_count: number }[];
+};
+
+/** POST /order/202309/orders/search — daftar pesanan terbaru toko. */
+export async function getTiktokOrders(
+  shop: { cipher: string; access_token: string },
+  daysBack = 7,
+): Promise<
+  { ok: true; orders: TiktokOrderSummary[] } | { ok: false; detail: string }
+> {
+  const { appKey, appSecret, ready } = tiktokEnv();
+  if (!ready) {
+    return {
+      ok: false,
+      detail:
+        "Kredensial aplikasi belum diatur (env TIKTOK_APP_KEY dan TIKTOK_APP_SECRET).",
+    };
+  }
+  if (shop.cipher === "") {
+    return {
+      ok: false,
+      detail: "shop_cipher belum tersimpan — coba otorisasi ulang aplikasi.",
+    };
+  }
+  const path = "/order/202309/orders/search";
+  const now = Math.floor(Date.now() / 1000);
+  const body = JSON.stringify({
+    page_size: 20,
+    update_time_from: now - daysBack * 86400,
+    update_time_to: now,
+    sort_by: "update_time",
+    sort_order: "DESC",
+  });
+  const params: Record<string, string> = {
+    app_key: appKey,
+    shop_cipher: shop.cipher,
+    timestamp: now.toString(),
+  };
+  const sign = signRequest(appSecret, path, params, body);
+  const qs = new URLSearchParams({ ...params, sign });
+  try {
+    const res = await fetch(`${API_HOST}${path}?${qs.toString()}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-tts-access-token": shop.access_token,
+      },
+      body,
+      cache: "no-store",
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      code?: number;
+      message?: string;
+      data?: { order_list?: unknown[] };
+    };
+    if (!res.ok || (data.code ?? 1) !== 0) {
+      return {
+        ok: false,
+        detail: `Gagal mengambil pesanan: ${String(
+          data.message ?? res.status,
+        )}`,
+      };
+    }
+    const orders: TiktokOrderSummary[] = (data.data?.order_list ?? []).map(
+      (o) => {
+        const r = o as Record<string, unknown>;
+        const itemList = (r.item_list as unknown[] | undefined) ?? [];
+        return {
+          order_id: String(r.order_id ?? ""),
+          order_status: String(r.order_status ?? ""),
+          create_time: Number(r.create_time ?? 0),
+          update_time: Number(r.update_time ?? 0),
+          items: itemList.map((it) => {
+            const i = it as Record<string, unknown>;
+            return {
+              product_name: String(i.product_name ?? ""),
+              sku_count: Number(i.sku_count ?? 1),
+            };
+          }),
+        };
+      },
+    );
+    return { ok: true, orders };
   } catch (e) {
     return {
       ok: false,

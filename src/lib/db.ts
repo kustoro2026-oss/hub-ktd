@@ -248,12 +248,23 @@ function migrateSqlite(db: DatabaseSync) {
     CREATE TABLE IF NOT EXISTS tiktok_shop_tokens (
       shop_id TEXT PRIMARY KEY,
       shop_name TEXT NOT NULL DEFAULT '',
+      cipher TEXT NOT NULL DEFAULT '',
       access_token TEXT NOT NULL DEFAULT '',
       refresh_token TEXT NOT NULL DEFAULT '',
       expires_at TEXT NOT NULL DEFAULT '',
       updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
   `);
+
+  // Migrasi DB lama: kolom shop_cipher untuk panggilan API pesanan.
+  const tcols = db
+    .prepare("PRAGMA table_info(tiktok_shop_tokens)")
+    .all() as unknown as { name: string }[];
+  if (!tcols.some((c) => c.name === "cipher")) {
+    db.exec(
+      "ALTER TABLE tiktok_shop_tokens ADD COLUMN cipher TEXT NOT NULL DEFAULT ''",
+    );
+  }
 
   // Migrasi DB lama: tambah kolom wa_id bila belum ada (id pesan WhatsApp
   // untuk mencocokkan event status kiriman dari webhook Meta).
@@ -397,12 +408,18 @@ async function migratePg(pool: Pool) {
     CREATE TABLE IF NOT EXISTS tiktok_shop_tokens (
       shop_id TEXT PRIMARY KEY,
       shop_name TEXT NOT NULL DEFAULT '',
+      cipher TEXT NOT NULL DEFAULT '',
       access_token TEXT NOT NULL DEFAULT '',
       refresh_token TEXT NOT NULL DEFAULT '',
       expires_at TEXT NOT NULL DEFAULT '',
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+
+  // Migrasi DB lama: kolom shop_cipher untuk panggilan API pesanan.
+  await pool.query(
+    "ALTER TABLE tiktok_shop_tokens ADD COLUMN IF NOT EXISTS cipher TEXT NOT NULL DEFAULT ''",
+  );
 
   // Migrasi DB lama: kolom arah pesan (masuk/keluar) dan status terbaca.
   await pool.query(
@@ -918,6 +935,7 @@ export async function markConversationRead(waFrom: string): Promise<void> {
 export type TiktokShopToken = {
   shop_id: string;
   shop_name: string;
+  cipher: string;
   access_token: string;
   refresh_token: string;
   expires_at: string;
@@ -928,18 +946,25 @@ export type TiktokShopToken = {
 export async function saveTiktokShopToken(
   t: Pick<
     TiktokShopToken,
-    "shop_id" | "shop_name" | "access_token" | "refresh_token" | "expires_at"
+    | "shop_id"
+    | "shop_name"
+    | "cipher"
+    | "access_token"
+    | "refresh_token"
+    | "expires_at"
   >,
 ): Promise<void> {
   const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
   await queryRun(
-    `INSERT INTO tiktok_shop_tokens (shop_id, shop_name, access_token, refresh_token, expires_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)
-     ON CONFLICT (shop_id) DO UPDATE SET shop_name = excluded.shop_name, access_token = excluded.access_token,
-       refresh_token = excluded.refresh_token, expires_at = excluded.expires_at, updated_at = excluded.updated_at`,
+    `INSERT INTO tiktok_shop_tokens (shop_id, shop_name, cipher, access_token, refresh_token, expires_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (shop_id) DO UPDATE SET shop_name = excluded.shop_name, cipher = excluded.cipher,
+       access_token = excluded.access_token, refresh_token = excluded.refresh_token,
+       expires_at = excluded.expires_at, updated_at = excluded.updated_at`,
     [
       t.shop_id,
       t.shop_name ?? "",
+      t.cipher ?? "",
       t.access_token,
       t.refresh_token,
       t.expires_at,

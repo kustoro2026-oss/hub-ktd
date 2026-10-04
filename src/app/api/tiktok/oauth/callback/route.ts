@@ -25,6 +25,7 @@ export async function GET(req: NextRequest) {
   // token/get tidak memuat shop_id — ambil lewat Get Authorized Shops.
   let shopId = `open-${res.open_id || "tokopedia"}`;
   let shopName = res.shop_name;
+  let cipher = "";
   let catatan = "";
   const shopsRes = await getAuthorizedTiktokShops(res.access_token);
   if (!shopsRes.ok) {
@@ -33,10 +34,12 @@ export async function GET(req: NextRequest) {
     const shop = shopsRes.shops[0];
     shopId = shop.id;
     shopName = shop.name || shopName;
+    cipher = shop.cipher;
   }
   await saveTiktokShopToken({
     shop_id: shopId,
     shop_name: shopName,
+    cipher,
     access_token: res.access_token,
     refresh_token: res.refresh_token,
     expires_at: res.expires_at,
