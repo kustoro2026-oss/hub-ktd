@@ -244,6 +244,15 @@ function migrateSqlite(db: DatabaseSync) {
       contact_id INTEGER NOT NULL,
       PRIMARY KEY (group_id, contact_id)
     );
+
+    CREATE TABLE IF NOT EXISTS tiktok_shop_tokens (
+      shop_id TEXT PRIMARY KEY,
+      shop_name TEXT NOT NULL DEFAULT '',
+      access_token TEXT NOT NULL DEFAULT '',
+      refresh_token TEXT NOT NULL DEFAULT '',
+      expires_at TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
   `);
 
   // Migrasi DB lama: tambah kolom wa_id bila belum ada (id pesan WhatsApp
@@ -383,6 +392,15 @@ async function migratePg(pool: Pool) {
       group_id INTEGER NOT NULL,
       contact_id INTEGER NOT NULL,
       PRIMARY KEY (group_id, contact_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS tiktok_shop_tokens (
+      shop_id TEXT PRIMARY KEY,
+      shop_name TEXT NOT NULL DEFAULT '',
+      access_token TEXT NOT NULL DEFAULT '',
+      refresh_token TEXT NOT NULL DEFAULT '',
+      expires_at TEXT NOT NULL DEFAULT '',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
 
@@ -892,5 +910,47 @@ export async function markConversationRead(waFrom: string): Promise<void> {
   await queryRun(
     "UPDATE messages SET read = 1 WHERE wa_from = ? AND direction = 'in' AND read = 0",
     [waFrom],
+  );
+}
+
+// ---------- Token TikTok Shop (Open API) ----------
+
+export type TiktokShopToken = {
+  shop_id: string;
+  shop_name: string;
+  access_token: string;
+  refresh_token: string;
+  expires_at: string;
+  updated_at: string;
+};
+
+/** Simpan/timpa token OAuth toko TikTok Shop (kunci: shop_id). */
+export async function saveTiktokShopToken(
+  t: Pick<
+    TiktokShopToken,
+    "shop_id" | "shop_name" | "access_token" | "refresh_token" | "expires_at"
+  >,
+): Promise<void> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  await queryRun(
+    `INSERT INTO tiktok_shop_tokens (shop_id, shop_name, access_token, refresh_token, expires_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
+     ON CONFLICT (shop_id) DO UPDATE SET shop_name = excluded.shop_name, access_token = excluded.access_token,
+       refresh_token = excluded.refresh_token, expires_at = excluded.expires_at, updated_at = excluded.updated_at`,
+    [
+      t.shop_id,
+      t.shop_name ?? "",
+      t.access_token,
+      t.refresh_token,
+      t.expires_at,
+      nowUtc,
+    ],
+  );
+}
+
+/** Daftar toko TikTok Shop yang sudah diotorisasi (token tersimpan). */
+export async function listTiktokShopTokens(): Promise<TiktokShopToken[]> {
+  return queryAll<TiktokShopToken>(
+    "SELECT * FROM tiktok_shop_tokens ORDER BY updated_at DESC",
   );
 }
