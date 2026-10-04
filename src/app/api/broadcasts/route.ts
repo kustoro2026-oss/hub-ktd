@@ -1,18 +1,29 @@
 // Buat kampanye broadcast baru: nama kampanye + daftar penerima.
-// Penerima diambil dari semua kontak (default) atau daftar id kontak pilihan.
+// Penerima: semua kontak (default), kontak pilihan (contactIds), atau
+// seluruh anggota satu grup (groupId).
 import { isAuthed } from "@/lib/auth";
-import { createBroadcastWithItems, listContacts } from "@/lib/db";
+import {
+  createBroadcastWithItems,
+  listContacts,
+  listContactsByGroup,
+} from "@/lib/db";
 
 export async function POST(request: Request) {
   if (!(await isAuthed())) {
     return Response.json({ error: "Belum masuk" }, { status: 401 });
   }
-  let body: { name?: string; template?: string; contactIds?: number[] } = {};
+  let body: {
+    name?: string;
+    template?: string;
+    contactIds?: number[];
+    groupId?: number;
+  } = {};
   try {
     body = (await request.json()) as {
       name?: string;
       template?: string;
       contactIds?: number[];
+      groupId?: number;
     };
   } catch {
     return Response.json({ error: "Body tidak valid" }, { status: 400 });
@@ -21,10 +32,15 @@ export async function POST(request: Request) {
     return Response.json({ error: "Nama kampanye wajib diisi" }, { status: 400 });
   }
 
-  const all = await listContacts();
-  const selected = body.contactIds?.length
-    ? all.filter((c) => body.contactIds!.includes(c.id))
-    : all;
+  let selected;
+  if (body.groupId) {
+    selected = await listContactsByGroup(body.groupId);
+  } else if (body.contactIds?.length) {
+    const all = await listContacts();
+    selected = all.filter((c) => body.contactIds!.includes(c.id));
+  } else {
+    selected = await listContacts();
+  }
   if (selected.length === 0) {
     return Response.json(
       { error: "Tidak ada kontak — tambahkan kontak dulu" },
@@ -36,6 +52,7 @@ export async function POST(request: Request) {
     body.name,
     body.template?.trim() || "info_promo_v2",
     selected.map((c) => ({ contactId: c.id, phone: c.phone })),
+    body.groupId ?? null,
   );
   return Response.json({ ok: true, broadcast }, { status: 201 });
 }

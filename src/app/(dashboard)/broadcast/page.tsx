@@ -1,6 +1,6 @@
 // Halaman Broadcast — daftar kampanye + buat kampanye baru.
 import Link from "next/link";
-import { countContacts, listBroadcasts } from "@/lib/db";
+import { countContacts, listBroadcasts, listGroups } from "@/lib/db";
 import BroadcastCreate from "@/components/broadcast-create";
 
 export const dynamic = "force-dynamic";
@@ -13,9 +13,10 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 export default async function BroadcastPage() {
-  const [broadcasts, contactCount] = await Promise.all([
+  const [broadcasts, contactCount, groups] = await Promise.all([
     listBroadcasts(),
     countContacts(),
+    listGroups(),
   ]);
 
   return (
@@ -31,10 +32,11 @@ export default async function BroadcastPage() {
         <h2 className="mb-3 text-sm font-semibold text-slate-900">
           Kampanye baru
         </h2>
-        <BroadcastCreate contactCount={contactCount} />
+        <BroadcastCreate contactCount={contactCount} groups={groups} />
         <p className="mt-3 text-xs text-slate-400">
-          Menggunakan template <code>info_promo_v2</code> yang sudah disetujui Meta.
-          Semua kontak menjadi penerima.
+          Hanya template berstatus <strong>Disetujui</strong> Meta yang bisa
+          dipilih. Sasaran bisa semua kontak atau satu grup — kirim berjalan
+          dari halaman detail kampanye.
         </p>
       </div>
 

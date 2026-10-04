@@ -35,6 +35,7 @@ export type Broadcast = {
   id: number;
   name: string;
   template: string;
+  group_id: number | null;
   total: number;
   sent: number;
   failed: number;
@@ -187,6 +188,7 @@ function migrateSqlite(db: DatabaseSync) {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL,
       template TEXT NOT NULL DEFAULT 'info_promo_v2',
+      group_id INTEGER,
       total INTEGER NOT NULL DEFAULT 0,
       sent INTEGER NOT NULL DEFAULT 0,
       failed INTEGER NOT NULL DEFAULT 0,
@@ -276,6 +278,14 @@ function migrateSqlite(db: DatabaseSync) {
       "ALTER TABLE contacts ADD COLUMN wa_status TEXT NOT NULL DEFAULT ''",
     );
   }
+
+  // Migrasi DB lama: kolom id grup sasaran broadcast (NULL = semua kontak).
+  const bcols = db
+    .prepare("PRAGMA table_info(broadcasts)")
+    .all() as unknown as { name: string }[];
+  if (!bcols.some((c) => c.name === "group_id")) {
+    db.exec("ALTER TABLE broadcasts ADD COLUMN group_id INTEGER");
+  }
 }
 
 async function migratePg(pool: Pool) {
@@ -292,6 +302,7 @@ async function migratePg(pool: Pool) {
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL,
       template TEXT NOT NULL DEFAULT 'info_promo_v2',
+      group_id INTEGER,
       total INTEGER NOT NULL DEFAULT 0,
       sent INTEGER NOT NULL DEFAULT 0,
       failed INTEGER NOT NULL DEFAULT 0,
@@ -353,6 +364,9 @@ async function migratePg(pool: Pool) {
   );
   await pool.query(
     "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS wa_status TEXT NOT NULL DEFAULT ''",
+  );
+  await pool.query(
+    "ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS group_id INTEGER",
   );
 }
 
@@ -521,10 +535,11 @@ export async function createBroadcastWithItems(
   name: string,
   template: string,
   items: { contactId: number | null; phone: string }[],
+  groupId: number | null = null,
 ): Promise<Broadcast> {
   const bc = await queryOne<Broadcast>(
-    "INSERT INTO broadcasts (name, template, total) VALUES (?, ?, ?) RETURNING *",
-    [name.trim(), template, items.length],
+    "INSERT INTO broadcasts (name, template, total, group_id) VALUES (?, ?, ?, ?) RETURNING *",
+    [name.trim(), template, items.length, groupId],
   );
   if (!bc) throw new Error("gagal membuat broadcast");
   if (items.length > 0) {
