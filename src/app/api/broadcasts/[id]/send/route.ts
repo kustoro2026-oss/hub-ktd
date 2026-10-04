@@ -11,6 +11,7 @@ import {
   markBroadcastItem,
   pendingBroadcastItems,
   setBroadcastStatus,
+  setContactWaStatus,
 } from "@/lib/db";
 import { getTemplateStatus, getWaEnv, sendTemplate } from "@/lib/wa";
 
@@ -81,6 +82,11 @@ export async function POST(
     } else {
       await markBroadcastItem(item.id, "failed", res.error ?? "gagal");
       failedNow++;
+      // Nomor tidak terdaftar WhatsApp → tandai kontaknya invalid supaya
+      // bisa difilter di menu Verifikasi / kiriman berikutnya.
+      if (res.notOnWa && item.contact_id != null) {
+        await setContactWaStatus(item.contact_id, "invalid");
+      }
     }
     await new Promise((r) => setTimeout(r, DELAY_MS));
   }

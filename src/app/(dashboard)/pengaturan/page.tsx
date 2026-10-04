@@ -117,7 +117,11 @@ export default function PengaturanPage() {
             tidak memakai kuota pesan, dan tidak mengirim apa pun ke nomor
             itu. Nomor dicek satu per satu dari browser; hasil disimpan di
             kolom <code>contacts.wa_status</code> (valid / tidak valid /
-            gagal cek) dan tampil juga di halaman Kontak.
+            gagal cek) dan tampil juga di halaman Kontak. Catatan: bila
+            endpoint itu ditolak Meta (hasil "Gagal cek"), nomor yang tidak
+            terdaftar tetap otomatis ditandai <strong>tidak valid</strong>
+            saat kirim massal menemukannya (error 131026 dari Meta — tidak
+            memakai kuota karena pesan tidak jadi terkirim).
           </li>
           <li>
             <strong>Balasan otomatis:</strong> teks bebas gratis dalam window 24

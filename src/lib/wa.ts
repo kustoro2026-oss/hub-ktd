@@ -46,7 +46,7 @@ export async function sendTemplate(
   to: string,
   template = "info_promo_v2",
   language = "id",
-): Promise<{ ok: boolean; error?: string; waId?: string }> {
+): Promise<{ ok: boolean; error?: string; waId?: string; notOnWa?: boolean }> {
   const env = getWaEnv();
   if (!env) return { ok: false, error: "WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur" };
   const res = await fetch(
@@ -68,7 +68,12 @@ export async function sendTemplate(
   );
   if (!res.ok) {
     const err = await res.text();
-    return { ok: false, error: `HTTP ${res.status} ${err.slice(0, 300)}` };
+    // 131026 = nomor tujuan bukan nomor WhatsApp; 1013 = kode lama untuk
+    // hal yang sama (kirim template ke nomor tanpa akun WhatsApp). Kiriman
+    // seperti ini tidak dihitung kuota karena percakapan tidak pernah
+    // terbuka — tandai supaya kontak bisa difilter dari kiriman berikutnya.
+    const notOnWa = /131026|1013/.test(err);
+    return { ok: false, error: `HTTP ${res.status} ${err.slice(0, 300)}`, notOnWa };
   }
   const data = (await res.json()) as { messages?: { id?: string }[] };
   return { ok: true, waId: data.messages?.[0]?.id };
