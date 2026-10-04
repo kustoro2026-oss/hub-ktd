@@ -118,10 +118,22 @@ export function ownerNumber(): string | null {
   return normalizePhone(process.env.OWNER_WA_NUMBER ?? "6285171157938");
 }
 
+/** Waktu sekarang dalam WIB (UTC+7), format "DD/MM/YYYY HH.MM WIB". */
+export function nowWib(): string {
+  const w = new Date(Date.now() + 7 * 3600 * 1000);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(w.getUTCDate())}/${p(w.getUTCMonth() + 1)}/${w.getUTCFullYear()} ${p(w.getUTCHours())}.${p(w.getUTCMinutes())} WIB`;
+}
+
 /** Susun teks notifikasi pesanan untuk dikirim ke nomor admin. */
-export function buildOrderNotification(from: string, body: string): string {
+export function buildOrderNotification(
+  from: string,
+  body: string,
+  time: string,
+): string {
   return `Pesanan baru masuk — KTD Hub
 Dari: ${from}
+Waktu: ${time}
 Lihat & balas: https://admin.kustoro2026.com/pesan/${from}
 
 ${body}`;
@@ -182,10 +194,11 @@ export async function notifyOrderOwner(
   const owner = ownerNumber();
   if (!owner) return "";
   if (owner === normalizePhone(from)) return "skip"; // pengirim = nomor admin sendiri
-  const res = await sendText(owner, buildOrderNotification(from, body));
+  const time = nowWib();
+  const res = await sendText(owner, buildOrderNotification(from, body, time));
   if (res.ok) return "ok";
   // Window 24 jam tidak terbuka — template utility tetap bisa masuk kapan saja.
-  const detail = `Dari: ${from}\n\n${body}`;
+  const detail = `Dari: ${from}\nWaktu: ${time}\n\n${body}`;
   const tpl = await sendTemplateParams(owner, NOTIF_TEMPLATE, [
     detail.length > 900 ? `${detail.slice(0, 900)}...` : detail,
   ]);
