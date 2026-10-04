@@ -108,6 +108,12 @@ export async function sendText(
 
 // ---------- Verifikasi nomor WhatsApp ----------
 
+// Versi Graph yang dicoba untuk cek nomor. Endpoint contacts di versi baru
+// bisa menolak dengan "Unsupported post request ... does not support this
+// operation", jadi bila versi utama menolak, coba versi lama yang masih
+// aktif (Graph mendukung ~2 tahun ke belakang).
+const CONTACT_CHECK_VERSIONS = ["v24.0", "v23.0", "v22.0", "v21.0"];
+
 /** Cek apakah satu nomor terdaftar di WhatsApp lewat endpoint contacts
  *  (gratis — tidak memakai kuota pesan, tidak mengirim apa pun ke nomor
  *  itu). Hasil: "valid" (terdaftar), "invalid" (tidak terdaftar), atau
@@ -121,32 +127,41 @@ export async function checkContactWa(
       status: "error",
       detail: "WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur",
     };
-  const res = await fetch(
-    `https://graph.facebook.com/${GRAPH_VERSION}/${env.phoneNumberId}/contacts`,
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${env.token}`,
-        "Content-Type": "application/json",
+  let lastDetail = "";
+  for (const ver of CONTACT_CHECK_VERSIONS) {
+    const res = await fetch(
+      `https://graph.facebook.com/${ver}/${env.phoneNumberId}/contacts`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ blocking: "wait", contacts: [withPlus(to)] }),
       },
-      body: JSON.stringify({ blocking: "wait", contacts: [withPlus(to)] }),
-    },
-  );
-  if (!res.ok) {
+    );
+    if (res.ok) {
+      const data = (await res.json()) as {
+        contacts?: { input?: string; status?: string; wa_id?: string }[];
+      };
+      const c = data.contacts?.[0];
+      if (!c) return { status: "error", detail: "respons kosong" };
+      if (c.status === "valid") return { status: "valid" };
+      if (c.status === "invalid") return { status: "invalid" };
+      return { status: "error", detail: `status ${c.status ?? "?"}` };
+    }
     const err = await res.text();
-    return {
-      status: "error",
-      detail: `HTTP ${res.status} ${err.slice(0, 200)}`,
-    };
+    lastDetail = `HTTP ${res.status} ${err.slice(0, 200)}`;
+    // Bila versi ini tidak mendukung endpoint contacts, coba versi berikut.
+    if (
+      !/does not exist|Unsupported post request|does not support this operation|missing permissions/i.test(
+        err,
+      )
+    ) {
+      break;
+    }
   }
-  const data = (await res.json()) as {
-    contacts?: { input?: string; status?: string; wa_id?: string }[];
-  };
-  const c = data.contacts?.[0];
-  if (!c) return { status: "error", detail: "respons kosong" };
-  if (c.status === "valid") return { status: "valid" };
-  if (c.status === "invalid") return { status: "invalid" };
-  return { status: "error", detail: `status ${c.status ?? "?"}` };
+  return { status: "error", detail: lastDetail };
 }
 
 // ---------- Notifikasi pesanan ke admin toko ----------
