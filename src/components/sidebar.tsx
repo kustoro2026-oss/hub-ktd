@@ -14,11 +14,13 @@ import {
   BadgeCheck,
   Store,
   FileText,
+  Package,
 } from "lucide-react";
 
 export const NAV = [
   { href: "/", label: "Dasbor", Icon: LayoutDashboard },
   { href: "/kontak", label: "Kontak", Icon: Users },
+  { href: "/pesanan", label: "Pesanan", Icon: Package },
   { href: "/verifikasi", label: "Verifikasi", Icon: BadgeCheck },
   { href: "/broadcast", label: "Broadcast", Icon: Send },
   { href: "/template", label: "Template", Icon: FileText },
