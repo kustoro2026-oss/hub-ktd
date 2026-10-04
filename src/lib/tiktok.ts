@@ -257,12 +257,13 @@ export type TiktokOrderSummary = {
   items: { product_name: string; sku_count: number }[];
 };
 
-/** POST /order/202309/orders/search — daftar pesanan terbaru toko. */
+/** POST /order/202309/orders/search — daftar pesanan terbaru toko.
+ *  page_size/sort_field/sort_order ada di QUERY; filter waktu di body. */
 export async function getTiktokOrders(
   shop: { cipher: string; access_token: string },
   daysBack = 7,
 ): Promise<
-  { ok: true; orders: TiktokOrderSummary[] } | { ok: false; detail: string }
+  { ok: true; orders: TiktokOrderSummary[]; total_count: number } | { ok: false; detail: string }
 > {
   const { appKey, appSecret, ready } = tiktokEnv();
   if (!ready) {
@@ -281,16 +282,16 @@ export async function getTiktokOrders(
   const path = "/order/202309/orders/search";
   const now = Math.floor(Date.now() / 1000);
   const body = JSON.stringify({
-    page_size: 20,
-    update_time_from: now - daysBack * 86400,
-    update_time_to: now,
-    sort_by: "update_time",
-    sort_order: "DESC",
+    update_time_ge: now - daysBack * 86400,
+    update_time_lt: now,
   });
   const params: Record<string, string> = {
     app_key: appKey,
     shop_cipher: shop.cipher,
     timestamp: now.toString(),
+    page_size: "20",
+    sort_field: "update_time",
+    sort_order: "DESC",
   };
   const sign = signRequest(appSecret, path, params, body);
   const qs = new URLSearchParams({ ...params, sign });
@@ -307,7 +308,7 @@ export async function getTiktokOrders(
     const data = (await res.json().catch(() => ({}))) as {
       code?: number;
       message?: string;
-      data?: { order_list?: unknown[] };
+      data?: { orders?: unknown[]; total_count?: number };
     };
     if (!res.ok || (data.code ?? 1) !== 0) {
       return {
@@ -317,26 +318,42 @@ export async function getTiktokOrders(
         )}`,
       };
     }
-    const orders: TiktokOrderSummary[] = (data.data?.order_list ?? []).map(
+    const orders: TiktokOrderSummary[] = (data.data?.orders ?? []).map(
       (o) => {
         const r = o as Record<string, unknown>;
-        const itemList = (r.item_list as unknown[] | undefined) ?? [];
+        const lines = (r.line_items as unknown[] | undefined) ?? [];
         return {
-          order_id: String(r.order_id ?? ""),
-          order_status: String(r.order_status ?? ""),
+          order_id: String(r.id ?? ""),
+          order_status: String(r.status ?? ""),
           create_time: Number(r.create_time ?? 0),
           update_time: Number(r.update_time ?? 0),
-          items: itemList.map((it) => {
+          items: lines.map((it) => {
             const i = it as Record<string, unknown>;
+            const combos =
+              (i.combined_listing_skus as Record<string, unknown>[] |
+                undefined) ?? [];
+            let qty = Number(i.sku_count ?? 0);
+            if (!qty && combos.length > 0) {
+              qty = combos.reduce(
+                (acc, c) =>
+                  acc + Number((c as Record<string, unknown>).sku_count ?? 0),
+                0,
+              );
+            }
+            if (!qty) qty = 1;
             return {
               product_name: String(i.product_name ?? ""),
-              sku_count: Number(i.sku_count ?? 1),
+              sku_count: qty,
             };
           }),
         };
       },
     );
-    return { ok: true, orders };
+    return {
+      ok: true,
+      orders,
+      total_count: Number(data.data?.total_count ?? orders.length),
+    };
   } catch (e) {
     return {
       ok: false,
