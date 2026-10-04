@@ -11,12 +11,14 @@ import {
   Settings,
   LogOut,
   Users,
+  BadgeCheck,
   Store,
 } from "lucide-react";
 
 export const NAV = [
   { href: "/", label: "Dasbor", Icon: LayoutDashboard },
   { href: "/kontak", label: "Kontak", Icon: Users },
+  { href: "/verifikasi", label: "Verifikasi", Icon: BadgeCheck },
   { href: "/broadcast", label: "Broadcast", Icon: Send },
   { href: "/pesan", label: "Pesan Masuk", Icon: MessageSquare },
   { href: "/pengaturan", label: "Pengaturan", Icon: Settings },

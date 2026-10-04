@@ -106,6 +106,49 @@ export async function sendText(
   return { ok: true, waId: data.messages?.[0]?.id };
 }
 
+// ---------- Verifikasi nomor WhatsApp ----------
+
+/** Cek apakah satu nomor terdaftar di WhatsApp lewat endpoint contacts
+ *  (gratis — tidak memakai kuota pesan, tidak mengirim apa pun ke nomor
+ *  itu). Hasil: "valid" (terdaftar), "invalid" (tidak terdaftar), atau
+ *  "error" (gagal/tak bisa ditentukan — bisa dicek ulang). */
+export async function checkContactWa(
+  to: string,
+): Promise<{ status: "valid" | "invalid" | "error"; detail?: string }> {
+  const env = getWaEnv();
+  if (!env)
+    return {
+      status: "error",
+      detail: "WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur",
+    };
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${env.phoneNumberId}/contacts`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ blocking: "wait", contacts: [withPlus(to)] }),
+    },
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    return {
+      status: "error",
+      detail: `HTTP ${res.status} ${err.slice(0, 200)}`,
+    };
+  }
+  const data = (await res.json()) as {
+    contacts?: { input?: string; status?: string; wa_id?: string }[];
+  };
+  const c = data.contacts?.[0];
+  if (!c) return { status: "error", detail: "respons kosong" };
+  if (c.status === "valid") return { status: "valid" };
+  if (c.status === "invalid") return { status: "invalid" };
+  return { status: "error", detail: `status ${c.status ?? "?"}` };
+}
+
 // ---------- Notifikasi pesanan ke admin toko ----------
 
 /** Template utility notifikasi pesanan (bebas window 24 jam) — dibuat

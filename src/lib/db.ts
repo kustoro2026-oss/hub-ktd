@@ -20,6 +20,7 @@ export type Contact = {
   name: string;
   phone: string;
   note: string;
+  wa_status: string;
   created_at: string;
 };
 
@@ -245,6 +246,17 @@ function migrateSqlite(db: DatabaseSync) {
   if (!mcols.some((c) => c.name === "notify")) {
     db.exec("ALTER TABLE messages ADD COLUMN notify TEXT NOT NULL DEFAULT ''");
   }
+
+  // Migrasi DB lama: kolom status verifikasi WhatsApp kontak
+  // ('' = belum dicek, 'valid', 'invalid', 'error').
+  const ccols = db
+    .prepare("PRAGMA table_info(contacts)")
+    .all() as unknown as { name: string }[];
+  if (!ccols.some((c) => c.name === "wa_status")) {
+    db.exec(
+      "ALTER TABLE contacts ADD COLUMN wa_status TEXT NOT NULL DEFAULT ''",
+    );
+  }
 }
 
 async function migratePg(pool: Pool) {
@@ -308,12 +320,30 @@ async function migratePg(pool: Pool) {
   await pool.query(
     "ALTER TABLE messages ADD COLUMN IF NOT EXISTS notify TEXT NOT NULL DEFAULT ''",
   );
+  await pool.query(
+    "ALTER TABLE contacts ADD COLUMN IF NOT EXISTS wa_status TEXT NOT NULL DEFAULT ''",
+  );
 }
 
 // ---------- Kontak ----------
 
 export async function listContacts(): Promise<Contact[]> {
   return queryAll<Contact>("SELECT * FROM contacts ORDER BY id DESC");
+}
+
+export async function getContact(id: number): Promise<Contact | undefined> {
+  return queryOne<Contact>("SELECT * FROM contacts WHERE id = ?", [id]);
+}
+
+/** Simpan hasil verifikasi WhatsApp kontak ('' / valid / invalid / error). */
+export async function setContactWaStatus(
+  id: number,
+  status: string,
+): Promise<void> {
+  await queryRun("UPDATE contacts SET wa_status = ? WHERE id = ?", [
+    status,
+    id,
+  ]);
 }
 
 export async function countContacts(): Promise<number> {

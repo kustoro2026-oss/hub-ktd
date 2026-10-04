@@ -107,7 +107,17 @@ export default function PengaturanPage() {
             <strong>250 nomor unik/24 jam</strong> untuk akun baru; setelah
             verifikasi bisnis naik ke <strong>2.000</strong>, lalu bisa naik
             otomatis bertahap (10.000 → 100.000 → tanpa batas) bila kualitas
-            pesan terjaga.
+            pesan terjaga. Sebelum kirim massal, cek dulu nomor kontak di menu{" "}
+            <strong>Verifikasi</strong> agar kuota tidak terbuang ke nomor
+            yang tidak terdaftar WhatsApp.
+          </li>
+          <li>
+            <strong>Verifikasi WhatsApp:</strong> menu Verifikasi mengecek
+            nomor kontak lewat endpoint <code>contacts</code> Meta — gratis,
+            tidak memakai kuota pesan, dan tidak mengirim apa pun ke nomor
+            itu. Nomor dicek satu per satu dari browser; hasil disimpan di
+            kolom <code>contacts.wa_status</code> (valid / tidak valid /
+            gagal cek) dan tampil juga di halaman Kontak.
           </li>
           <li>
             <strong>Balasan otomatis:</strong> teks bebas gratis dalam window 24
