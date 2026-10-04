@@ -171,12 +171,14 @@ export async function sendResiForOrder(
     if (!prep.ok) continue;
     const cred = { cipher: prep.cipher, access_token: prep.access_token };
 
-    const official = await fetchOfficialResiPdf(cred, orderId);
+    const official = await getOfficialResiForCred(cred, orderId);
     if (!official.ok) return { ok: false, result: official.detail };
 
     const result = await sendResiPdf(orderId, null, shop.shop_name, {
       pdf: official.pdf,
-      label: "label resmi",
+      label: official.arranged
+        ? "label resmi + penjemputan dijadwalkan"
+        : "label resmi",
     });
     if (result.startsWith("ok")) {
       await markTiktokOrderSeen(orderId, shop.shop_id, result);
@@ -245,7 +247,7 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
 
       // Pesanan baru, atau percobaan ulang untuk kiriman yang gagal.
       newOrders++;
-      const official = await fetchOfficialResiPdf(cred, o.order_id);
+      const official = await getOfficialResiForCred(cred, o.order_id);
       if (!official.ok) {
         errors.push(`${shop.shop_name}: ${o.order_id}: ${official.detail}`);
         await recordTiktokOrderFailure(
@@ -258,7 +260,9 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
 
       const result = await sendResiPdf(o.order_id, null, shop.shop_name, {
         pdf: official.pdf,
-        label: "label resmi",
+        label: official.arranged
+          ? "label resmi + penjemputan dijadwalkan"
+          : "label resmi",
       });
       if (result.startsWith("ok")) {
         await markTiktokOrderSeen(o.order_id, shop.shop_id, result);
@@ -288,10 +292,77 @@ function formatSlotWib(start: number, end: number): string {
   return `${HARI[s.getUTCDay()]}, ${p(s.getUTCDate())}/${p(s.getUTCMonth() + 1)} ${p(s.getUTCHours())}.${p(s.getUTCMinutes())}–${p(e.getUTCHours())}.${p(e.getUTCMinutes())} WIB`;
 }
 
-/** Atur pengiriman untuk satu pesanan — persis menu "Atur Pengiriman" di
- *  aplikasi TikTok Shop: ambil slot penjemputan tersedia, pilih yang
- *  tercepat, lalu jadwalkan PICKUP (atau DROP_OFF bila pickup tidak ada).
- *  Setelah berhasil, label kirim resmi bisa diambil lewat Cetak Resi. */
+/** Atur pengiriman untuk satu pesanan (inti, tanpa loop toko) — persis menu
+ *  "Atur Pengiriman" di aplikasi TikTok Shop: ambil slot penjemputan
+ *  tersedia, pilih yang tercepat, lalu jadwalkan PICKUP (atau DROP_OFF bila
+ *  pickup tidak ada). Setelah berhasil, label kirim resmi bisa diambil. */
+async function arrangeShipment(
+  cred: { cipher: string; access_token: string },
+  orderId: string,
+): Promise<{ ok: boolean; result: string }> {
+  const detail = await getTiktokOrderDetail(cred, [orderId]);
+  if (!detail.ok) return { ok: false, result: detail.detail };
+  const order = detail.orders.find((o) => o.id === orderId);
+  const packageId = order?.package_list[0]?.id;
+  if (!packageId) {
+    return { ok: false, result: "Paket belum tersedia untuk pesanan ini" };
+  }
+
+  const slots = await getPackageHandoverTimeSlots(cred, packageId);
+  if (!slots.ok) return { ok: false, result: slots.detail };
+
+  if (slots.can_pickup) {
+    const now = Math.floor(Date.now() / 1000);
+    const slot = slots.pickup_slots
+      .filter((s) => s.available && s.start_time >= now)
+      .sort((a, b) => a.start_time - b.start_time)[0];
+    if (!slot) {
+      return {
+        ok: false,
+        result: "Tidak ada slot penjemputan yang tersedia saat ini",
+      };
+    }
+    const ship = await shipPackage(cred, packageId, {
+      handover_method: "PICKUP",
+      pickup_slot: { start_time: slot.start_time, end_time: slot.end_time },
+    });
+    if (!ship.ok) return { ok: false, result: ship.detail };
+
+    const pkg = await getPackageDetail(cred, packageId);
+    const resi =
+      pkg.ok && pkg.tracking_number
+        ? ` · No resi ${pkg.tracking_number}`
+        : "";
+    return {
+      ok: true,
+      result: `Penjemputan dijadwalkan ${formatSlotWib(
+        slot.start_time,
+        slot.end_time,
+      )}${resi}`,
+    };
+  }
+
+  if (slots.can_drop_off) {
+    const ship = await shipPackage(cred, packageId, {
+      handover_method: "DROP_OFF",
+    });
+    if (!ship.ok) return { ok: false, result: ship.detail };
+    const link = slots.drop_off_point_url
+      ? ` Lokasi drop-off: ${slots.drop_off_point_url}`
+      : "";
+    return {
+      ok: true,
+      result: `Pengiriman diatur — silakan antar paket ke titik drop-off.${link}`,
+    };
+  }
+
+  return {
+    ok: false,
+    result: "Paket ini tidak mendukung pickup maupun drop-off lewat API",
+  };
+}
+
+/** Atur pengiriman untuk satu pesanan (loop semua toko terotorisasi). */
 export async function arrangeShipmentForOrder(
   orderId: string,
 ): Promise<{ ok: boolean; result: string }> {
@@ -300,67 +371,62 @@ export async function arrangeShipmentForOrder(
     const prep = await prepareShop(shop);
     if (!prep.ok) continue;
     const cred = { cipher: prep.cipher, access_token: prep.access_token };
-
-    const detail = await getTiktokOrderDetail(cred, [orderId]);
-    if (!detail.ok) return { ok: false, result: detail.detail };
-    const order = detail.orders.find((o) => o.id === orderId);
-    const packageId = order?.package_list[0]?.id;
-    if (!packageId) {
-      return { ok: false, result: "Paket belum tersedia untuk pesanan ini" };
-    }
-
-    const slots = await getPackageHandoverTimeSlots(cred, packageId);
-    if (!slots.ok) return { ok: false, result: slots.detail };
-
-    if (slots.can_pickup) {
-      const now = Math.floor(Date.now() / 1000);
-      const slot = slots.pickup_slots
-        .filter((s) => s.available && s.start_time >= now)
-        .sort((a, b) => a.start_time - b.start_time)[0];
-      if (!slot) {
-        return {
-          ok: false,
-          result: "Tidak ada slot penjemputan yang tersedia saat ini",
-        };
-      }
-      const ship = await shipPackage(cred, packageId, {
-        handover_method: "PICKUP",
-        pickup_slot: { start_time: slot.start_time, end_time: slot.end_time },
-      });
-      if (!ship.ok) return { ok: false, result: ship.detail };
-
-      const pkg = await getPackageDetail(cred, packageId);
-      const resi =
-        pkg.ok && pkg.tracking_number
-          ? ` · No resi ${pkg.tracking_number}`
-          : "";
-      return {
-        ok: true,
-        result: `Penjemputan dijadwalkan ${formatSlotWib(
-          slot.start_time,
-          slot.end_time,
-        )}${resi}`,
-      };
-    }
-
-    if (slots.can_drop_off) {
-      const ship = await shipPackage(cred, packageId, {
-        handover_method: "DROP_OFF",
-      });
-      if (!ship.ok) return { ok: false, result: ship.detail };
-      const link = slots.drop_off_point_url
-        ? ` Lokasi drop-off: ${slots.drop_off_point_url}`
-        : "";
-      return {
-        ok: true,
-        result: `Pengiriman diatur — silakan antar paket ke titik drop-off.${link}`,
-      };
-    }
-
-    return {
-      ok: false,
-      result: "Paket ini tidak mendukung pickup maupun drop-off lewat API",
-    };
+    const res = await arrangeShipment(cred, orderId);
+    return res;
   }
   return { ok: false, result: "Pesanan tidak ditemukan di toko terotorisasi" };
+}
+
+/** Ambil label kirim RESMI untuk satu pesanan — meniru persis alur aplikasi
+ *  TikTok Shop: bila label belum tersedia karena pesanan masih "Menunggu
+ *  kirim" (AWAITING_SHIPMENT), jadwalkan penjemputan dulu (slot tercepat)
+ *  lalu ambil labelnya — status pesanan otomatis berubah jadi "Menunggu
+ *  pickup", dan selanjutnya resi bisa dicetak ulang kapan saja. */
+export async function getOfficialResiForCred(
+  cred: { cipher: string; access_token: string },
+  orderId: string,
+): Promise<
+  | { ok: true; pdf: Buffer; tracking_number: string; arranged: boolean }
+  | { ok: false; detail: string }
+> {
+  // 1. Coba label langsung (logistics → cadangan fulfillment).
+  const direct = await fetchOfficialResiPdf(cred, orderId);
+  if (direct.ok) return { ...direct, arranged: false };
+
+  // 2. Label belum tersedia. Bila pesanan masih berstatus menunggu kirim,
+  //    jalankan alur aplikasi: atur pengiriman dulu, baru ambil label.
+  const detail = await getTiktokOrderDetail(cred, [orderId]);
+  const order = detail.ok
+    ? detail.orders.find((o) => o.id === orderId)
+    : undefined;
+  if (!order || order.status !== "AWAITING_SHIPMENT") {
+    return { ok: false, detail: direct.detail };
+  }
+  const arranged = await arrangeShipment(cred, orderId);
+  if (!arranged.ok) {
+    return {
+      ok: false,
+      detail: `${direct.detail} — dan gagal mengatur pengiriman: ${arranged.result}`,
+    };
+  }
+  const after = await fetchOfficialResiPdf(cred, orderId);
+  if (!after.ok) return { ok: false, detail: after.detail };
+  return { ...after, arranged: true };
+}
+
+/** Ambil label kirim resmi untuk satu pesanan (loop semua toko terotorisasi). */
+export async function getOfficialResiForOrder(
+  orderId: string,
+): Promise<
+  | { ok: true; pdf: Buffer; tracking_number: string; arranged: boolean }
+  | { ok: false; detail: string }
+> {
+  const shops = await listTiktokShopTokens();
+  for (const shop of shops) {
+    const prep = await prepareShop(shop);
+    if (!prep.ok) continue;
+    const cred = { cipher: prep.cipher, access_token: prep.access_token };
+    return await getOfficialResiForCred(cred, orderId);
+  }
+  return { ok: false, detail: "Pesanan tidak ditemukan di toko terotorisasi" };
 }

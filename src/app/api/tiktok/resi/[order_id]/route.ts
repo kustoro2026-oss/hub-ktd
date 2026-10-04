@@ -2,15 +2,16 @@
 // aplikasi) — dibuka di tab baru dari halaman Pesanan lalu dicetak. Perlu
 // sesi admin karena label berisi data pelanggan (nama, alamat, telepon)
 // yang sensitif.
+//
+// Meniru alur aplikasi TikTok Shop: bila pesanan masih "Menunggu kirim"
+// (AWAITING_SHIPMENT), pengiriman dijadwalkan dulu otomatis (slot
+// penjemputan tercepat) baru label diambil — status pesanan berubah jadi
+// "Menunggu pickup" dan resi bisa dicetak ulang kapan saja.
 import { isAuthed } from "@/lib/auth";
-import { listTiktokShopTokens } from "@/lib/db";
-import {
-  downloadShippingDocument,
-  getShippingDocument,
-} from "@/lib/tiktok";
-import { prepareShop } from "@/lib/tiktok-orders";
+import { getOfficialResiForOrder } from "@/lib/tiktok-resi";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export async function GET(
   _request: Request,
@@ -21,30 +22,9 @@ export async function GET(
   }
   const { order_id } = await params;
 
-  // Cari pesanan di semua toko terotorisasi (id pesanan unik global, tetapi
-  // dokumen hanya bisa diambil dengan kredensial toko pemiliknya).
-  const shops = await listTiktokShopTokens();
-  let reason = "";
-  for (const shop of shops) {
-    const prep = await prepareShop(shop);
-    if (!prep.ok) {
-      reason = prep.detail;
-      continue;
-    }
-    const cred = { cipher: prep.cipher, access_token: prep.access_token };
-
-    const doc = await getShippingDocument(cred, order_id, "SHIPPING_LABEL");
-    if (!doc.ok) {
-      reason = doc.detail;
-      continue;
-    }
-    const dl = await downloadShippingDocument(doc.doc_url);
-    if (!dl.ok) {
-      reason = dl.detail;
-      continue;
-    }
-
-    return new Response(new Uint8Array(dl.pdf), {
+  const res = await getOfficialResiForOrder(order_id);
+  if (res.ok) {
+    return new Response(new Uint8Array(res.pdf), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `inline; filename="resi-${order_id}.pdf"`,
@@ -53,7 +33,7 @@ export async function GET(
   }
 
   // Label resmi tidak tersedia — tampilkan keterangan + alasan dari API.
-  const safe = reason
+  const safe = res.detail
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;");
