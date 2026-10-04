@@ -6,6 +6,7 @@ import {
   getBroadcast,
   listBroadcastItems,
 } from "@/lib/db";
+import { toWib } from "@/lib/format";
 import SendButton from "@/components/send-button";
 import { getTemplateStatus, getWaEnv } from "@/lib/wa";
 
@@ -28,6 +29,7 @@ export default async function BroadcastDetailPage({
     : null;
 
   const failedItems = items.filter((i) => i.status === "failed");
+  const isScheduled = broadcast.status === "draft" && broadcast.scheduled_at !== "";
 
   // Nilai variabel kampanye (mis. link produk) — JSON di kolom vars.
   const vars = (() => {
@@ -51,7 +53,10 @@ export default async function BroadcastDetailPage({
           </Link>
           <h1 className="text-xl font-bold text-slate-900">{broadcast.name}</h1>
           <p className="text-sm text-slate-500">
-            Template {broadcast.template} · dibuat {broadcast.created_at}
+            Template {broadcast.template} ·{" "}
+            {isScheduled
+              ? `dijadwalkan ${toWib(broadcast.scheduled_at)} WIB`
+              : `dibuat ${broadcast.created_at}`}
           </p>
           {vars.length > 0 && (
             <p className="break-all text-xs text-slate-500">
@@ -89,6 +94,13 @@ export default async function BroadcastDetailPage({
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur di env — isi dulu di
           .env.local (atau Vercel Settings) sebelum mengirim.
+        </div>
+      ) : isScheduled ? (
+        <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800">
+          Kampanye ini dijadwalkan kirim otomatis pada{" "}
+          <strong>{toWib(broadcast.scheduled_at)} WIB</strong>. Penjadwal akan
+          mengirimnya saat waktunya tiba — tidak perlu klik apa-apa. Statusnya
+          berubah menjadi Terkirim di halaman ini.
         </div>
       ) : (
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">

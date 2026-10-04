@@ -33,6 +33,22 @@ export default function BroadcastCreate({
   const [groupId, setGroupId] = useState(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [limitInfo, setLimitInfo] = useState<{
+    ok?: boolean;
+    tier?: string;
+    limit?: number | null;
+    remaining?: number | null;
+    unlimited?: boolean;
+    sentToday?: number;
+  } | null>(null);
+  const [sendMode, setSendMode] = useState<"manual" | "jadwal">("manual");
+  const [scheduleAt, setScheduleAt] = useState("");
+  const [testPhone, setTestPhone] = useState("");
+  const [testBusy, setTestBusy] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    ok: boolean;
+    text: string;
+  } | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -63,6 +79,25 @@ export default function BroadcastCreate({
   // Ganti template → kosongkan nilai variabel kampanye lama.
   useEffect(() => setVarValues({}), [template]);
 
+  // Penjaga kuota: baca sisa kuota harian live dari Meta + kiriman Hub.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/wa/send-limit");
+        const d = (await res.json().catch(() => ({}))) as {
+          ok?: boolean;
+          limit?: number | null;
+          remaining?: number | null;
+          unlimited?: boolean;
+          sentToday?: number;
+        };
+        if (res.ok) setLimitInfo(d);
+      } catch {
+        // Kuota tidak terbaca — form tetap jalan tanpa peringatan.
+      }
+    })();
+  }, []);
+
   const approvedTemplates = (templates ?? []).filter(
     (t) => t.status === "APPROVED",
   );
@@ -87,6 +122,62 @@ export default function BroadcastCreate({
   const selectedGroup = groups.find((g) => g.id === groupId);
   const recipients = target === "group" ? (selectedGroup?.member_count ?? 0) : contactCount;
 
+  // Konversi pilihan tanggal+jam WIB (input datetime-local) → UTC
+  // "YYYY-MM-DD HH:MM:SS" untuk disimpan. Dibangun manual dari komponen
+  // angka supaya tidak bergantung zona waktu browser.
+  function scheduleUtc(): string {
+    const m = scheduleAt.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/);
+    if (!m) return "";
+    const [, y, mo, d, h, mi] = m;
+    const utcMs =
+      Date.UTC(Number(y), Number(mo) - 1, Number(d), Number(h), Number(mi)) -
+      7 * 3600_000;
+    return new Date(utcMs).toISOString().slice(0, 19).replace("T", " ");
+  }
+
+  async function sendTest() {
+    if (!template) return;
+    if (varNumbers.some((n) => !(varValues[n] ?? "").trim())) {
+      setTestResult({
+        ok: false,
+        text: "Isi semua nilai variabel dulu sebelum uji kirim",
+      });
+      return;
+    }
+    setTestBusy(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/wa/test-send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          template,
+          lang: selectedTpl?.language ?? "id",
+          vars: varNumbers.map((n) => (varValues[n] ?? "").trim()),
+          phone: testPhone.trim(),
+        }),
+      });
+      const d = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        detail?: string;
+        error?: string;
+        to?: string;
+      };
+      if (d.ok) {
+        setTestResult({ ok: true, text: `${d.detail ?? "Terkirim"} (ke ${d.to})` });
+      } else {
+        setTestResult({
+          ok: false,
+          text: d.error ?? d.detail ?? "Uji kirim gagal",
+        });
+      }
+    } catch {
+      setTestResult({ ok: false, text: "Tidak dapat terhubung ke server" });
+    } finally {
+      setTestBusy(false);
+    }
+  }
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!template) {
@@ -95,6 +186,10 @@ export default function BroadcastCreate({
     }
     if (target === "group" && groupId === 0) {
       setError("Pilih grup dulu");
+      return;
+    }
+    if (sendMode === "jadwal" && !scheduleAt) {
+      setError("Pilih tanggal dan jam kirim dulu");
       return;
     }
     if (varNumbers.some((n) => !(varValues[n] ?? "").trim())) {
@@ -113,6 +208,7 @@ export default function BroadcastCreate({
           groupId: target === "group" ? groupId : undefined,
           vars: varNumbers.map((n) => (varValues[n] ?? "").trim()),
           lang: selectedTpl?.language ?? "id",
+          scheduledAt: sendMode === "jadwal" ? scheduleUtc() : undefined,
         }),
       });
       if (res.ok) {
@@ -206,6 +302,39 @@ export default function BroadcastCreate({
         </label>
       ))}
 
+      {template && (
+        <div className="rounded-lg border border-slate-200 px-3 py-2">
+          <p className="mb-1 text-xs font-medium text-slate-600">
+            Kirim uji dulu
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input
+              value={testPhone}
+              onChange={(e) => setTestPhone(e.target.value)}
+              placeholder="Nomor uji (kosongkan = nomor admin)"
+              className={inputCls}
+            />
+            <button
+              type="button"
+              onClick={sendTest}
+              disabled={testBusy || !template}
+              className="rounded-lg border border-emerald-600 px-3 py-2 text-xs font-medium text-emerald-700 hover:bg-emerald-50 disabled:opacity-60"
+            >
+              {testBusy ? "Mengirim…" : "Kirim uji"}
+            </button>
+          </div>
+          {testResult && (
+            <p
+              className={`mt-1 text-xs ${
+                testResult.ok ? "text-emerald-700" : "text-red-600"
+              }`}
+            >
+              {testResult.text}
+            </p>
+          )}
+        </div>
+      )}
+
       {tplError && (
         <p className="text-xs text-red-600">{tplError}</p>
       )}
@@ -256,6 +385,72 @@ export default function BroadcastCreate({
         </div>
       </div>
 
+      {limitInfo?.ok && !limitInfo.unlimited && (
+        <div
+          className={`rounded-lg px-3 py-2 text-xs ${
+            recipients > (limitInfo.remaining ?? 0)
+              ? "border border-red-200 bg-red-50 text-red-700"
+              : "bg-slate-50 text-slate-600"
+          }`}
+        >
+          {recipients > (limitInfo.remaining ?? 0) ? (
+            <>
+              <strong>Perhatian kuota:</strong> penerima ({recipients})
+              melebihi sisa kuota harian ({limitInfo.remaining} nomor —
+              terpakai {limitInfo.sentToday} dari {limitInfo.limit}). Kiriman
+              yang tembus batas akan <strong>ditolak Meta (kode 131049)</strong>{" "}
+              dan tercatat Gagal. Saran: pecah jadi dua kampanye atau
+              jadwalkan besok.
+            </>
+          ) : (
+            <>
+              Sisa kuota harian: <strong>{limitInfo.remaining}</strong> nomor
+              (terpakai {limitInfo.sentToday} dari {limitInfo.limit}) —{" "}
+              {recipients} penerima masih aman.
+            </>
+          )}
+        </div>
+      )}
+
+      <div>
+        <span className="mb-1 block text-xs font-medium text-slate-600">
+          Waktu kirim
+        </span>
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+            <input
+              type="radio"
+              checked={sendMode === "manual"}
+              onChange={() => setSendMode("manual")}
+            />
+            Kirim manual (tombol di halaman kampanye)
+          </label>
+          <label className="flex cursor-pointer items-center gap-2 text-sm text-slate-700">
+            <input
+              type="radio"
+              checked={sendMode === "jadwal"}
+              onChange={() => setSendMode("jadwal")}
+            />
+            Kirim otomatis pada
+          </label>
+          {sendMode === "jadwal" && (
+            <input
+              type="datetime-local"
+              value={scheduleAt}
+              onChange={(e) => setScheduleAt(e.target.value)}
+              className={inputCls}
+            />
+          )}
+        </div>
+        {sendMode === "jadwal" && (
+          <p className="mt-1 text-[11px] text-slate-500">
+            Jam memakai WIB. Kiriman berjalan otomatis selama ada tab Hub yang
+            terbuka atau saat ada pesan masuk (webhook), plus jaring pengaman
+            cron harian Vercel.
+          </p>
+        )}
+      </div>
+
       <div className="flex flex-wrap items-center gap-3">
         <button
           type="submit"
@@ -268,7 +463,11 @@ export default function BroadcastCreate({
           className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
           title={recipients === 0 ? "Tambahkan kontak dulu" : undefined}
         >
-          {busy ? "Membuat…" : `Buat (${recipients} penerima)`}
+          {busy
+            ? "Membuat…"
+            : sendMode === "jadwal"
+              ? `Jadwalkan (${recipients} penerima)`
+              : `Buat (${recipients} penerima)`}
         </button>
         {error && <p className="text-sm text-red-600">{error}</p>}
       </div>

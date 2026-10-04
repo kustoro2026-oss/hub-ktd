@@ -1,22 +1,12 @@
 // Kirim broadcast (lanjutkan bila masih ada yang pending).
 //
-// Satu permintaan memproses sejumlah penerima terbatas (default 40, atur via
-// env BROADCAST_BATCH) — aman untuk serverless Vercel yang membatasi durasi
-// fungsi. Bila penerima belum habis, status broadcast tetap "sending" dan
+// Logika pengiriman ada di src/lib/broadcast-send.ts — dipakai bersama oleh
+// penjadwal kampanye. Satu permintaan memproses sejumlah penerima terbatas
+// (default 40, atur via env BROADCAST_BATCH) — aman untuk serverless
+// Vercel. Bila penerima belum habis, status broadcast tetap "sending" dan
 // halaman detail menyediakan tombol lanjut.
 import { isAuthed } from "@/lib/auth";
-import {
-  broadcastProgress,
-  getBroadcast,
-  markBroadcastItem,
-  pendingBroadcastItems,
-  setBroadcastStatus,
-  setContactWaStatus,
-} from "@/lib/db";
-import { getTemplateStatus, getWaEnv, sendTemplate, sendTemplateParams } from "@/lib/wa";
-
-const DELAY_MS = 1200; // jeda antar pesan — hormati rate limit Meta
-const BATCH_SIZE = Number(process.env.BROADCAST_BATCH ?? 40) || 40;
+import { runBroadcast } from "@/lib/broadcast-send";
 
 export async function POST(
   _request: Request,
@@ -26,95 +16,15 @@ export async function POST(
     return Response.json({ error: "Belum masuk" }, { status: 401 });
   }
   const { id } = await params;
-  const broadcast = await getBroadcast(Number(id));
-  if (!broadcast) {
-    return Response.json({ error: "Broadcast tidak ditemukan" }, { status: 404 });
+  const res = await runBroadcast(Number(id));
+  if (!res.ok) {
+    const error = res.error ?? "Gagal mengirim";
+    const status = error.includes("tidak ditemukan")
+      ? 404
+      : error.includes("belum diatur")
+        ? 500
+        : 409;
+    return Response.json({ ok: false, error }, { status });
   }
-  if (!getWaEnv()) {
-    return Response.json(
-      { error: "WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur" },
-      { status: 500 },
-    );
-  }
-
-  // Template yang belum disetujui Meta pasti gagal — tolak lebih awal
-  // supaya tidak membakar limit panggilan API dengan percobaan sia-sia.
-  const tplStatus = await getTemplateStatus(broadcast.template);
-  if (tplStatus && tplStatus !== "APPROVED") {
-    return Response.json(
-      {
-        ok: false,
-        error: `Template "${broadcast.template}" masih berstatus ${tplStatus} di Meta — tunggu sampai disetujui sebelum mengirim.`,
-      },
-      { status: 409 },
-    );
-  }
-
-  const items = await pendingBroadcastItems(broadcast.id, BATCH_SIZE);
-  if (items.length === 0) {
-    await setBroadcastStatus(
-      broadcast.id,
-      "done",
-      broadcast.sent,
-      broadcast.failed,
-    );
-    return Response.json({
-      ok: true,
-      sentNow: 0,
-      ...(await broadcastProgress(broadcast.id)),
-    });
-  }
-
-  await setBroadcastStatus(
-    broadcast.id,
-    "sending",
-    broadcast.sent,
-    broadcast.failed,
-  );
-
-  let sentNow = 0;
-  let failedNow = 0;
-  // Nilai variabel {{1}}, {{2}}… kampanye (mis. link produk) — JSON array
-  // di kolom broadcasts.vars, dibuat saat kampanye dibentuk.
-  let tplParams: string[] = [];
-  try {
-    const raw = JSON.parse(broadcast.vars || "[]");
-    if (Array.isArray(raw)) tplParams = raw.map(String);
-  } catch {
-    tplParams = [];
-  }
-  for (const item of items) {
-    const res =
-      tplParams.length > 0
-        ? await sendTemplateParams(item.phone, broadcast.template, tplParams, broadcast.lang || "id")
-        : await sendTemplate(item.phone, broadcast.template);
-    if (res.ok) {
-      await markBroadcastItem(item.id, "sent", "", res.waId ?? "");
-      sentNow++;
-    } else {
-      await markBroadcastItem(item.id, "failed", res.error ?? "gagal");
-      failedNow++;
-      // Nomor tidak terdaftar WhatsApp → tandai kontaknya invalid supaya
-      // bisa difilter di menu Verifikasi / kiriman berikutnya.
-      if (res.notOnWa && item.contact_id != null) {
-        await setContactWaStatus(item.contact_id, "invalid");
-      }
-    }
-    await new Promise((r) => setTimeout(r, DELAY_MS));
-  }
-
-  const progress = await broadcastProgress(broadcast.id);
-  await setBroadcastStatus(
-    broadcast.id,
-    progress.pending === 0 ? "done" : "sending",
-    progress.sent,
-    progress.failed,
-  );
-
-  return Response.json({
-    ok: true,
-    sentNow,
-    failedNow,
-    ...progress,
-  });
+  return Response.json(res);
 }

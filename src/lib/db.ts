@@ -38,6 +38,7 @@ export type Broadcast = {
   group_id: number | null;
   vars: string;
   lang: string;
+  scheduled_at: string;
   total: number;
   sent: number;
   failed: number;
@@ -50,9 +51,10 @@ export type BroadcastItem = {
   broadcast_id: number;
   contact_id: number | null;
   phone: string;
-  status: "pending" | "sent" | "delivered" | "read" | "failed";
+  status: "pending" | "queued" | "sent" | "delivered" | "read" | "failed";
   error: string;
   wa_id: string;
+  claimed_at: string;
 };
 
 export type InboundMessage = {
@@ -193,6 +195,7 @@ function migrateSqlite(db: DatabaseSync) {
       group_id INTEGER,
       vars TEXT NOT NULL DEFAULT '',
       lang TEXT NOT NULL DEFAULT 'id',
+      scheduled_at TEXT NOT NULL DEFAULT '',
       total INTEGER NOT NULL DEFAULT 0,
       sent INTEGER NOT NULL DEFAULT 0,
       failed INTEGER NOT NULL DEFAULT 0,
@@ -208,6 +211,7 @@ function migrateSqlite(db: DatabaseSync) {
       status TEXT NOT NULL DEFAULT 'pending',
       error TEXT NOT NULL DEFAULT '',
       wa_id TEXT NOT NULL DEFAULT '',
+      claimed_at TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
 
@@ -252,6 +256,11 @@ function migrateSqlite(db: DatabaseSync) {
       "ALTER TABLE broadcast_items ADD COLUMN wa_id TEXT NOT NULL DEFAULT ''",
     );
   }
+  if (!cols.some((c) => c.name === "claimed_at")) {
+    db.exec(
+      "ALTER TABLE broadcast_items ADD COLUMN claimed_at TEXT NOT NULL DEFAULT ''",
+    );
+  }
 
   // Migrasi DB lama: kolom nilai variabel kampanye + bahasa template
   // (template bervariabel {{1}} diisi saat kampanye dibuat).
@@ -263,6 +272,11 @@ function migrateSqlite(db: DatabaseSync) {
   }
   if (!vcols.some((c) => c.name === "lang")) {
     db.exec("ALTER TABLE broadcasts ADD COLUMN lang TEXT NOT NULL DEFAULT 'id'");
+  }
+  if (!vcols.some((c) => c.name === "scheduled_at")) {
+    db.exec(
+      "ALTER TABLE broadcasts ADD COLUMN scheduled_at TEXT NOT NULL DEFAULT ''",
+    );
   }
 
   // Migrasi DB lama: kolom arah pesan (masuk/keluar) dan status terbaca
@@ -321,6 +335,7 @@ async function migratePg(pool: Pool) {
       group_id INTEGER,
       vars TEXT NOT NULL DEFAULT '',
       lang TEXT NOT NULL DEFAULT 'id',
+      scheduled_at TEXT NOT NULL DEFAULT '',
       total INTEGER NOT NULL DEFAULT 0,
       sent INTEGER NOT NULL DEFAULT 0,
       failed INTEGER NOT NULL DEFAULT 0,
@@ -336,6 +351,7 @@ async function migratePg(pool: Pool) {
       status TEXT NOT NULL DEFAULT 'pending',
       error TEXT NOT NULL DEFAULT '',
       wa_id TEXT NOT NULL DEFAULT '',
+      claimed_at TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
@@ -391,6 +407,12 @@ async function migratePg(pool: Pool) {
   );
   await pool.query(
     "ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS lang TEXT NOT NULL DEFAULT 'id'",
+  );
+  await pool.query(
+    "ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS scheduled_at TEXT NOT NULL DEFAULT ''",
+  );
+  await pool.query(
+    "ALTER TABLE broadcast_items ADD COLUMN IF NOT EXISTS claimed_at TEXT NOT NULL DEFAULT ''",
   );
 }
 
@@ -562,10 +584,11 @@ export async function createBroadcastWithItems(
   groupId: number | null = null,
   vars: string[] = [],
   lang = "id",
+  scheduledAt = "",
 ): Promise<Broadcast> {
   const bc = await queryOne<Broadcast>(
-    "INSERT INTO broadcasts (name, template, total, group_id, vars, lang) VALUES (?, ?, ?, ?, ?, ?) RETURNING *",
-    [name.trim(), template, items.length, groupId, JSON.stringify(vars), lang],
+    "INSERT INTO broadcasts (name, template, total, group_id, vars, lang, scheduled_at) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *",
+    [name.trim(), template, items.length, groupId, JSON.stringify(vars), lang, scheduledAt],
   );
   if (!bc) throw new Error("gagal membuat broadcast");
   if (items.length > 0) {
@@ -608,8 +631,40 @@ export async function markBroadcastItem(
   waId = "",
 ): Promise<void> {
   await queryRun(
-    "UPDATE broadcast_items SET status = ?, error = ?, wa_id = ? WHERE id = ?",
+    "UPDATE broadcast_items SET status = ?, error = ?, wa_id = ?, claimed_at = '' WHERE id = ?",
     [status, error, waId, id],
+  );
+}
+
+// Ambil-sekaligus-tandai item yang akan dikirim pada ronde ini. Penandaan
+// "queued" terjadi dalam satu pernyataan UPDATE ... RETURNING supaya dua
+// ronde yang berjalan beriringan tidak mengambil penerima yang sama.
+export async function claimPendingBroadcastItems(
+  broadcastId: number,
+  limit = 40,
+): Promise<BroadcastItem[]> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  return queryAll<BroadcastItem>(
+    "UPDATE broadcast_items SET status = 'queued', claimed_at = ? WHERE id IN (SELECT id FROM broadcast_items WHERE broadcast_id = ? AND status = 'pending' ORDER BY id LIMIT ?) RETURNING *",
+    [nowUtc, broadcastId, limit],
+  );
+}
+
+// Kembalikan item yang sempat di-claim tapi rondenya tidak selesai (proses
+// terpotong di tengah jalan) supaya bisa diambil ulang. Hanya menyentuh
+// claim yang lebih tua dari batas menit — ronde yang sedang berjalan (jeda
+// antar pesan < 5 menit) tidak akan pernah diambil alih.
+export async function requeueStaleQueuedItems(
+  broadcastId: number,
+  staleMinutes = 5,
+): Promise<void> {
+  const cutoff = new Date(Date.now() - staleMinutes * 60_000)
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ");
+  await queryRun(
+    "UPDATE broadcast_items SET status = 'pending', claimed_at = '' WHERE broadcast_id = ? AND status = 'queued' AND claimed_at != '' AND claimed_at <= ?",
+    [broadcastId, cutoff],
   );
 }
 
@@ -703,6 +758,17 @@ export async function countSentThisMonth(): Promise<number> {
     `SELECT COUNT(*) AS n FROM broadcast_items WHERE status IN ('sent', 'delivered', 'read') AND created_at >= ${since}`,
   );
   return Number(rows[0]?.n ?? 0);
+}
+
+// Kampanye terjadwal yang waktunya sudah tiba dan belum pernah dikirim.
+// scheduled_at disimpan sebagai teks UTC "YYYY-MM-DD HH:MM:SS" (format yang
+// sama di SQLite & Postgres) supaya perbandingan string aman di keduanya.
+export async function listDueScheduledBroadcasts(): Promise<Broadcast[]> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  return queryAll<Broadcast>(
+    "SELECT * FROM broadcasts WHERE status = 'draft' AND scheduled_at != '' AND scheduled_at <= ? ORDER BY scheduled_at ASC",
+    [nowUtc],
+  );
 }
 
 // ---------- Pesan masuk ----------

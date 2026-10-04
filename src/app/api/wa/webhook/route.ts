@@ -24,6 +24,8 @@ import {
   type WaMessage,
 } from "@/lib/replies";
 import { notifyOrderOwner, sendText } from "@/lib/wa";
+import { runDueScheduledBroadcasts } from "@/lib/broadcast-send";
+import { after } from "next/server";
 
 type WaStatusEvent = {
   id?: string;
@@ -166,6 +168,15 @@ export async function POST(request: Request) {
     console.error("[wa-webhook] gagal memproses payload:", e);
     return Response.json({ error: "gagal memproses payload" }, { status: 500 });
   }
+
+  // Tick penjadwal: setiap payload webhook juga memeriksa kampanye terjadwal
+  // yang waktunya sudah tiba. Dijalankan lewat after() supaya respon webhook
+  // tetap cepat (Meta mensyaratkan balasan kilat) tanpa membatalkan tick.
+  after(() => {
+    runDueScheduledBroadcasts().catch((e) =>
+      console.error("[wa-webhook] tick jadwal gagal:", e),
+    );
+  });
 
   return new Response("OK", { status: 200 });
 }

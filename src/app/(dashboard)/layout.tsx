@@ -4,6 +4,7 @@ import { requireAuth } from "@/lib/auth";
 import Sidebar from "@/components/sidebar";
 import MobileNav from "@/components/mobile-nav";
 import DashboardMain from "@/components/dashboard-main";
+import SchedulerTick from "@/components/scheduler-tick";
 
 export default async function DashboardLayout({
   children,
@@ -16,6 +17,7 @@ export default async function DashboardLayout({
       <MobileNav />
       <Sidebar />
       <DashboardMain>{children}</DashboardMain>
+      <SchedulerTick />
     </div>
   );
 }
