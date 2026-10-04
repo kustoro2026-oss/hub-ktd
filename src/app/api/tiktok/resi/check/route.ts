@@ -14,6 +14,9 @@
 import { isAuthed } from "@/lib/auth";
 import { checkNewTiktokOrders } from "@/lib/tiktok-resi";
 
+export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
 /** True bila secret cocok lewat salah satu saluran yang didukung. */
 function cronAuthorized(request: Request): boolean {
   const secret = process.env.CRON_SECRET;
@@ -30,8 +33,21 @@ async function handle(request: Request) {
   if (!cronAuthorized(request) && !(await isAuthed())) {
     return Response.json({ error: "Belum masuk" }, { status: 401 });
   }
-  const res = await checkNewTiktokOrders();
-  return Response.json(res, { status: res.ok ? 200 : 500 });
+  let res;
+  try {
+    res = await checkNewTiktokOrders();
+  } catch (e) {
+    res = {
+      ok: false,
+      detail: `Kesalahan server: ${
+        e instanceof Error ? e.message : "tidak dikenal"
+      }`,
+    };
+  }
+  // Di production, body 5xx bisa diganti Cloudflare dengan halaman 502
+  // generik — balas 200 + pesan supaya alasan aslinya sampai ke pemanggil.
+  const status = res.ok ? 200 : process.env.NODE_ENV === "production" ? 200 : 500;
+  return Response.json(res, { status });
 }
 
 export async function POST(request: Request) {

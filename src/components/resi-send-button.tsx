@@ -28,11 +28,11 @@ export default function ResiSendButton({ orderId }: { orderId: string }) {
         setDetail(data.result ?? "terkirim");
       } else {
         setState("fail");
-        setDetail(data.result ?? data.error ?? "gagal");
+        setDetail(data.result ?? data.error ?? `HTTP ${res.status}`);
       }
     } catch {
       setState("fail");
-      setDetail("jaringan bermasalah");
+      setDetail("tidak dapat menghubungi server");
     }
   }
 
@@ -45,10 +45,10 @@ export default function ResiSendButton({ orderId }: { orderId: string }) {
   }
   if (state === "fail") {
     return (
-      <div className="max-w-44">
+      <div className="max-w-48">
         <span className="text-xs font-medium text-rose-700">Gagal — coba lagi</span>
         {detail ? (
-          <p className="mt-0.5 break-words text-[10px] leading-tight text-rose-600/90">
+          <p className="mt-0.5 break-words text-xs leading-snug text-rose-600/90">
             {detail}
           </p>
         ) : null}
