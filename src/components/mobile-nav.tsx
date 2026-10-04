@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { LogOut, Store } from "lucide-react";
-import { NAV } from "@/components/sidebar";
+import { flattenNav } from "@/components/sidebar";
 
 export default function MobileNav() {
   const pathname = usePathname();
@@ -45,9 +45,8 @@ export default function MobileNav() {
         </button>
       </div>
       <nav className="flex gap-1.5 overflow-x-auto px-3 pb-2.5">
-        {NAV.map(({ href, label, Icon }) => {
-          const active =
-            href === "/" ? pathname === "/" : pathname.startsWith(href);
+        {flattenNav().map(({ href, label, Icon }) => {
+          const active = href === "/" ? pathname === "/" : pathname === href;
           return (
             <Link
               key={href}
