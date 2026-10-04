@@ -1,5 +1,6 @@
 // Pengaturan — status env, catatan webhook, dan info deploy.
 import { AD_PRODUCT_MAP } from "@/lib/replies";
+import DisplayNameStatus from "@/components/display-name-status";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pengaturan" };
@@ -64,6 +65,13 @@ export default function PengaturanPage() {
           Environment variables
         </h2>
         <ul>{envs.map((e) => status(e.label, e.label, e.ok, e.detail))}</ul>
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="mb-2 text-sm font-semibold text-slate-900">
+          Status nama tampilan WhatsApp (dari API Meta)
+        </h2>
+        <DisplayNameStatus />
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm">

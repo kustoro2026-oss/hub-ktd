@@ -169,6 +169,55 @@ export async function checkContactWa(
   return { status: "error", detail: lastDetail };
 }
 
+// ---------- Status nama tampilan ----------
+
+export type DisplayNameStatus = {
+  ok: boolean;
+  verifiedName?: string;
+  nameStatus?: string;
+  newDisplayName?: string;
+  newNameStatus?: string;
+  qualityRating?: string;
+  messagingLimit?: string;
+  detail?: string;
+};
+
+/** Baca status nama tampilan nomor API langsung dari Graph. UI WhatsApp
+ *  Manager kadang menampilkan nama lama tanpa status review; field
+ *  new_display_name/new_name_status memuat pengajuan nama yang sedang
+ *  antre (PENDING_REVIEW) sampai disetujui/ditolak. */
+export async function getDisplayNameStatus(): Promise<DisplayNameStatus> {
+  const env = getWaEnv();
+  if (!env)
+    return { ok: false, detail: "WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur" };
+  const fields = [
+    "verified_name",
+    "name_status",
+    "new_display_name",
+    "new_name_status",
+    "quality_rating",
+    "whatsapp_business_manager_messaging_limit",
+  ].join(",");
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${env.phoneNumberId}?fields=${fields}`,
+    { headers: { Authorization: `Bearer ${env.token}` } },
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    return { ok: false, detail: `HTTP ${res.status} ${err.slice(0, 200)}` };
+  }
+  const data = (await res.json()) as Record<string, string | undefined>;
+  return {
+    ok: true,
+    verifiedName: data.verified_name,
+    nameStatus: data.name_status,
+    newDisplayName: data.new_display_name,
+    newNameStatus: data.new_name_status,
+    qualityRating: data.quality_rating,
+    messagingLimit: data.whatsapp_business_manager_messaging_limit,
+  };
+}
+
 // ---------- Notifikasi pesanan ke admin toko ----------
 
 /** Template utility notifikasi pesanan (bebas window 24 jam) — dibuat
