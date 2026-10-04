@@ -87,6 +87,30 @@ export async function sendResiPdf(
   return `gagal: ${doc.error ?? "dokumen ditolak"} | template: ${tpl.error ?? "ditolak"}`;
 }
 
+/** Kirim resi pesanan tertentu ke WA admin (dipakai tombol manual di
+ *  halaman Pesanan). Kembalikan hasil kirim ('ok...' atau 'gagal: ...'). */
+export async function sendResiForOrder(
+  orderId: string,
+): Promise<{ ok: boolean; result: string }> {
+  const shops = await listTiktokShopTokens();
+  for (const shop of shops) {
+    const prep = await prepareShop(shop);
+    if (!prep.ok) continue;
+    const cred = { cipher: prep.cipher, access_token: prep.access_token };
+    const detail = await getTiktokOrderDetail(cred, [orderId]);
+    if (!detail.ok) continue;
+    const order = detail.orders.find((o) => o.id === orderId);
+    if (!order) continue;
+
+    const result = await sendResiPdf(orderId, order, shop.shop_name);
+    if (result.startsWith("ok")) {
+      await markTiktokOrderSeen(orderId, shop.shop_id, result);
+    }
+    return { ok: result.startsWith("ok"), result };
+  }
+  return { ok: false, result: "Pesanan tidak ditemukan di toko terotorisasi" };
+}
+
 /** Jalankan satu ronde pengecekan pesanan baru untuk semua toko terotorisasi.
  *  Idempoten — tabel tiktok_order_seen mencegah kirim ganda. */
 export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {

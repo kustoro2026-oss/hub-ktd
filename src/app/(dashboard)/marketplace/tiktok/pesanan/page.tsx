@@ -4,6 +4,7 @@
 import { pullTiktokShopOrders, type TiktokShopOrders } from "@/lib/tiktok-orders";
 import RefreshButton from "@/components/refresh-button";
 import ResiCheckButton from "@/components/resi-check-button";
+import ResiSendButton from "@/components/resi-send-button";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pesanan TikTok Shop" };
@@ -97,14 +98,17 @@ function TabelPesanan({ shop }: { shop: TiktokShopOrders }) {
                 {o.order_id}
               </td>
               <td className="whitespace-nowrap px-4 py-3">
-                <a
-                  href={`/api/tiktok/resi/${o.order_id}`}
-                  target="_blank"
-                  rel="noopener"
-                  className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-slate-500 hover:bg-slate-50"
-                >
-                  Cetak Resi
-                </a>
+                <div className="flex items-center gap-2">
+                  <a
+                    href={`/api/tiktok/resi/${o.order_id}`}
+                    target="_blank"
+                    rel="noopener"
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:border-slate-500 hover:bg-slate-50"
+                  >
+                    Cetak Resi
+                  </a>
+                  <ResiSendButton orderId={o.order_id} />
+                </div>
               </td>
             </tr>
           ))}
