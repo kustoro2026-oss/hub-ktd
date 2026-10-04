@@ -417,6 +417,8 @@ export type TiktokOrderDetail = {
     shipping_provider_name: string;
     combined_listing_skus: { sku_count: number }[];
   }[];
+  /** Paket yang sudah dibuat untuk pesanan ini (id + nomor resi kurir). */
+  package_list: { id: string; tracking_number: string }[];
 };
 
 function str(v: unknown): string {
@@ -457,6 +459,7 @@ function parseDetail(o: Record<string, unknown>): TiktokOrderDetail {
   const dist =
     (addr?.district_info as Record<string, unknown>[] | undefined) ?? [];
   const lines = (o.line_items as unknown[] | undefined) ?? [];
+  const pkgs = (o.package_list as Record<string, unknown>[] | undefined) ?? [];
   return {
     id: str(o.id),
     status: str(o.status),
@@ -504,6 +507,10 @@ function parseDetail(o: Record<string, unknown>): TiktokOrderDetail {
     line_items: lines.map((it) =>
       parseDetailItem(it as Record<string, unknown>),
     ),
+    package_list: pkgs.map((pk) => ({
+      id: str(pk.id),
+      tracking_number: str(pk.tracking_number),
+    })),
   };
 }
 
@@ -569,6 +576,177 @@ export async function getTiktokOrderDetail(
     return {
       ok: false,
       detail: `Gagal menghubungi server TikTok: ${
+        e instanceof Error ? e.message : "kesalahan tidak dikenal"
+      }`,
+    };
+  }
+}
+
+// ---------- Dokumen pengiriman resmi (label kirim "Cetak Resi") ----------
+
+export type TiktokShippingDocumentResult =
+  | { ok: true; doc_url: string; tracking_number: string }
+  | { ok: false; detail: string };
+
+/** GET /logistics/202309/orders/{order_id}/shipping_documents — URL dokumen
+ *  pengiriman RESMI TikTok Shop (label kirim PDF persis seperti menu
+ *  "Cetak Resi" di aplikasi). document_type: SHIPPING_LABEL | PICK_LIST. */
+export async function getShippingDocument(
+  shop: { cipher: string; access_token: string },
+  orderId: string,
+  documentType: "SHIPPING_LABEL" | "PICK_LIST" = "SHIPPING_LABEL",
+): Promise<TiktokShippingDocumentResult> {
+  const { appKey, appSecret, ready } = tiktokEnv();
+  if (!ready) {
+    return {
+      ok: false,
+      detail:
+        "Kredensial aplikasi belum diatur (env TIKTOK_APP_KEY dan TIKTOK_APP_SECRET).",
+    };
+  }
+  if (shop.cipher === "") {
+    return {
+      ok: false,
+      detail: "shop_cipher belum tersimpan — coba otorisasi ulang aplikasi.",
+    };
+  }
+  const path = `/logistics/202309/orders/${orderId}/shipping_documents`;
+  const params: Record<string, string> = {
+    app_key: appKey,
+    shop_cipher: shop.cipher,
+    timestamp: Math.floor(Date.now() / 1000).toString(),
+    document_type: documentType,
+  };
+  const sign = signRequest(appSecret, path, params);
+  const qs = new URLSearchParams({ ...params, sign });
+  try {
+    const res = await fetch(`${API_HOST}${path}?${qs.toString()}`, {
+      method: "GET",
+      headers: {
+        "content-type": "application/json",
+        "x-tts-access-token": shop.access_token,
+      },
+      cache: "no-store",
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      code?: number;
+      message?: string;
+      data?: { doc_url?: string; tracking_number?: string };
+    };
+    if (!res.ok || (data.code ?? 1) !== 0) {
+      return {
+        ok: false,
+        detail: `Gagal mengambil dokumen pengiriman: ${String(
+          data.message ?? res.status,
+        )}`,
+      };
+    }
+    const docUrl = String(data.data?.doc_url ?? "");
+    if (docUrl === "") {
+      return {
+        ok: false,
+        detail: "Dokumen pengiriman belum tersedia untuk pesanan ini",
+      };
+    }
+    return {
+      ok: true,
+      doc_url: docUrl,
+      tracking_number: String(data.data?.tracking_number ?? ""),
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Gagal menghubungi server TikTok: ${
+        e instanceof Error ? e.message : "kesalahan tidak dikenal"
+      }`,
+    };
+  }
+}
+
+/** GET /fulfillment/202309/packages/{package_id}/shipping_documents — jalur
+ *  cadangan dokumen resmi per paket (butuh paket sudah diatur kirimnya). */
+export async function getPackageShippingDocument(
+  shop: { cipher: string; access_token: string },
+  packageId: string,
+): Promise<TiktokShippingDocumentResult> {
+  const { appKey, appSecret, ready } = tiktokEnv();
+  if (!ready || shop.cipher === "") {
+    return {
+      ok: false,
+      detail: "Kredensial aplikasi atau shop_cipher belum lengkap",
+    };
+  }
+  const path = `/fulfillment/202309/packages/${packageId}/shipping_documents`;
+  const params: Record<string, string> = {
+    app_key: appKey,
+    shop_cipher: shop.cipher,
+    timestamp: Math.floor(Date.now() / 1000).toString(),
+    document_type: "SHIPPING_LABEL",
+  };
+  const sign = signRequest(appSecret, path, params);
+  const qs = new URLSearchParams({ ...params, sign });
+  try {
+    const res = await fetch(`${API_HOST}${path}?${qs.toString()}`, {
+      method: "GET",
+      headers: {
+        "content-type": "application/json",
+        "x-tts-access-token": shop.access_token,
+      },
+      cache: "no-store",
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      code?: number;
+      message?: string;
+      data?: { doc_url?: string; tracking_number?: string };
+    };
+    if (!res.ok || (data.code ?? 1) !== 0) {
+      return {
+        ok: false,
+        detail: `Gagal mengambil dokumen paket: ${String(
+          data.message ?? res.status,
+        )}`,
+      };
+    }
+    const docUrl = String(data.data?.doc_url ?? "");
+    if (docUrl === "") {
+      return { ok: false, detail: "Dokumen paket belum tersedia" };
+    }
+    return {
+      ok: true,
+      doc_url: docUrl,
+      tracking_number: String(data.data?.tracking_number ?? ""),
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Gagal menghubungi server TikTok: ${
+        e instanceof Error ? e.message : "kesalahan tidak dikenal"
+      }`,
+    };
+  }
+}
+
+/** Unduh isi PDF dokumen pengiriman resmi dari doc_url (berlaku 24 jam). */
+export async function downloadShippingDocument(
+  docUrl: string,
+): Promise<{ ok: true; pdf: Buffer } | { ok: false; detail: string }> {
+  try {
+    const res = await fetch(docUrl, { cache: "no-store" });
+    if (!res.ok) {
+      return {
+        ok: false,
+        detail: `Gagal mengunduh dokumen (HTTP ${res.status})`,
+      };
+    }
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.length < 100) {
+      return { ok: false, detail: "Dokumen yang diunduh kosong/rusak" };
+    }
+    return { ok: true, pdf: buf };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Gagal mengunduh dokumen: ${
         e instanceof Error ? e.message : "kesalahan tidak dikenal"
       }`,
     };

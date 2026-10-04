@@ -45,9 +45,14 @@ export default function ResiSendButton({ orderId }: { orderId: string }) {
   }
   if (state === "fail") {
     return (
-      <span className="max-w-40 text-xs font-medium text-rose-700" title={detail}>
-        Gagal — coba lagi
-      </span>
+      <div className="max-w-44">
+        <span className="text-xs font-medium text-rose-700">Gagal — coba lagi</span>
+        {detail ? (
+          <p className="mt-0.5 break-words text-[10px] leading-tight text-rose-600/90">
+            {detail}
+          </p>
+        ) : null}
+      </div>
     );
   }
   return (
