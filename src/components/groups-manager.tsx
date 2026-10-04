@@ -63,34 +63,31 @@ export default function GroupsManager({ groups }: { groups: ContactGroup[] }) {
 
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-        <h2 className="text-sm font-semibold text-slate-900">Grup kontak</h2>
-        <form onSubmit={create} className="flex items-center gap-2">
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Nama grup (mis. Bisnis A)"
-            maxLength={40}
-            className="w-52 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-emerald-500"
-          />
-          <button
-            type="submit"
-            disabled={busy}
-            className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
-          >
-            {busy ? "Menyimpan…" : "Buat grup"}
-          </button>
-        </form>
-      </div>
-      {error && <p className="mb-2 text-xs text-red-600">{error}</p>}
+      <form onSubmit={create} className="flex flex-wrap items-center gap-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Nama grup (mis. Bisnis A)"
+          maxLength={40}
+          className="w-52 rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-emerald-500"
+        />
+        <button
+          type="submit"
+          disabled={busy}
+          className="rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-40"
+        >
+          {busy ? "Menyimpan…" : "Buat grup"}
+        </button>
+      </form>
+      {error && <p className="mt-2 text-xs text-red-600">{error}</p>}
       {groups.length === 0 ? (
-        <p className="text-sm text-slate-500">
-          Belum ada grup. Buat grup untuk mengelompokkan kontak — misalnya
-          &quot;Bisnis A&quot; atau &quot;Pelanggan Herbal&quot; — lalu tandai
-          kontak dan masukkan ke grup lewat tabel di bawah.
+        <p className="mt-3 text-sm text-slate-500">
+          Belum ada grup. Ketik nama lalu klik &quot;Buat grup&quot; — grup ini
+          nanti bisa dipilih langsung saat menambah kontak satuan maupun
+          import massal, atau lewat tabel di Langkah 3.
         </p>
       ) : (
-        <div className="flex flex-wrap gap-2">
+        <div className="mt-3 flex flex-wrap gap-2">
           {groups.map((g) => (
             <span
               key={g.id}
