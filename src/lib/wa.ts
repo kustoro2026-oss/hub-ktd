@@ -151,7 +151,7 @@ export async function checkContactWa(
       return { status: "error", detail: `status ${c.status ?? "?"}` };
     }
     const err = await res.text();
-    lastDetail = `HTTP ${res.status} ${err.slice(0, 200)}`;
+    lastDetail = `${ver}: HTTP ${res.status} ${err.slice(0, 200)}`;
     // Bila versi ini tidak mendukung endpoint contacts, coba versi berikut.
     if (
       !/does not exist|Unsupported post request|does not support this operation|missing permissions/i.test(
