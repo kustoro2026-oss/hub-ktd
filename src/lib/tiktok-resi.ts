@@ -23,10 +23,13 @@ import {
 } from "@/lib/db";
 import {
   downloadShippingDocument,
+  getPackageDetail,
+  getPackageHandoverTimeSlots,
   getPackageShippingDocument,
   getShippingDocument,
   getTiktokOrderDetail,
   getTiktokOrders,
+  shipPackage,
   type TiktokOrderDetail,
 } from "@/lib/tiktok";
 import { prepareShop } from "@/lib/tiktok-orders";
@@ -274,4 +277,90 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
     sent,
     errors,
   };
+}
+
+/** Epoch detik (UTC) → "Sen, 05/10 09.00–12.00 WIB". */
+function formatSlotWib(start: number, end: number): string {
+  const HARI = ["Min", "Sen", "Sel", "Rab", "Kam", "Jum", "Sab"];
+  const s = new Date((start + 7 * 3600) * 1000);
+  const e = new Date((end + 7 * 3600) * 1000);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${HARI[s.getUTCDay()]}, ${p(s.getUTCDate())}/${p(s.getUTCMonth() + 1)} ${p(s.getUTCHours())}.${p(s.getUTCMinutes())}–${p(e.getUTCHours())}.${p(e.getUTCMinutes())} WIB`;
+}
+
+/** Atur pengiriman untuk satu pesanan — persis menu "Atur Pengiriman" di
+ *  aplikasi TikTok Shop: ambil slot penjemputan tersedia, pilih yang
+ *  tercepat, lalu jadwalkan PICKUP (atau DROP_OFF bila pickup tidak ada).
+ *  Setelah berhasil, label kirim resmi bisa diambil lewat Cetak Resi. */
+export async function arrangeShipmentForOrder(
+  orderId: string,
+): Promise<{ ok: boolean; result: string }> {
+  const shops = await listTiktokShopTokens();
+  for (const shop of shops) {
+    const prep = await prepareShop(shop);
+    if (!prep.ok) continue;
+    const cred = { cipher: prep.cipher, access_token: prep.access_token };
+
+    const detail = await getTiktokOrderDetail(cred, [orderId]);
+    if (!detail.ok) return { ok: false, result: detail.detail };
+    const order = detail.orders.find((o) => o.id === orderId);
+    const packageId = order?.package_list[0]?.id;
+    if (!packageId) {
+      return { ok: false, result: "Paket belum tersedia untuk pesanan ini" };
+    }
+
+    const slots = await getPackageHandoverTimeSlots(cred, packageId);
+    if (!slots.ok) return { ok: false, result: slots.detail };
+
+    if (slots.can_pickup) {
+      const now = Math.floor(Date.now() / 1000);
+      const slot = slots.pickup_slots
+        .filter((s) => s.available && s.start_time >= now)
+        .sort((a, b) => a.start_time - b.start_time)[0];
+      if (!slot) {
+        return {
+          ok: false,
+          result: "Tidak ada slot penjemputan yang tersedia saat ini",
+        };
+      }
+      const ship = await shipPackage(cred, packageId, {
+        handover_method: "PICKUP",
+        pickup_slot: { start_time: slot.start_time, end_time: slot.end_time },
+      });
+      if (!ship.ok) return { ok: false, result: ship.detail };
+
+      const pkg = await getPackageDetail(cred, packageId);
+      const resi =
+        pkg.ok && pkg.tracking_number
+          ? ` · No resi ${pkg.tracking_number}`
+          : "";
+      return {
+        ok: true,
+        result: `Penjemputan dijadwalkan ${formatSlotWib(
+          slot.start_time,
+          slot.end_time,
+        )}${resi}`,
+      };
+    }
+
+    if (slots.can_drop_off) {
+      const ship = await shipPackage(cred, packageId, {
+        handover_method: "DROP_OFF",
+      });
+      if (!ship.ok) return { ok: false, result: ship.detail };
+      const link = slots.drop_off_point_url
+        ? ` Lokasi drop-off: ${slots.drop_off_point_url}`
+        : "";
+      return {
+        ok: true,
+        result: `Pengiriman diatur — silakan antar paket ke titik drop-off.${link}`,
+      };
+    }
+
+    return {
+      ok: false,
+      result: "Paket ini tidak mendukung pickup maupun drop-off lewat API",
+    };
+  }
+  return { ok: false, result: "Pesanan tidak ditemukan di toko terotorisasi" };
 }

@@ -5,6 +5,7 @@ import { pullTiktokShopOrders, type TiktokShopOrders } from "@/lib/tiktok-orders
 import RefreshButton from "@/components/refresh-button";
 import ResiCheckButton from "@/components/resi-check-button";
 import ResiSendButton from "@/components/resi-send-button";
+import ResiShipButton from "@/components/resi-ship-button";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pesanan TikTok Shop" };
@@ -99,6 +100,9 @@ function TabelPesanan({ shop }: { shop: TiktokShopOrders }) {
               </td>
               <td className="whitespace-nowrap px-4 py-3">
                 <div className="flex items-center gap-2">
+                  {o.order_status === "AWAITING_SHIPMENT" ? (
+                    <ResiShipButton orderId={o.order_id} />
+                  ) : null}
                   <a
                     href={`/api/tiktok/resi/${o.order_id}`}
                     target="_blank"

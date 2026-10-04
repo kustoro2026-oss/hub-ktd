@@ -752,3 +752,244 @@ export async function downloadShippingDocument(
     };
   }
 }
+
+/** Satu slot waktu penjemputan (Unix detik). */
+export type TiktokPickupSlot = {
+  start_time: number;
+  end_time: number;
+  available: boolean;
+};
+
+/** GET /fulfillment/202309/packages/{package_id}/handover_time_slots — daftar
+ *  slot penjemputan/drop-off yang tersedia untuk satu paket (persis daftar jam
+ *  di menu "Atur Pengiriman" aplikasi TikTok Shop). */
+export async function getPackageHandoverTimeSlots(
+  shop: { cipher: string; access_token: string },
+  packageId: string,
+): Promise<
+  | {
+      ok: true;
+      can_pickup: boolean;
+      can_drop_off: boolean;
+      drop_off_point_url: string;
+      pickup_slots: TiktokPickupSlot[];
+    }
+  | { ok: false; detail: string }
+> {
+  const { appKey, appSecret, ready } = tiktokEnv();
+  if (!ready || shop.cipher === "") {
+    return {
+      ok: false,
+      detail: "Kredensial aplikasi atau shop_cipher belum lengkap",
+    };
+  }
+  const path = `/fulfillment/202309/packages/${packageId}/handover_time_slots`;
+  const params: Record<string, string> = {
+    app_key: appKey,
+    shop_cipher: shop.cipher,
+    timestamp: Math.floor(Date.now() / 1000).toString(),
+  };
+  const sign = signRequest(appSecret, path, params);
+  const qs = new URLSearchParams({ ...params, sign });
+  try {
+    const res = await fetch(`${API_HOST}${path}?${qs.toString()}`, {
+      method: "GET",
+      headers: {
+        "content-type": "application/json",
+        "x-tts-access-token": shop.access_token,
+      },
+      cache: "no-store",
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      code?: number;
+      message?: string;
+      data?: {
+        can_pickup?: boolean;
+        can_drop_off?: boolean;
+        drop_off_point_url?: string;
+        pickup_slots?: {
+          start_time?: number;
+          end_time?: number;
+          avaliable?: boolean;
+          available?: boolean;
+        }[];
+      };
+    };
+    if (!res.ok || (data.code ?? 1) !== 0) {
+      return {
+        ok: false,
+        detail: `Gagal mengambil slot penjemputan: ${String(
+          data.message ?? res.status,
+        )}`,
+      };
+    }
+    return {
+      ok: true,
+      can_pickup: Boolean(data.data?.can_pickup),
+      can_drop_off: Boolean(data.data?.can_drop_off),
+      drop_off_point_url: String(data.data?.drop_off_point_url ?? ""),
+      pickup_slots: (data.data?.pickup_slots ?? []).map((s) => ({
+        start_time: Number(s.start_time ?? 0),
+        end_time: Number(s.end_time ?? 0),
+        available: Boolean(s.avaliable ?? s.available ?? true),
+      })),
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Gagal menghubungi server TikTok: ${
+        e instanceof Error ? e.message : "kesalahan tidak dikenal"
+      }`,
+    };
+  }
+}
+
+/** POST /fulfillment/202309/packages/{package_id}/ship — atur pengiriman
+ *  paket (jadwalkan penjemputan PICKUP atau DROP_OFF), sama seperti tombol
+ *  "Atur Pengiriman" di aplikasi TikTok Shop. */
+export async function shipPackage(
+  shop: { cipher: string; access_token: string },
+  packageId: string,
+  opts: {
+    handover_method: "PICKUP" | "DROP_OFF";
+    pickup_slot?: { start_time: number; end_time: number };
+  },
+): Promise<{ ok: boolean; detail: string }> {
+  const { appKey, appSecret, ready } = tiktokEnv();
+  if (!ready || shop.cipher === "") {
+    return {
+      ok: false,
+      detail: "Kredensial aplikasi atau shop_cipher belum lengkap",
+    };
+  }
+  const path = `/fulfillment/202309/packages/${packageId}/ship`;
+  const body = JSON.stringify({
+    handover_method: opts.handover_method,
+    pickup_slot: opts.pickup_slot,
+  });
+  const params: Record<string, string> = {
+    app_key: appKey,
+    shop_cipher: shop.cipher,
+    timestamp: Math.floor(Date.now() / 1000).toString(),
+  };
+  const sign = signRequest(appSecret, path, params, body);
+  const qs = new URLSearchParams({ ...params, sign });
+  try {
+    const res = await fetch(`${API_HOST}${path}?${qs.toString()}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-tts-access-token": shop.access_token,
+      },
+      body,
+      cache: "no-store",
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      code?: number;
+      message?: string;
+    };
+    if (!res.ok || (data.code ?? 1) !== 0) {
+      return {
+        ok: false,
+        detail: `Gagal mengatur pengiriman: ${String(
+          data.message ?? res.status,
+        )}`,
+      };
+    }
+    return { ok: true, detail: String(data.message ?? "Success") };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Gagal menghubungi server TikTok: ${
+        e instanceof Error ? e.message : "kesalahan tidak dikenal"
+      }`,
+    };
+  }
+}
+
+/** GET /fulfillment/202309/packages/{package_id} — detail paket: status,
+ *  nomor resi, dan slot penjemputan yang sudah dijadwalkan. */
+export async function getPackageDetail(
+  shop: { cipher: string; access_token: string },
+  packageId: string,
+): Promise<
+  | {
+      ok: true;
+      package_status: string;
+      package_sub_status: string;
+      shipping_type: string;
+      tracking_number: string;
+      handover_method: string;
+      pickup_slot: TiktokPickupSlot | null;
+    }
+  | { ok: false; detail: string }
+> {
+  const { appKey, appSecret, ready } = tiktokEnv();
+  if (!ready || shop.cipher === "") {
+    return {
+      ok: false,
+      detail: "Kredensial aplikasi atau shop_cipher belum lengkap",
+    };
+  }
+  const path = `/fulfillment/202309/packages/${packageId}`;
+  const params: Record<string, string> = {
+    app_key: appKey,
+    shop_cipher: shop.cipher,
+    timestamp: Math.floor(Date.now() / 1000).toString(),
+  };
+  const sign = signRequest(appSecret, path, params);
+  const qs = new URLSearchParams({ ...params, sign });
+  try {
+    const res = await fetch(`${API_HOST}${path}?${qs.toString()}`, {
+      method: "GET",
+      headers: {
+        "content-type": "application/json",
+        "x-tts-access-token": shop.access_token,
+      },
+      cache: "no-store",
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      code?: number;
+      message?: string;
+      data?: {
+        package_status?: string;
+        package_sub_status?: string;
+        shipping_type?: string;
+        tracking_number?: string;
+        handover_method?: string;
+        pickup_slot?: { start_time?: number; end_time?: number };
+      };
+    };
+    if (!res.ok || (data.code ?? 1) !== 0) {
+      return {
+        ok: false,
+        detail: `Gagal mengambil detail paket: ${String(
+          data.message ?? res.status,
+        )}`,
+      };
+    }
+    const slot = data.data?.pickup_slot;
+    return {
+      ok: true,
+      package_status: String(data.data?.package_status ?? ""),
+      package_sub_status: String(data.data?.package_sub_status ?? ""),
+      shipping_type: String(data.data?.shipping_type ?? ""),
+      tracking_number: String(data.data?.tracking_number ?? ""),
+      handover_method: String(data.data?.handover_method ?? ""),
+      pickup_slot: slot
+        ? {
+            start_time: Number(slot.start_time ?? 0),
+            end_time: Number(slot.end_time ?? 0),
+            available: true,
+          }
+        : null,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Gagal menghubungi server TikTok: ${
+        e instanceof Error ? e.message : "kesalahan tidak dikenal"
+      }`,
+    };
+  }
+}
