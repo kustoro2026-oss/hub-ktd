@@ -5,7 +5,7 @@
 // agar tidak menabrak batas waktu serverless dan rate limit Meta.
 import { useRef, useState } from "react";
 import Link from "next/link";
-import { BadgeCheck, CheckCircle2, XCircle, AlertCircle, Play, Square } from "lucide-react";
+import { BadgeCheck, CheckCircle2, XCircle, AlertCircle, Play, Square, Info } from "lucide-react";
 import type { Contact } from "@/lib/db";
 
 const DELAY_MS = 700; // jeda antar cek nomor
@@ -139,6 +139,19 @@ export default function VerifikasiClient({
             </>
           )}
         </div>
+      </div>
+
+      {/* Keterangan pembatasan Meta: endpoint cek nomor ditolak untuk akun
+          ini, jadi tombol Cek menghasilkan "Gagal cek". Deteksi nomor tanpa
+          WhatsApp tetap jalan lewat error 131026 saat broadcast. */}
+      <div className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+        <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+        <p>
+          Cek langsung sedang dibatasi Meta untuk akun ini, jadi tombol Cek
+          menghasilkan "Gagal cek". Nomor tanpa WhatsApp tetap otomatis
+          tertandai <strong>Tidak valid</strong> saat broadcast (error 131026)
+          tanpa memakai kuota, dan bisa difilter di kiriman berikutnya.
+        </p>
       </div>
 
       {/* Ringkasan status */}
