@@ -507,3 +507,37 @@ export async function notifyOrderOwner(
   if (tpl.ok) return "ok (template)";
   return `gagal: ${res.error ?? "teks ditolak"} | template: ${tpl.error ?? "ditolak"}`;
 }
+
+// ---------- Status nomor & batas kirim ----------
+
+export type WaPhoneStatus = {
+  // Batas kirim harian level portofolio (TIER_250, TIER_2K, TIER_10K,
+  // TIER_100K, UNLIMITED). Field messaging_limit_tier sudah deprecated —
+  // pakai whatsapp_business_manager_messaging_limit.
+  whatsapp_business_manager_messaging_limit?: string;
+  quality_rating?: string;
+  throughput?: { level: string };
+  display_phone_number?: string;
+  verified_name?: string;
+};
+
+/** Status nomor WA: batas kirim harian, rating kualitas, throughput. */
+export async function getPhoneNumberStatus(): Promise<{
+  ok: boolean;
+  status?: WaPhoneStatus;
+  detail?: string;
+}> {
+  const env = getWaEnv();
+  if (!env)
+    return { ok: false, detail: "WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur" };
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${env.phoneNumberId}?fields=whatsapp_business_manager_messaging_limit,quality_rating,throughput,display_phone_number,verified_name`,
+    { headers: { Authorization: `Bearer ${env.token}` } },
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    return { ok: false, detail: `HTTP ${res.status} ${err.slice(0, 200)}` };
+  }
+  const data = (await res.json()) as WaPhoneStatus;
+  return { ok: true, status: data };
+}

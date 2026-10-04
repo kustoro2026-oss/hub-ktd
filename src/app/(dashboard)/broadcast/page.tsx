@@ -2,6 +2,7 @@
 import Link from "next/link";
 import { countContacts, listBroadcasts, listGroups } from "@/lib/db";
 import BroadcastCreate from "@/components/broadcast-create";
+import SendLimitPanel from "@/components/send-limit-panel";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Broadcast" };
@@ -27,6 +28,8 @@ export default async function BroadcastPage() {
           Kirim pesan massal memakai template WhatsApp
         </p>
       </div>
+
+      <SendLimitPanel />
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">

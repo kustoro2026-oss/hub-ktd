@@ -677,6 +677,34 @@ export async function broadcastProgress(id: number): Promise<{
   };
 }
 
+// ---------- Statistik pengiriman (panel batas kirim) ----------
+
+// Pesan template terkirim dari Hub hari ini (jendela kalender lokal). Angka
+// ini batas bawah pemakaian portofolio — Meta menghitung nomor unik lintas
+// semua kanal (termasuk WhatsApp Manager) dalam 24 jam berjalan.
+export async function countSentToday(): Promise<number> {
+  const since =
+    dbMode() === "pg"
+      ? "date_trunc('day', now())"
+      : "datetime('now','localtime','start of day')";
+  const rows = await queryAll<{ n: string | number | null }>(
+    `SELECT COUNT(*) AS n FROM broadcast_items WHERE status IN ('sent', 'delivered', 'read') AND created_at >= ${since}`,
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
+// Pesan template terkirim dari Hub bulan kalender ini (sejak tanggal 1).
+export async function countSentThisMonth(): Promise<number> {
+  const since =
+    dbMode() === "pg"
+      ? "date_trunc('month', now())"
+      : "strftime('%Y-%m-01', 'now', 'localtime')";
+  const rows = await queryAll<{ n: string | number | null }>(
+    `SELECT COUNT(*) AS n FROM broadcast_items WHERE status IN ('sent', 'delivered', 'read') AND created_at >= ${since}`,
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
 // ---------- Pesan masuk ----------
 
 export async function insertMessage(
