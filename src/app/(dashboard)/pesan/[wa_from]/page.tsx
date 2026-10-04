@@ -26,9 +26,9 @@ export default async function ConversationPage({
   const botPaused = isBotHandoverActive(lastOut);
 
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+    <div className="flex h-dvh flex-col overflow-hidden bg-white md:h-full">
       {/* Kepala chat hijau ala WhatsApp */}
-      <header className="flex items-center gap-3 bg-emerald-700 px-3 py-3 sm:px-4">
+      <header className="flex shrink-0 items-center gap-3 bg-emerald-700 px-3 py-3 sm:px-4">
         <Link
           href="/pesan"
           className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20"
@@ -48,7 +48,7 @@ export default async function ConversationPage({
       </header>
 
       {botPaused && lastOut && (
-        <div className="border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs text-amber-800">
+        <div className="shrink-0 border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs text-amber-800">
           <span className="font-semibold">Bot dijeda.</span> Percakapan ini sedang
           ditangani manual — bot tidak membalas otomatis sampai pukul{" "}
           {handoverUntilLabel(lastOut)} (selama tidak ada balasan manual baru).
@@ -56,7 +56,7 @@ export default async function ConversationPage({
       )}
 
       {messages.length === 0 ? (
-        <p className="p-8 text-center text-sm text-slate-500">
+        <p className="flex flex-1 items-center justify-center p-8 text-sm text-slate-500">
           Tidak ada percakapan dengan nomor ini.
         </p>
       ) : (

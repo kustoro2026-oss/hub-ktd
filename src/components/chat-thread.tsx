@@ -123,11 +123,11 @@ export default function ChatThread({
   }
 
   return (
-    <div className="flex flex-col">
+    <div className="flex min-h-0 flex-1 flex-col">
       {/* Area chat */}
       <div
         ref={scrollRef}
-        className="h-[56vh] min-h-[320px] overflow-y-auto px-3 py-4 sm:px-4 md:h-[52vh] md:min-h-[340px]"
+        className="min-h-0 flex-1 overflow-y-auto px-3 py-4 sm:px-5"
         style={{
           backgroundColor: "#efe7db",
           backgroundImage:
@@ -135,7 +135,7 @@ export default function ChatThread({
           backgroundSize: "18px 18px",
         }}
       >
-        <div className="mx-auto flex max-w-2xl flex-col gap-1.5">
+        <div className="mx-auto flex w-full max-w-4xl flex-col gap-1.5">
           {nodes.map((n) => {
             if (n.kind === "sep") {
               return (
@@ -224,7 +224,7 @@ export default function ChatThread({
       {/* Kolom ketik */}
       <form
         onSubmit={send}
-        className="flex items-center gap-2 border-t border-slate-200 bg-white px-3 py-2"
+        className="flex shrink-0 items-center gap-2 border-t border-slate-200 bg-white px-3 py-2 sm:px-4"
       >
         <input
           value={text}

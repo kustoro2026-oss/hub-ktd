@@ -13,6 +13,10 @@ export default function MobileNav() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
+  // Halaman percakapan punya header sendiri (tombol kembali) — bilah atas
+  // disembunyikan agar chat memakai seluruh tinggi layar HP.
+  if (/^\/pesan\/[^/]+/.test(pathname)) return null;
+
   async function logout() {
     setBusy(true);
     try {
