@@ -24,6 +24,13 @@ export type Contact = {
   created_at: string;
 };
 
+export type ContactGroup = {
+  id: number;
+  name: string;
+  member_count: number;
+  created_at: string;
+};
+
 export type Broadcast = {
   id: number;
   name: string;
@@ -215,6 +222,18 @@ function migrateSqlite(db: DatabaseSync) {
       ON broadcast_items (broadcast_id);
     CREATE INDEX IF NOT EXISTS idx_messages_created
       ON messages (created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS contact_groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS group_members (
+      group_id INTEGER NOT NULL,
+      contact_id INTEGER NOT NULL,
+      PRIMARY KEY (group_id, contact_id)
+    );
   `);
 
   // Migrasi DB lama: tambah kolom wa_id bila belum ada (id pesan WhatsApp
@@ -308,6 +327,18 @@ async function migratePg(pool: Pool) {
       ON broadcast_items (broadcast_id);
     CREATE INDEX IF NOT EXISTS idx_messages_created
       ON messages (created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS contact_groups (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS group_members (
+      group_id INTEGER NOT NULL,
+      contact_id INTEGER NOT NULL,
+      PRIMARY KEY (group_id, contact_id)
+    );
   `);
 
   // Migrasi DB lama: kolom arah pesan (masuk/keluar) dan status terbaca.
@@ -366,8 +397,103 @@ export async function addContact(
   return row;
 }
 
-export async function deleteContact(id: number): Promise<void> {
-  await queryRun("DELETE FROM contacts WHERE id = ?", [id]);
+/** Hapus banyak kontak sekaligus (permanen). Riwayat broadcast tetap
+ *  utuh — broadcast_items menyimpan salinan nomornya sendiri, jadi
+ *  contact_id-nya cukup dikosongkan. Keanggotaan grup ikut terhapus. */
+export async function deleteContacts(ids: number[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const ph = ids.map(() => "?").join(", ");
+  await queryRun(
+    `UPDATE broadcast_items SET contact_id = NULL WHERE contact_id IN (${ph})`,
+    ids,
+  );
+  await queryRun(`DELETE FROM group_members WHERE contact_id IN (${ph})`, ids);
+  await queryRun(`DELETE FROM contacts WHERE id IN (${ph})`, ids);
+  return ids.length;
+}
+
+// ---------- Grup kontak ----------
+
+/** Semua grup beserta jumlah anggotanya. */
+export async function listGroups(): Promise<ContactGroup[]> {
+  const rows = await queryAll<
+    Omit<ContactGroup, "member_count"> & { member_count: string | number }
+  >(
+    `SELECT g.id, g.name, g.created_at,
+       (SELECT COUNT(*) FROM group_members m WHERE m.group_id = g.id) AS member_count
+     FROM contact_groups g ORDER BY g.name`,
+  );
+  return rows.map((r) => ({ ...r, member_count: Number(r.member_count ?? 0) }));
+}
+
+export async function createGroup(name: string): Promise<ContactGroup> {
+  const row = await queryOne<Omit<ContactGroup, "member_count">>(
+    "INSERT INTO contact_groups (name) VALUES (?) RETURNING id, name, created_at",
+    [name.trim()],
+  );
+  if (!row) throw new Error("gagal membuat grup");
+  return { ...row, member_count: 0 };
+}
+
+export async function renameGroup(id: number, name: string): Promise<void> {
+  await queryRun("UPDATE contact_groups SET name = ? WHERE id = ?", [
+    name.trim(),
+    id,
+  ]);
+}
+
+/** Hapus grup — kontak di dalamnya TIDAK ikut terhapus. */
+export async function deleteGroup(id: number): Promise<void> {
+  await queryRun("DELETE FROM group_members WHERE group_id = ?", [id]);
+  await queryRun("DELETE FROM contact_groups WHERE id = ?", [id]);
+}
+
+/** Peta id kontak → daftar grupnya (untuk badge di tabel kontak). */
+export async function listContactGroupMap(): Promise<
+  { contact_id: number; group_id: number; group_name: string }[]
+> {
+  return queryAll(
+    `SELECT m.contact_id, m.group_id, g.name AS group_name
+     FROM group_members m JOIN contact_groups g ON g.id = m.group_id`,
+  );
+}
+
+/** Ganti seluruh keanggotaan grup satu kontak. */
+export async function setContactGroups(
+  contactId: number,
+  groupIds: number[],
+): Promise<void> {
+  await queryRun("DELETE FROM group_members WHERE contact_id = ?", [contactId]);
+  for (const gid of groupIds) {
+    await queryRun(
+      "INSERT INTO group_members (group_id, contact_id) VALUES (?, ?)",
+      [gid, contactId],
+    );
+  }
+}
+
+/** Tambahkan banyak kontak ke satu grup (keanggotaan lama dipertahankan). */
+export async function addContactsToGroup(
+  contactIds: number[],
+  groupId: number,
+): Promise<void> {
+  const sql =
+    dbMode() === "pg"
+      ? "INSERT INTO group_members (group_id, contact_id) VALUES (?, ?) ON CONFLICT DO NOTHING"
+      : "INSERT OR IGNORE INTO group_members (group_id, contact_id) VALUES (?, ?)";
+  for (const cid of contactIds) {
+    await queryRun(sql, [groupId, cid]);
+  }
+}
+
+/** Kontak anggota satu grup. */
+export async function listContactsByGroup(groupId: number): Promise<Contact[]> {
+  return queryAll<Contact>(
+    `SELECT c.* FROM contacts c
+     JOIN group_members m ON m.contact_id = c.id
+     WHERE m.group_id = ? ORDER BY c.id DESC`,
+    [groupId],
+  );
 }
 
 // ---------- Broadcast ----------

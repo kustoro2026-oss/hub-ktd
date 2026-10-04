@@ -1,14 +1,24 @@
-// Halaman Kontak — daftar penerima broadcast WhatsApp.
-import { listContacts } from "@/lib/db";
+// Halaman Kontak — daftar penerima broadcast WhatsApp dengan grup.
+import { listContacts, listContactGroupMap, listGroups } from "@/lib/db";
 import ContactForm from "@/components/contact-form";
 import ImportForm from "@/components/import-form";
 import ContactsTable from "@/components/contacts-table";
+import GroupsManager from "@/components/groups-manager";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Kontak" };
 
 export default async function KontakPage() {
-  const contacts = await listContacts();
+  const [contacts, groups, mapRows] = await Promise.all([
+    listContacts(),
+    listGroups(),
+    listContactGroupMap(),
+  ]);
+
+  const groupMap: Record<number, { id: number; name: string }[]> = {};
+  for (const r of mapRows) {
+    (groupMap[r.contact_id] ??= []).push({ id: r.group_id, name: r.group_name });
+  }
 
   return (
     <div className="space-y-6">
@@ -18,6 +28,8 @@ export default async function KontakPage() {
           Daftar penerima pesan broadcast WhatsApp
         </p>
       </div>
+
+      <GroupsManager groups={groups} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -36,7 +48,7 @@ export default async function KontakPage() {
             Semua kontak ({contacts.length})
           </h2>
         </div>
-        <ContactsTable contacts={contacts} />
+        <ContactsTable contacts={contacts} groups={groups} groupMap={groupMap} />
       </div>
     </div>
   );

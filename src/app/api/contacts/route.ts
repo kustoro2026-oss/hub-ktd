@@ -1,6 +1,7 @@
-// CRUD kontak: POST tambah, DELETE hapus. Semua mutasi butuh login admin.
+// CRUD kontak: POST tambah, DELETE hapus (satu atau banyak sekaligus).
+// Semua mutasi butuh login admin.
 import { isAuthed } from "@/lib/auth";
-import { addContact, deleteContact } from "@/lib/db";
+import { addContact, deleteContacts } from "@/lib/db";
 import { normalizePhone } from "@/lib/wa";
 
 export async function POST(request: Request) {
@@ -32,15 +33,20 @@ export async function DELETE(request: Request) {
   if (!(await isAuthed())) {
     return Response.json({ error: "Belum masuk" }, { status: 401 });
   }
-  let body: { id?: number } = {};
+  let body: { id?: number; ids?: number[] } = {};
   try {
-    body = (await request.json()) as { id?: number };
+    body = (await request.json()) as { id?: number; ids?: number[] };
   } catch {
     return Response.json({ error: "Body tidak valid" }, { status: 400 });
   }
-  if (!body.id) {
+  const ids = body.ids?.length
+    ? body.ids
+    : body.id
+      ? [body.id]
+      : [];
+  if (ids.length === 0) {
     return Response.json({ error: "id kontak wajib diisi" }, { status: 400 });
   }
-  await deleteContact(body.id);
-  return Response.json({ ok: true });
+  const deleted = await deleteContacts(ids);
+  return Response.json({ ok: true, deleted });
 }
