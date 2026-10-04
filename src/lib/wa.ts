@@ -248,6 +248,29 @@ export async function registerApplyName(
   return { ok: true };
 }
 
+/** Ajukan nama tampilan baru via API (Meta membatasi maks 10 perubahan per
+ *  30 hari). Nama masuk antrean verifikasi — pantau lewat new_display_name /
+ *  new_name_status, lalu terapkan dengan registerApplyName (PIN). */
+export async function updateDisplayName(
+  newName: string,
+): Promise<{ ok: boolean; detail?: string }> {
+  const env = getWaEnv();
+  if (!env)
+    return { ok: false, detail: "WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur" };
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${env.phoneNumberId}?new_display_name=${encodeURIComponent(newName)}`,
+    {
+      method: "POST",
+      headers: { Authorization: `Bearer ${env.token}` },
+    },
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    return { ok: false, detail: `HTTP ${res.status} ${err.slice(0, 300)}` };
+  }
+  return { ok: true };
+}
+
 // ---------- Notifikasi pesanan ke admin toko ----------
 
 /** Template utility notifikasi pesanan (bebas window 24 jam) — dibuat
