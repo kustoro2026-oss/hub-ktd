@@ -13,6 +13,7 @@ import {
   Users,
   BadgeCheck,
   Store,
+  FileText,
 } from "lucide-react";
 
 export const NAV = [
@@ -20,6 +21,7 @@ export const NAV = [
   { href: "/kontak", label: "Kontak", Icon: Users },
   { href: "/verifikasi", label: "Verifikasi", Icon: BadgeCheck },
   { href: "/broadcast", label: "Broadcast", Icon: Send },
+  { href: "/template", label: "Template", Icon: FileText },
   { href: "/pesan", label: "Pesan Masuk", Icon: MessageSquare },
   { href: "/pengaturan", label: "Pengaturan", Icon: Settings },
 ];

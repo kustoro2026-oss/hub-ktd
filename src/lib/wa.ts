@@ -41,6 +41,137 @@ export async function getTemplateStatus(name: string): Promise<string | null> {
   return data.data?.[0]?.status ?? null;
 }
 
+// ---------- Kelola template (Business Management API) ----------
+
+export type WaTemplate = {
+  id: string;
+  name: string;
+  status: string;
+  category: string;
+  language: string;
+  rejected_reason?: string;
+};
+
+/** Daftar template pesan milik WABA beserta status review-nya. */
+export async function listTemplates(): Promise<{
+  ok: boolean;
+  templates?: WaTemplate[];
+  detail?: string;
+}> {
+  const env = getWaEnv();
+  const wabaId = process.env.WA_WABA_ID;
+  if (!env || !wabaId)
+    return { ok: false, detail: "WA_TOKEN / WA_WABA_ID belum diatur" };
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${wabaId}/message_templates?fields=name,status,category,language,rejected_reason&limit=100`,
+    { headers: { Authorization: `Bearer ${env.token}` } },
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    return { ok: false, detail: `HTTP ${res.status} ${err.slice(0, 300)}` };
+  }
+  const data = (await res.json()) as { data?: WaTemplate[] };
+  return { ok: true, templates: data.data ?? [] };
+}
+
+/** Buat template baru. `example` = contoh nilai variabel {{1}}, {{2}}, ...
+ *  — diletakkan DI DALAM komponen BODY (bukan top-level request). */
+export async function createTemplate(opts: {
+  name: string;
+  category: string; // MARKETING | UTILITY
+  language?: string;
+  body: string;
+  example?: string[];
+}): Promise<{ ok: boolean; id?: string; detail?: string }> {
+  const env = getWaEnv();
+  const wabaId = process.env.WA_WABA_ID;
+  if (!env || !wabaId)
+    return { ok: false, detail: "WA_TOKEN / WA_WABA_ID belum diatur" };
+  const components: Record<string, unknown>[] = [
+    { type: "BODY", text: opts.body },
+  ];
+  if (opts.example && opts.example.length > 0) {
+    components[0] = { ...components[0], example: { body_text: [opts.example] } };
+  }
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${wabaId}/message_templates`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        name: opts.name,
+        category: opts.category,
+        language: opts.language ?? "id",
+        components,
+      }),
+    },
+  );
+  const data = (await res.json().catch(() => ({}))) as {
+    id?: string;
+    error?: { message?: string };
+  };
+  if (!res.ok) {
+    return { ok: false, detail: data.error?.message ?? `HTTP ${res.status}` };
+  }
+  return { ok: true, id: data.id };
+}
+
+/** Hapus template berdasarkan nama. */
+export async function deleteTemplate(
+  name: string,
+): Promise<{ ok: boolean; detail?: string }> {
+  const env = getWaEnv();
+  const wabaId = process.env.WA_WABA_ID;
+  if (!env || !wabaId)
+    return { ok: false, detail: "WA_TOKEN / WA_WABA_ID belum diatur" };
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${wabaId}/message_templates?name=${encodeURIComponent(name)}`,
+    { method: "DELETE", headers: { Authorization: `Bearer ${env.token}` } },
+  );
+  if (!res.ok) {
+    const err = await res.text();
+    return { ok: false, detail: `HTTP ${res.status} ${err.slice(0, 300)}` };
+  }
+  return { ok: true };
+}
+
+/** Ajukan ulang (edit) template yang ditolak — isi baru masuk review lagi. */
+export async function editTemplate(
+  id: string,
+  opts: { body: string; example?: string[] },
+): Promise<{ ok: boolean; detail?: string }> {
+  const env = getWaEnv();
+  if (!env)
+    return { ok: false, detail: "WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur" };
+  const components: Record<string, unknown>[] = [
+    { type: "BODY", text: opts.body },
+  ];
+  if (opts.example && opts.example.length > 0) {
+    components[0] = { ...components[0], example: { body_text: [opts.example] } };
+  }
+  const res = await fetch(
+    `https://graph.facebook.com/${GRAPH_VERSION}/${id}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${env.token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ components }),
+    },
+  );
+  const data = (await res.json().catch(() => ({}))) as {
+    error?: { message?: string };
+  };
+  if (!res.ok) {
+    return { ok: false, detail: data.error?.message ?? `HTTP ${res.status}` };
+  }
+  return { ok: true };
+}
+
 /** Kirim pesan template (mis. info_promo_v2) ke satu nomor. */
 export async function sendTemplate(
   to: string,
