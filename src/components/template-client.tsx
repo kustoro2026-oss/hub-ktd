@@ -20,6 +20,18 @@ const CATEGORY_LABEL: Record<string, string> = {
   AUTHENTICATION: "Autentikasi",
 };
 
+const LANG_LABEL: Record<string, string> = {
+  id: "Indonesia",
+  en: "Inggris",
+  en_US: "Inggris (AS)",
+  en_GB: "Inggris (Inggris)",
+  ms: "Melayu",
+  ar: "Arab",
+  zh_CN: "Mandarin",
+};
+
+const LANG_OPTIONS = Object.keys(LANG_LABEL);
+
 export default function TemplateClient() {
   const [templates, setTemplates] = useState<WaTemplate[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -29,6 +41,7 @@ export default function TemplateClient() {
   // Form buat baru
   const [name, setName] = useState("");
   const [category, setCategory] = useState("MARKETING");
+  const [language, setLanguage] = useState("id");
   const [body, setBody] = useState("");
   const [example, setExample] = useState("");
   const [creating, setCreating] = useState(false);
@@ -79,7 +92,7 @@ export default function TemplateClient() {
         body: JSON.stringify({
           name,
           category,
-          language: "id",
+          language,
           body,
           example: example.split(",").map((s) => s.trim()).filter(Boolean),
         }),
@@ -178,6 +191,18 @@ export default function TemplateClient() {
   const inputCls =
     "rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm outline-none focus:border-emerald-500";
 
+  // Variabel {{1}}, {{2}} … yang dipakai di isi pesan (untuk hint).
+  const varNumbers = [
+    ...new Set(
+      [...body.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map((m) => Number(m[1])),
+    ),
+  ].sort((a, b) => a - b);
+
+  const exampleCount = example
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean).length;
+
   return (
     <div className="space-y-4 text-sm">
       <div className="flex items-start justify-between gap-3">
@@ -210,40 +235,152 @@ export default function TemplateClient() {
         <h3 className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
           Buat template baru
         </h3>
-        <form onSubmit={create} className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
+
+        <details className="mb-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+          <summary className="cursor-pointer font-medium text-slate-700">
+            Panduan singkat — cara membuat & arti tiap kolom
+          </summary>
+          <ol className="mt-2 list-decimal space-y-1.5 pl-4">
+            <li>
+              <strong>Apa itu template?</strong> Pesan standar yang harus
+              disetujui Meta dulu sebelum bisa dikirim ke banyak nomor
+              (broadcast). Tanpa template, nomor bot tidak boleh mengirim pesan
+              promosi ke pelanggan yang belum pernah chat.
+            </li>
+            <li>
+              <strong>Alur:</strong> isi form → Buat template → status{" "}
+              <em>Menunggu review</em> → <em>Disetujui</em> (langsung bisa
+              dipakai broadcast) atau <em>Ditolak</em> (lihat alasan, perbaiki,
+              klik Ajukan ulang).
+            </li>
+            <li>
+              <strong>Nama:</strong> identitas internal, tidak terlihat
+              pelanggan. Huruf kecil, angka, garis bawah — tanpa spasi (mis.{" "}
+              <code>promo_oktober</code>).
+            </li>
+            <li>
+              <strong>Kategori:</strong> <em>Marketing</em> untuk promosi /
+              penawaran; <em>Utility</em> untuk notifikasi transaksi (konfirmasi
+              pesanan, resi, dsb).
+            </li>
+            <li>
+              <strong>Bahasa:</strong> bahasa isi pesan — review Meta mengikuti
+              bahasa ini (default Indonesia).
+            </li>
+            <li>
+              <strong>Variabel {"{{1}}"}:</strong> penanda data dinamis
+              yang diganti saat pesan dikirim, mis. nama penerima ({" "}
+              <code>Halo {"{{1}}"}, ada promo untuk Anda.</code>). Untuk
+              sekarang broadcast di Hub mengirim template apa adanya tanpa
+              mengisi nilai variabel, jadi pakai teks tetap tanpa{" "}
+              <code>{"{{1}}"}</code> dulu — template bervariabel akan
+              gagal dikirim dari broadcast.
+            </li>
+            <li>
+              <strong>Contoh nilai variabel:</strong> Meta wajib melihat contoh
+              saat template memakai variabel — isi sesuai urutan{" "}
+              <code>{"{{1}}"}</code>, <code>{"{{2}}"}</code>{" "}
+              dipisah koma (mis. <code>Budi, Diskon 20%</code>). Kosongkan
+              kalau pesan tidak memakai variabel.
+            </li>
+          </ol>
+        </details>
+
+        <form onSubmit={create} className="space-y-2.5">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-600">
+              Nama template (internal — tidak terlihat pelanggan)
+            </span>
             <input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Nama (mis. promo_oktober)"
+              placeholder="promo_oktober"
               maxLength={60}
               required
-              className={`${inputCls} w-56`}
+              className={`${inputCls} w-64`}
             />
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className={inputCls}
-            >
-              <option value="MARKETING">Marketing</option>
-              <option value="UTILITY">Utility</option>
-            </select>
+            <span className="mt-1 block text-xs text-slate-400">
+              Huruf kecil, angka, garis bawah — tanpa spasi.
+            </span>
+          </label>
+
+          <div className="flex flex-wrap gap-4">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-600">
+                Kategori
+              </span>
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                className={inputCls}
+              >
+                <option value="MARKETING">Marketing — promosi / penawaran</option>
+                <option value="UTILITY">Utility — notifikasi transaksi</option>
+              </select>
+            </label>
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-600">
+                Bahasa
+              </span>
+              <select
+                value={language}
+                onChange={(e) => setLanguage(e.target.value)}
+                className={inputCls}
+              >
+                {LANG_OPTIONS.map((code) => (
+                  <option key={code} value={code}>
+                    {LANG_LABEL[code]}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder={'Isi pesan. Untuk data dinamis pakai {{1}}, contoh: "Halo {{1}}, ada promo untuk Anda."'}
-            rows={3}
-            required
-            className={`${inputCls} w-full resize-y`}
-          />
-          <div className="flex flex-wrap items-center gap-2">
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-600">
+              Isi pesan
+            </span>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder={'Contoh: "Halo, ada promo terbaru dari KTD Store. Klik untuk lihat katalog."'}
+              rows={3}
+              required
+              className={`${inputCls} w-full resize-y`}
+            />
+            {varNumbers.length > 0 ? (
+              <span className="mt-1 block text-xs text-amber-700">
+                Variabel terdeteksi:{" "}
+                {varNumbers.map((n) => `{{${n}}}`).join(", ")} — isi contoh
+                nilainya di bawah, atau hapus variabelnya (lihat panduan).
+              </span>
+            ) : (
+              <span className="mt-1 block text-xs text-slate-400">
+                Tanpa variabel — teks tetap seperti ini yang disarankan untuk
+                broadcast.
+              </span>
+            )}
+          </label>
+
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-600">
+              Contoh nilai variabel (hanya kalau pesan memakai variabel)
+            </span>
             <input
               value={example}
               onChange={(e) => setExample(e.target.value)}
-              placeholder="Contoh nilai variabel (pisahkan koma)"
-              className={`${inputCls} w-72`}
+              placeholder="Budi, Diskon 20% — urut sesuai {{1}}, {{2}}, pisahkan koma"
+              className={`${inputCls} w-full max-w-md`}
             />
+            {varNumbers.length > 0 && exampleCount < Math.max(...varNumbers) && (
+              <span className="mt-1 block text-xs text-red-600">
+                Kurang — butuh minimal {Math.max(...varNumbers)} nilai (terdeteksi{" "}
+                {varNumbers.length} variabel).
+              </span>
+            )}
+          </label>
+
+          <div className="flex flex-wrap items-center gap-2">
             <button
               type="submit"
               disabled={creating}
@@ -251,11 +388,10 @@ export default function TemplateClient() {
             >
               {creating ? "Membuat…" : "Buat template"}
             </button>
+            <p className="text-xs text-slate-500">
+              Template baru masuk antrean review Meta (biasanya beberapa menit).
+            </p>
           </div>
-          <p className="text-xs text-slate-500">
-            Nama: huruf kecil, angka, garis bawah — tanpa spasi. Template baru
-            masuk antrean review Meta (biasanya beberapa menit).
-          </p>
         </form>
       </div>
 
@@ -330,7 +466,9 @@ function TableRows(props: {
         <td className="px-3 py-2 text-slate-600">
           {CATEGORY_LABEL[t.category] ?? t.category}
         </td>
-        <td className="px-3 py-2 text-slate-600">{t.language}</td>
+        <td className="px-3 py-2 text-slate-600">
+          {LANG_LABEL[t.language] ?? t.language}
+        </td>
         <td className="px-3 py-2">
           <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${badge.cls}`}>
             {badge.label}
