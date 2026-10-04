@@ -36,6 +36,8 @@ export type Broadcast = {
   name: string;
   template: string;
   group_id: number | null;
+  vars: string;
+  lang: string;
   total: number;
   sent: number;
   failed: number;
@@ -189,6 +191,8 @@ function migrateSqlite(db: DatabaseSync) {
       name TEXT NOT NULL,
       template TEXT NOT NULL DEFAULT 'info_promo_v2',
       group_id INTEGER,
+      vars TEXT NOT NULL DEFAULT '',
+      lang TEXT NOT NULL DEFAULT 'id',
       total INTEGER NOT NULL DEFAULT 0,
       sent INTEGER NOT NULL DEFAULT 0,
       failed INTEGER NOT NULL DEFAULT 0,
@@ -249,6 +253,18 @@ function migrateSqlite(db: DatabaseSync) {
     );
   }
 
+  // Migrasi DB lama: kolom nilai variabel kampanye + bahasa template
+  // (template bervariabel {{1}} diisi saat kampanye dibuat).
+  const vcols = db
+    .prepare("PRAGMA table_info(broadcasts)")
+    .all() as unknown as { name: string }[];
+  if (!vcols.some((c) => c.name === "vars")) {
+    db.exec("ALTER TABLE broadcasts ADD COLUMN vars TEXT NOT NULL DEFAULT ''");
+  }
+  if (!vcols.some((c) => c.name === "lang")) {
+    db.exec("ALTER TABLE broadcasts ADD COLUMN lang TEXT NOT NULL DEFAULT 'id'");
+  }
+
   // Migrasi DB lama: kolom arah pesan (masuk/keluar) dan status terbaca
   // untuk tampilan daftar chat + balasan manual ala WhatsApp.
   const mcols = db
@@ -303,6 +319,8 @@ async function migratePg(pool: Pool) {
       name TEXT NOT NULL,
       template TEXT NOT NULL DEFAULT 'info_promo_v2',
       group_id INTEGER,
+      vars TEXT NOT NULL DEFAULT '',
+      lang TEXT NOT NULL DEFAULT 'id',
       total INTEGER NOT NULL DEFAULT 0,
       sent INTEGER NOT NULL DEFAULT 0,
       failed INTEGER NOT NULL DEFAULT 0,
@@ -367,6 +385,12 @@ async function migratePg(pool: Pool) {
   );
   await pool.query(
     "ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS group_id INTEGER",
+  );
+  await pool.query(
+    "ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS vars TEXT NOT NULL DEFAULT ''",
+  );
+  await pool.query(
+    "ALTER TABLE broadcasts ADD COLUMN IF NOT EXISTS lang TEXT NOT NULL DEFAULT 'id'",
   );
 }
 
@@ -536,10 +560,12 @@ export async function createBroadcastWithItems(
   template: string,
   items: { contactId: number | null; phone: string }[],
   groupId: number | null = null,
+  vars: string[] = [],
+  lang = "id",
 ): Promise<Broadcast> {
   const bc = await queryOne<Broadcast>(
-    "INSERT INTO broadcasts (name, template, total, group_id) VALUES (?, ?, ?, ?) RETURNING *",
-    [name.trim(), template, items.length, groupId],
+    "INSERT INTO broadcasts (name, template, total, group_id, vars, lang) VALUES (?, ?, ?, ?, ?, ?) RETURNING *",
+    [name.trim(), template, items.length, groupId, JSON.stringify(vars), lang],
   );
   if (!bc) throw new Error("gagal membuat broadcast");
   if (items.length > 0) {

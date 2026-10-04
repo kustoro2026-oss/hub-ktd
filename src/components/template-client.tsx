@@ -269,12 +269,14 @@ export default function TemplateClient() {
             </li>
             <li>
               <strong>Variabel {"{{1}}"}:</strong> penanda data dinamis
-              yang diganti saat pesan dikirim, mis. nama penerima ({" "}
-              <code>Halo {"{{1}}"}, ada promo untuk Anda.</code>). Untuk
-              sekarang broadcast di Hub mengirim template apa adanya tanpa
-              mengisi nilai variabel, jadi pakai teks tetap tanpa{" "}
-              <code>{"{{1}}"}</code> dulu — template bervariabel akan
-              gagal dikirim dari broadcast.
+              yang diganti saat pesan dikirim, mis. link produk ({` `}
+              <code>Lihat produknya di sini: {"{{1}}"}</code>). Saat
+              membuat kampanye broadcast, Hub menampilkan kolom{" "}
+              <em>Nilai {"{{1}}"}</em> — isi link produk di sana (mis.{" "}
+              <code>https://toko.kustoro2026.com/produk/11</code>) dan semua
+              penerima kampanye itu mendapat link yang sama. Kampanye
+              berikutnya tinggal ganti angkanya saja, template tidak perlu
+              dibuat ulang.
             </li>
             <li>
               <strong>Contoh nilai variabel:</strong> Meta wajib melihat contoh
@@ -356,8 +358,9 @@ export default function TemplateClient() {
               </span>
             ) : (
               <span className="mt-1 block text-xs text-slate-400">
-                Tanpa variabel — teks tetap seperti ini yang disarankan untuk
-                broadcast.
+                Tanpa variabel — teks dikirim persis seperti ini. Kalau mau
+                link produk bisa diganti-ganti tanpa membuat template baru,
+                pakai variabel (lihat panduan).
               </span>
             )}
           </label>

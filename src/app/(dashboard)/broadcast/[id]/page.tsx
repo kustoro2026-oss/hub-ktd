@@ -29,6 +29,16 @@ export default async function BroadcastDetailPage({
 
   const failedItems = items.filter((i) => i.status === "failed");
 
+  // Nilai variabel kampanye (mis. link produk) — JSON di kolom vars.
+  const vars = (() => {
+    try {
+      const v = JSON.parse(broadcast.vars || "[]");
+      return Array.isArray(v) ? v.map(String) : [];
+    } catch {
+      return [];
+    }
+  })();
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -43,6 +53,11 @@ export default async function BroadcastDetailPage({
           <p className="text-sm text-slate-500">
             Template {broadcast.template} · dibuat {broadcast.created_at}
           </p>
+          {vars.length > 0 && (
+            <p className="break-all text-xs text-slate-500">
+              Nilai variabel: {vars.join(", ")}
+            </p>
+          )}
         </div>
       </div>
 

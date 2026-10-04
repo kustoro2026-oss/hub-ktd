@@ -1,8 +1,10 @@
 "use client";
 
 // Buat kampanye broadcast: nama + template (dari daftar Meta yang sudah
-// DISETUJUI) + sasaran (semua kontak atau satu grup). Setelah dibuat,
-// pengiriman dijalankan dari halaman detail kampanye.
+// DISETUJUI) + sasaran (semua kontak atau satu grup). Template bervariabel
+// {{n}} memunculkan kolom nilai (mis. link produk) yang dipakai untuk semua
+// penerima kampanye. Setelah dibuat, pengiriman dijalankan dari halaman
+// detail kampanye.
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import type { ContactGroup } from "@/lib/db";
@@ -26,6 +28,7 @@ export default function BroadcastCreate({
   const [templates, setTemplates] = useState<WaTemplate[] | null>(null);
   const [tplError, setTplError] = useState("");
   const [template, setTemplate] = useState("");
+  const [varValues, setVarValues] = useState<Record<number, string>>({});
   const [target, setTarget] = useState<"all" | "group">("all");
   const [groupId, setGroupId] = useState(0);
   const [error, setError] = useState("");
@@ -57,9 +60,29 @@ export default function BroadcastCreate({
     })();
   }, []);
 
+  // Ganti template → kosongkan nilai variabel kampanye lama.
+  useEffect(() => setVarValues({}), [template]);
+
   const approvedTemplates = (templates ?? []).filter(
     (t) => t.status === "APPROVED",
   );
+
+  const selectedTpl = approvedTemplates.find((t) => t.name === template);
+  const tplBody =
+    selectedTpl?.components?.find((c) => c.type === "BODY")?.text ?? "";
+  // Nomor variabel {{1}}, {{2}}… yang muncul di teks BODY template.
+  const varNumbers = [
+    ...new Set(
+      [...tplBody.matchAll(/\{\{\s*(\d+)\s*\}\}/g)].map((m) => Number(m[1])),
+    ),
+  ].sort((a, b) => a - b);
+  // Pratinjau: variabel yang sudah diisi tampil sebagai teks, yang belum
+  // sebagai penanda "(isi nilai n)".
+  const preview = tplBody.replace(/\{\{\s*(\d+)\s*\}\}/g, (_m, n: string) => {
+    const v = (varValues[Number(n)] ?? "").trim();
+    return v || `(isi nilai ${n})`;
+  });
+  const varTag = (n: number) => `{{${n}}}`;
 
   const selectedGroup = groups.find((g) => g.id === groupId);
   const recipients = target === "group" ? (selectedGroup?.member_count ?? 0) : contactCount;
@@ -74,6 +97,10 @@ export default function BroadcastCreate({
       setError("Pilih grup dulu");
       return;
     }
+    if (varNumbers.some((n) => !(varValues[n] ?? "").trim())) {
+      setError(`Isi semua nilai variabel dulu (tanda ${varTag(varNumbers[0])} di dalam pesan)`);
+      return;
+    }
     setBusy(true);
     setError("");
     try {
@@ -84,6 +111,8 @@ export default function BroadcastCreate({
           name,
           template,
           groupId: target === "group" ? groupId : undefined,
+          vars: varNumbers.map((n) => (varValues[n] ?? "").trim()),
+          lang: selectedTpl?.language ?? "id",
         }),
       });
       if (res.ok) {
@@ -147,6 +176,35 @@ export default function BroadcastCreate({
           )}
         </label>
       </div>
+
+      {selectedTpl && tplBody && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+          <p className="mb-1 text-xs font-medium text-slate-600">
+            Pratinjau isi pesan
+          </p>
+          <p className="whitespace-pre-wrap text-sm text-slate-800">{preview}</p>
+        </div>
+      )}
+      {varNumbers.map((n) => (
+        <label key={n} className="block max-w-xl">
+          <span className="mb-1 block text-xs font-medium text-slate-600">
+            Nilai {varTag(n)}
+          </span>
+          <input
+            value={varValues[n] ?? ""}
+            onChange={(e) =>
+              setVarValues((p) => ({ ...p, [n]: e.target.value }))
+            }
+            placeholder="mis. https://toko.kustoro2026.com/produk/11"
+            className={inputCls + " w-full"}
+          />
+          <span className="mt-1 block text-[11px] text-slate-500">
+            Nilai ini dipakai untuk SEMUA penerima kampanye ini. Kampanye
+            berikutnya cukup ganti angkanya di link produk — template tidak
+            perlu dibuat ulang.
+          </span>
+        </label>
+      ))}
 
       {tplError && (
         <p className="text-xs text-red-600">{tplError}</p>

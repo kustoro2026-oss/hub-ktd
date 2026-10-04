@@ -13,7 +13,7 @@ import {
   setBroadcastStatus,
   setContactWaStatus,
 } from "@/lib/db";
-import { getTemplateStatus, getWaEnv, sendTemplate } from "@/lib/wa";
+import { getTemplateStatus, getWaEnv, sendTemplate, sendTemplateParams } from "@/lib/wa";
 
 const DELAY_MS = 1200; // jeda antar pesan — hormati rate limit Meta
 const BATCH_SIZE = Number(process.env.BROADCAST_BATCH ?? 40) || 40;
@@ -74,8 +74,20 @@ export async function POST(
 
   let sentNow = 0;
   let failedNow = 0;
+  // Nilai variabel {{1}}, {{2}}… kampanye (mis. link produk) — JSON array
+  // di kolom broadcasts.vars, dibuat saat kampanye dibentuk.
+  let tplParams: string[] = [];
+  try {
+    const raw = JSON.parse(broadcast.vars || "[]");
+    if (Array.isArray(raw)) tplParams = raw.map(String);
+  } catch {
+    tplParams = [];
+  }
   for (const item of items) {
-    const res = await sendTemplate(item.phone, broadcast.template);
+    const res =
+      tplParams.length > 0
+        ? await sendTemplateParams(item.phone, broadcast.template, tplParams, broadcast.lang || "id")
+        : await sendTemplate(item.phone, broadcast.template);
     if (res.ok) {
       await markBroadcastItem(item.id, "sent", "", res.waId ?? "");
       sentNow++;

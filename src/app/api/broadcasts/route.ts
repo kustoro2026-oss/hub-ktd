@@ -1,6 +1,7 @@
 // Buat kampanye broadcast baru: nama kampanye + daftar penerima.
 // Penerima: semua kontak (default), kontak pilihan (contactIds), atau
-// seluruh anggota satu grup (groupId).
+// seluruh anggota satu grup (groupId). vars = nilai variabel {{1}}, {{2}}…
+// template (mis. link produk), lang = bahasa template.
 import { isAuthed } from "@/lib/auth";
 import {
   createBroadcastWithItems,
@@ -17,14 +18,11 @@ export async function POST(request: Request) {
     template?: string;
     contactIds?: number[];
     groupId?: number;
+    vars?: string[];
+    lang?: string;
   } = {};
   try {
-    body = (await request.json()) as {
-      name?: string;
-      template?: string;
-      contactIds?: number[];
-      groupId?: number;
-    };
+    body = (await request.json()) as typeof body;
   } catch {
     return Response.json({ error: "Body tidak valid" }, { status: 400 });
   }
@@ -48,11 +46,14 @@ export async function POST(request: Request) {
     );
   }
 
+  const vars = (body.vars ?? []).map((v) => v.trim());
   const broadcast = await createBroadcastWithItems(
     body.name,
     body.template?.trim() || "info_promo_v2",
     selected.map((c) => ({ contactId: c.id, phone: c.phone })),
     body.groupId ?? null,
+    vars,
+    (body.lang ?? "id").trim() || "id",
   );
   return Response.json({ ok: true, broadcast }, { status: 201 });
 }

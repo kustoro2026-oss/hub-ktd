@@ -50,9 +50,12 @@ export type WaTemplate = {
   category: string;
   language: string;
   rejected_reason?: string;
+  components?: { type: string; text?: string }[];
 };
 
-/** Daftar template pesan milik WABA beserta status review-nya. */
+/** Daftar template pesan milik WABA beserta status review-nya.
+ *  `components` ikut diambil supaya UI bisa mendeteksi variabel {{n}}
+ *  dari teks BODY sebelum membuat kampanye. */
 export async function listTemplates(): Promise<{
   ok: boolean;
   templates?: WaTemplate[];
@@ -63,7 +66,7 @@ export async function listTemplates(): Promise<{
   if (!env || !wabaId)
     return { ok: false, detail: "WA_TOKEN / WA_WABA_ID belum diatur" };
   const res = await fetch(
-    `https://graph.facebook.com/${GRAPH_VERSION}/${wabaId}/message_templates?fields=name,status,category,language,rejected_reason&limit=100`,
+    `https://graph.facebook.com/${GRAPH_VERSION}/${wabaId}/message_templates?fields=name,status,category,language,rejected_reason,components&limit=100`,
     { headers: { Authorization: `Bearer ${env.token}` } },
   );
   if (!res.ok) {
@@ -441,7 +444,7 @@ export async function sendTemplateParams(
   template: string,
   params: string[],
   language = "id",
-): Promise<{ ok: boolean; error?: string; waId?: string }> {
+): Promise<{ ok: boolean; error?: string; waId?: string; notOnWa?: boolean }> {
   const env = getWaEnv();
   if (!env) return { ok: false, error: "WA_TOKEN / WA_PHONE_NUMBER_ID belum diatur" };
   const res = await fetch(
@@ -472,7 +475,10 @@ export async function sendTemplateParams(
   );
   if (!res.ok) {
     const err = await res.text();
-    return { ok: false, error: `HTTP ${res.status} ${err.slice(0, 200)}` };
+    // 131026 / 1013 = nomor tujuan bukan nomor WhatsApp (sama seperti
+    // sendTemplate) — tanda kontak invalid, bukan kegagalan template.
+    const notOnWa = /131026|1013/.test(err);
+    return { ok: false, error: `HTTP ${res.status} ${err.slice(0, 200)}`, notOnWa };
   }
   const data = (await res.json()) as { messages?: { id?: string }[] };
   return { ok: true, waId: data.messages?.[0]?.id };
