@@ -23,6 +23,33 @@ export async function GET(
   const { order_id } = await params;
 
   const res = await getOfficialResiForOrder(order_id);
+
+  // Mode diagnostik (?debug=1): kembalikan JSON ringkasan dokumen yang ikut/
+  // dilewati + alasan API — tanpa isi PDF (untuk memeriksa hasil cetak).
+  const url = new URL(_request.url);
+  if (url.searchParams.get("debug") === "1") {
+    return Response.json(
+      res.ok
+        ? {
+            ok: true,
+            tracking_number: res.tracking_number,
+            arranged: res.arranged,
+            docs: res.docs.map((d) => ({
+              type: d.type,
+              label: d.label,
+              size: d.size,
+            })),
+            skipped: res.skipped.map((d) => ({
+              type: d.type,
+              label: d.label,
+              size: d.size,
+              reason: d.reason ?? "",
+            })),
+          }
+        : { ok: false, detail: res.detail },
+    );
+  }
+
   if (res.ok) {
     // Header ASCII (kode jenis dokumen) — nilai non-ASCII ditolak server.
     const headers: Record<string, string> = {

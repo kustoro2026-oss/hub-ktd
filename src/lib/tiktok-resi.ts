@@ -13,12 +13,13 @@
 //     statusnya "menunggu:<epoch_ms>"; kalau dibatalkan di tengah tunggu,
 //     notifikasi pembatalan menggantikan kirim resi.
 //  6. Setelah masa tunggu: ambil dokumen cetak resmi dari API TikTok Shop —
-//     label kirim (SHIPPING_LABEL, A6) + daftar pengemasan (PACKING_SLIP, A6)
-//     + daftar pengambilan barang (PICKUP_LIST, A4, bila API mendukung)
-//     digabung jadi satu PDF persis seperti dialog "Cetak halaman" aplikasi —
-//     lalu kirim ke WA admin lewat rantai: dokumen bebas (window 24 jam) →
-//     template dokumen resi_pesanan (bebas window, menunggu review Meta) →
-//     template teks order_alert_ktd2 berisi tautan halaman Pesanan.
+//     satu panggilan SHIPPING_LABEL_AND_PACKING_SLIP (label kirim + daftar
+//     pengemasan, A6) persis dua centang di dialog "Cetak halaman" aplikasi,
+//     plus percobaan daftar pengambilan barang (PICKUP_LIST, A4 — belum ada
+//     di API publik, dilewati bila ditolak) — lalu kirim ke WA admin lewat
+//     rantai: dokumen bebas (window 24 jam) → template dokumen resi_pesanan
+//     (bebas window, menunggu review Meta) → template teks order_alert_ktd2
+//     berisi tautan halaman Pesanan.
 //  7. Kirim gagal ditandai + hitungan percobaan naik — dicoba ulang pada
 //     pengecekan berikutnya sampai batas, lalu dihentikan (label tetap bisa
 //     dibuka manual dari halaman Pesanan).
@@ -63,16 +64,34 @@ const NEW_ORDER_WAIT_MS =
   (Number(process.env.TIKTOK_RESI_DELAY_MINUTES) || 15) * 60 * 1000;
 
 /** Satu jenis dokumen yang diminta saat "Cetak Resi" — urutan sesuai dialog
- *  "Cetak halaman" aplikasi TikTok Shop. */
-export type ResiDocInfo = { type: string; label: string; size: string };
+ *  "Cetak halaman" aplikasi TikTok Shop. `reason` diisi saat dokumen
+ *  dilewati (alasannya dari API/unduhan). */
+export type ResiDocInfo = {
+  type: string;
+  label: string;
+  size: string;
+  reason?: string;
+};
 
-/** Dokumen cetak resi lengkap: label kirim (wajib) + daftar pengemasan +
- *  daftar pengambilan barang (tambahan — dilewati bila API menolak). */
-const RESI_DOCS: ResiDocInfo[] = [
-  { type: "SHIPPING_LABEL", label: "Label pengiriman", size: "A6" },
-  { type: "PACKING_SLIP", label: "Daftar pengemasan", size: "A6" },
-  { type: "PICKUP_LIST", label: "Daftar pengambilan barang", size: "A4" },
-];
+/** Dokumen cetak resi lengkap — urutan sesuai dialog "Cetak halaman":
+ *  label kirim (A6) + daftar pengemasan (A6) + daftar pengambilan barang
+ *  (A4). Label + daftar pengemasan diambil SEKALIGUS lewat tipe
+ *  SHIPPING_LABEL_AND_PACKING_SLIP (satu PDF resmi dari TikTok). */
+const LABEL_DOC: ResiDocInfo = {
+  type: "SHIPPING_LABEL",
+  label: "Label pengiriman",
+  size: "A6",
+};
+const PACKING_DOC: ResiDocInfo = {
+  type: "PACKING_SLIP",
+  label: "Daftar pengemasan",
+  size: "A6",
+};
+const PICKUP_DOC: ResiDocInfo = {
+  type: "PICKUP_LIST",
+  label: "Daftar pengambilan barang",
+  size: "A4",
+};
 
 /** Hasil cetak resi resmi: PDF gabungan + daftar dokumen ikut/dilewati. */
 export type ResiPdfResult =
@@ -115,10 +134,15 @@ function resiDocsLabel(r: {
   skipped: ResiDocInfo[];
   arranged: boolean;
 }): string {
-  const extra = r.docs.length > 1 ? ` + ${r.docs.length - 1} dokumen` : "";
+  const extra =
+    r.docs.length === 2
+      ? ` + ${r.docs[1].label.toLowerCase()}`
+      : r.docs.length > 2
+        ? ` + ${r.docs.length - 1} dokumen`
+        : "";
   const skip =
     r.skipped.length > 0
-      ? ` (tanpa: ${r.skipped.map((d) => d.label).join(", ")})`
+      ? ` (tanpa: ${r.skipped.map((d) => d.label.toLowerCase()).join(", ")})`
       : "";
   return `label resmi${extra}${r.arranged ? " + penjemputan dijadwalkan" : ""}${skip}`;
 }
@@ -160,9 +184,17 @@ async function findPackageIdForOrder(
 
 /** Ambil dokumen cetak RESMI TikTok Shop untuk satu pesanan lewat jalur
  *  fulfillment (per package_id) — sama seperti dialog "Cetak halaman"
- *  aplikasi: label kirim (A6) + daftar pengemasan (A6) + daftar pengambilan
- *  barang (A4) digabung jadi satu PDF. Label wajib — tanpa label, gagal.
- *  Dokumen tambahan yang ditolak API dicatat di `skipped` tanpa membatalkan. */
+ *  aplikasi. Strategi:
+ *
+ *  1. SHIPPING_LABEL_AND_PACKING_SLIP — satu panggilan yang mengembalikan
+ *     label kirim + daftar pengemasan (A6) dalam SATU PDF resmi (persis dua
+ *     centang atas di dialog "Cetak halaman").
+ *  2. Bila gabungan ditolak: jatuh ke SHIPPING_LABEL (wajib — tanpa label,
+ *     gagal) lalu PACKING_SLIP terpisah, digabung dengan pdf-lib.
+ *  3. PICKUP_LIST (A4) dicoba — tipe ini belum ada di API publik TikTok,
+ *     jadi biasanya tercatat di `skipped` dengan alasan dari API.
+ *
+ *  Dokumen tambahan yang ditolak tidak pernah membatalkan cetak label. */
 async function fetchOfficialResiPdf(
   cred: { cipher: string; access_token: string },
   orderId: string,
@@ -170,41 +202,86 @@ async function fetchOfficialResiPdf(
   const pkgId = await findPackageIdForOrder(cred, orderId);
   if (!pkgId.ok) return { ok: false, detail: pkgId.detail };
 
-  const [wajib, ...tambahan] = RESI_DOCS;
-  const label = await getPackageShippingDocument(
+  const buffers: Buffer[] = [];
+  const docs: ResiDocInfo[] = [];
+  const skipped: ResiDocInfo[] = [];
+  let trackingNumber = "";
+  let gabungFail: string | null = null;
+
+  // 1. Label + daftar pengemasan sekaligus.
+  const gabung = await getPackageShippingDocument(
     cred,
     pkgId.packageId,
-    wajib.type,
-    wajib.size,
+    "SHIPPING_LABEL_AND_PACKING_SLIP",
+    "A6",
   );
-  if (!label.ok) return { ok: false, detail: label.detail };
-  const labelDl = await downloadShippingDocument(label.doc_url);
-  if (!labelDl.ok) return { ok: false, detail: labelDl.detail };
-
-  const buffers = [labelDl.pdf];
-  const docs: ResiDocInfo[] = [wajib];
-  const skipped: ResiDocInfo[] = [];
-
-  for (const doc of tambahan) {
-    const res = await getPackageShippingDocument(
-      cred,
-      pkgId.packageId,
-      doc.type,
-      doc.size,
-    );
-    if (!res.ok) {
-      skipped.push(doc);
-      continue;
+  if (gabung.ok) {
+    const gabungDl = await downloadShippingDocument(gabung.doc_url);
+    if (gabungDl.ok) {
+      buffers.push(gabungDl.pdf);
+      docs.push(LABEL_DOC, PACKING_DOC);
+      trackingNumber = gabung.tracking_number;
+    } else {
+      gabungFail = gabungDl.detail;
     }
-    const dl = await downloadShippingDocument(res.doc_url);
-    if (!dl.ok) {
-      skipped.push(doc);
-      continue;
-    }
-    buffers.push(dl.pdf);
-    docs.push(doc);
+  } else {
+    gabungFail = gabung.detail;
   }
 
+  // 2. Cadangan: label saja (wajib), lalu daftar pengemasan terpisah.
+  if (buffers.length === 0) {
+    const label = await getPackageShippingDocument(
+      cred,
+      pkgId.packageId,
+      "SHIPPING_LABEL",
+      "A6",
+    );
+    if (!label.ok) return { ok: false, detail: label.detail };
+    const labelDl = await downloadShippingDocument(label.doc_url);
+    if (!labelDl.ok) return { ok: false, detail: labelDl.detail };
+    buffers.push(labelDl.pdf);
+    docs.push(LABEL_DOC);
+    trackingNumber = label.tracking_number;
+
+    const pack = await getPackageShippingDocument(
+      cred,
+      pkgId.packageId,
+      "PACKING_SLIP",
+      "A6",
+    );
+    if (pack.ok) {
+      const packDl = await downloadShippingDocument(pack.doc_url);
+      if (packDl.ok) {
+        buffers.push(packDl.pdf);
+        docs.push(PACKING_DOC);
+      } else {
+        skipped.push({ ...PACKING_DOC, reason: packDl.detail });
+      }
+    } else {
+      skipped.push({ ...PACKING_DOC, reason: gabungFail ?? pack.detail });
+    }
+  }
+
+  // 3. Daftar pengambilan barang (A4) — dicoba, biasanya ditolak API.
+  const pickup = await getPackageShippingDocument(
+    cred,
+    pkgId.packageId,
+    "PICKUP_LIST",
+    "A4",
+  );
+  if (pickup.ok) {
+    const pickupDl = await downloadShippingDocument(pickup.doc_url);
+    if (pickupDl.ok) {
+      buffers.push(pickupDl.pdf);
+      docs.push(PICKUP_DOC);
+    } else {
+      skipped.push({ ...PICKUP_DOC, reason: pickupDl.detail });
+    }
+  } else {
+    skipped.push({ ...PICKUP_DOC, reason: pickup.detail });
+  }
+
+  // 4. Gabung PDF bila lebih dari satu (gagal gabung → label saja).
   let pdf = buffers[0];
   if (buffers.length > 1) {
     try {
@@ -212,7 +289,9 @@ async function fetchOfficialResiPdf(
     } catch {
       // PDF resmi memakai fitur yang tidak didukung library penggabung —
       // cetak label saja, dokumen tambahan dicatat sebagai dilewati.
-      skipped.push(...docs.slice(1));
+      skipped.push(
+        ...docs.slice(1).map((d) => ({ ...d, reason: "gagal digabung" })),
+      );
       docs.splice(1);
     }
   }
@@ -220,7 +299,7 @@ async function fetchOfficialResiPdf(
   return {
     ok: true,
     pdf,
-    tracking_number: label.tracking_number,
+    tracking_number: trackingNumber,
     docs,
     skipped,
   };
