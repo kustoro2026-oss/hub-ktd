@@ -175,7 +175,7 @@ export default function AnekaExecClient({
               <p className="mt-2 text-sm text-emerald-800">
                 ID pesanan Aneka:{" "}
                 <a
-                  href={`https://anekadropship.id/riwayat-pemesanan/${row.aneka_order_id}`}
+                  href="https://anekadropship.id/riwayat-pemesanan"
                   target="_blank"
                   rel="noreferrer"
                   className="font-semibold underline"
