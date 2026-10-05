@@ -546,7 +546,7 @@ export async function executeAnekaOrder(
   await sendExecNotice(
     anekaId
       ? `Eksekusi Aneka BERHASIL untuk pesanan ${orderId}.\nID pesanan Aneka: ${anekaId}`
-      : `Eksekusi Aneka BERHASIL untuk pesanan ${orderId} (payment ${pay.paymentId}), tetapi kode pesanan belum terbaca otomatis — cek riwayat: https://anekadropship.id/riwayat-pemesanan`,
+      : `Eksekusi Aneka BERHASIL untuk pesanan ${orderId} (payment ${pay.paymentId}), tetapi kode pesanan belum terbaca otomatis — cek riwayat: https://anekadropship.id/payment-history`,
   );
   return {
     ok: true,
