@@ -153,6 +153,18 @@ export default function TiktokOrdersClient({
                             {it.sku_count}×
                           </span>
                           {it.product_name}
+                          {it.product_id ? (
+                            <a
+                              href={`https://shop-id.tokopedia.com/view/product/${it.product_id}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Buka halaman produk di Seller Center"
+                              className="block font-mono text-[11px] text-slate-400 hover:text-emerald-700"
+                            >
+                              ID {it.product_id}
+                              {it.sku_id ? ` · SKU ${it.sku_id}` : ""} ↗
+                            </a>
+                          ) : null}
                         </li>
                       ))}
                     </ul>

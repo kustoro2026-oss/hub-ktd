@@ -37,6 +37,7 @@ type CatalogHit = {
 type TableProduct = {
   tiktok_product_id: string;
   tiktok_product_name: string;
+  sku: string;
   order_count: number;
   total_qty: number;
   manual: boolean;
@@ -256,6 +257,7 @@ export default function AnekaMapClient({
     rows.push({
       tiktok_product_id: s.product_id,
       tiktok_product_name: s.product_name,
+      sku: s.sku_id,
       order_count: s.order_count,
       total_qty: s.total_qty,
       manual: false,
@@ -266,6 +268,7 @@ export default function AnekaMapClient({
       rows.push({
         tiktok_product_id: m.tiktok_product_id,
         tiktok_product_name: m.tiktok_product_name || "(tanpa nama)",
+        sku: m.tiktok_sku || "",
         order_count: 0,
         total_qty: 0,
         manual: true,
@@ -395,7 +398,17 @@ export default function AnekaMapClient({
                               MANUAL
                             </span>
                           ) : null}
+                          {r.sku ? <span> · SKU {r.sku}</span> : null}
                         </div>
+                        <a
+                          href={`https://shop-id.tokopedia.com/view/product/${r.tiktok_product_id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          title="Buka halaman produk di Seller Center untuk memastikan produknya"
+                          className="mt-0.5 inline-block text-[11px] text-slate-400 underline decoration-dotted hover:text-emerald-700"
+                        >
+                          Buka produk ↗
+                        </a>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-500">
                         {r.manual ? (
