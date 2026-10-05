@@ -251,14 +251,92 @@ export async function anekaVariantSave(
   return { ok: true };
 }
 
+/** Normalisasi teks untuk pencocokan varian. */
+function normVar(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, " ").trim();
+}
+
+/** Token petunjuk (sku_name / nama produk) — dipakai skor pencocokan. */
+function variantTokens(hint: string): string[] {
+  return hint
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+/** Skor kecocokan satu varian terhadap token petunjuk. */
+function variantScore(
+  v: { name?: string; label?: string; color?: string | null; size?: string | null },
+  tokens: string[],
+): number {
+  const hay = normVar(
+    [v.name ?? "", v.label ?? "", v.color ?? "", v.size ?? ""].join(" "),
+  );
+  let score = 0;
+  for (const t of tokens) {
+    if (t.length === 1) {
+      if (new RegExp(`\\b${t}\\b`).test(hay)) score++;
+    } else if (hay.includes(t)) {
+      score++;
+    }
+  }
+  return score;
+}
+
+/** Ukuran numerik dari teks (mis. "100 ml" → {num:100, unit:"ml"}). */
+function extractSize(
+  text: string,
+): { num: number; unit: string | null } | null {
+  const m =
+    /(\d+(?:[.,]\d+)?)\s*(ml|milliliter|mililiter|liter|lt|l|kg|kilogram|gram|gr|g)?\b/i.exec(
+      text,
+    );
+  if (!m) return null;
+  return {
+    num: parseFloat(m[1].replace(",", ".")),
+    unit: m[2] ? m[2].toLowerCase() : null,
+  };
+}
+
+/** Bandingkan ukuran petunjuk vs varian (ml-normalisasi bila bersatuan). */
+function sizeMismatch(
+  hintSize: { num: number; unit: string | null },
+  varSize: { num: number; unit: string | null },
+): boolean {
+  const toMl = (s: { num: number; unit: string | null }) => {
+    if (!s || s.unit === null) return null;
+    if (["liter", "lt", "l", "kg", "kilogram"].includes(s.unit))
+      return s.num * 1000;
+    if (["gram", "gr", "g"].includes(s.unit)) return s.num;
+    if (["ml", "milliliter", "mililiter"].includes(s.unit)) return s.num;
+    return null;
+  };
+  const h = toMl(hintSize);
+  const v = toMl(varSize);
+  if (h !== null && v !== null) return Math.abs(h - v) > 0.5;
+  // Salah satu sisi tanpa satuan → bandingkan angkanya saja.
+  return Math.abs(hintSize.num - varSize.num) > 0.5;
+}
+
+/** Kata warna (ID/EN) untuk guard varian tunggal. */
+const COLOR_WORDS = [
+  "merah", "hitam", "putih", "biru", "hijau", "kuning", "ungu", "orange",
+  "oranye", "pink", "abu", "coklat", "cokelat", "cream", "krem", "mocca",
+  "beige", "gold", "silver", "red", "black", "white", "blue", "green",
+  "yellow", "purple", "gray", "grey", "brown", "lilac", "mint", "peach",
+  "navy", "maroon", "tosca",
+];
+
 /** Tentukan variant_id untuk produk Aneka (data varian disematkan sebagai
  *  JSON di atribut onclick halaman produk — harus login). Tanpa varian →
- *  ok tanpa variantId. Satu varian → dipakai langsung. Banyak varian →
- *  dicocokkan ukuran dari nama produk TikTok (mis. "100 ml" → size "100"). */
+ *  ok tanpa variantId. Satu varian → dipakai langsung dengan guard ukuran/
+ *  warna. Banyak varian → dicocokkan token dari sku_name pesanan (ukuran,
+ *  warna, jenis) — ambigu/konflik → gagal dengan daftar varian, supaya
+ *  checkout otomatis tidak pernah membeli varian yang salah. */
 export async function anekaResolveVariant(
   s: AnekaSession,
   productId: string,
-  tiktokName: string,
+  variantHint: string,
 ): Promise<
   { ok: true; variantId?: string; label?: string } | { ok: false; detail: string }
 > {
@@ -292,6 +370,7 @@ export async function anekaResolveVariant(
     let variants: {
       id: number | string;
       name?: string;
+      color?: string | null;
       size?: string | null;
       label?: string;
       stock?: number | null;
@@ -311,38 +390,62 @@ export async function anekaResolveVariant(
     if (list.length === 0) {
       return { ok: false, detail: `Produk ${productId} tidak punya varian aktif` };
     }
+    const teksVar = (v: (typeof list)[number]) =>
+      [v.name ?? "", v.label ?? "", v.size ?? ""].join(" ");
     if (list.length === 1) {
       const v = list[0];
+      const teks = teksVar(v);
+      // Guard ukuran: petunjuk menyebut ukuran lain dari satu-satunya varian.
+      const hintSize = extractSize(variantHint);
+      const varSize = extractSize(teks);
+      if (hintSize && varSize && sizeMismatch(hintSize, varSize)) {
+        return {
+          ok: false,
+          detail: `Ukuran pesanan "${variantHint}" tidak cocok dengan satu-satunya varian produk ${productId} (${v.name ?? v.label ?? "?"})`,
+        };
+      }
+      // Guard warna (hanya bila variannya memang ber-semantik warna).
+      const varWarna = COLOR_WORDS.filter((c) =>
+        new RegExp(`\\b${c}\\b`).test(normVar(teks)),
+      );
+      if (varWarna.length > 0) {
+        const hintWarna = COLOR_WORDS.filter((c) =>
+          new RegExp(`\\b${c}\\b`).test(normVar(variantHint)),
+        );
+        if (
+          hintWarna.length > 0 &&
+          !hintWarna.some((c) => varWarna.includes(c))
+        ) {
+          return {
+            ok: false,
+            detail: `Warna pesanan "${variantHint}" tidak cocok dengan satu-satunya varian produk ${productId} (${v.name ?? v.label ?? "?"})`,
+          };
+        }
+      }
       return { ok: true, variantId: String(v.id), label: v.label ?? v.name };
     }
-    // Banyak varian → cocokkan ukuran dari nama produk TikTok.
-    const sizeTok =
-      /(\d+(?:[.,]\d+)?)\s*(ml|milliliter|mililiter|gram|gr|g|kg|kilogram|l|liter|pcs|sachet|sak|butir|cm)\b/i.exec(
-        tiktokName,
-      );
-    if (sizeTok) {
-      const num = sizeTok[1].toLowerCase();
-      const unit = sizeTok[2].toLowerCase();
-      const hits = list.filter((v) => {
-        const size = String(v.size ?? "").trim().toLowerCase().replace(/\s+/g, "");
-        const label = String(v.label ?? "").toLowerCase();
-        const name = String(v.name ?? "").toLowerCase();
-        return (
-          size === num + unit ||
-          size === num ||
-          label.includes(num) ||
-          name.includes(num)
-        );
-      });
-      if (hits.length === 1) {
-        const v = hits[0];
-        return { ok: true, variantId: String(v.id), label: v.label ?? v.name };
-      }
+    // Banyak varian → cocokkan token petunjuk terhadap teks tiap varian.
+    const hint = normVar(variantHint);
+    const tokens = variantTokens(variantHint);
+    const exact = list.filter(
+      (v) => normVar(teksVar(v)) === hint || normVar(v.name ?? "") === hint,
+    );
+    if (exact.length === 1) {
+      const v = exact[0];
+      return { ok: true, variantId: String(v.id), label: v.label ?? v.name };
+    }
+    const scored = list
+      .map((v) => ({ v, score: variantScore(v, tokens) }))
+      .filter((x) => x.score > 0)
+      .sort((a, b) => b.score - a.score);
+    if (scored.length === 1 || (scored.length > 1 && scored[0].score > scored[1].score)) {
+      const v = scored[0].v;
+      return { ok: true, variantId: String(v.id), label: v.label ?? v.name };
     }
     return {
       ok: false,
-      detail: `Produk ${productId} punya ${list.length} varian dan ukuran tidak jelas dari nama TikTok "${tiktokName}". Pilihan: ${list
-        .map((v) => `${v.id} = ${v.label ?? v.name ?? "?"}`)
+      detail: `Produk ${productId} punya ${list.length} varian dan pesanan "${variantHint}" tidak bisa dicocokkan dengan pasti. Pilihan: ${list
+        .map((v) => `${v.id} = ${v.name ?? v.label ?? "?"} (stok ${v.stock ?? "?"})`)
         .join("; ")}`,
     };
   } catch (e) {

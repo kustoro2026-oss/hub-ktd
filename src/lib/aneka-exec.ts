@@ -44,6 +44,9 @@ const EKSEKUSI_URL =
 export type AnekaExecItem = {
   tiktok_product_id: string;
   product_name: string;
+  /** Nama varian dari pesanan TikTok (mis. "100 ml", "BLACK - S") —
+   *  petunjuk utama mencocokkan varian Aneka. */
+  sku_name: string;
   qty: number;
   aneka_product_id: string;
   aneka_variant_id: string;
@@ -119,6 +122,7 @@ export async function checkAnekaExecutable(
     items.push({
       tiktok_product_id: it.product_id,
       product_name: it.product_name,
+      sku_name: it.sku_name ?? "",
       qty: it.sku_count,
       aneka_product_id: map.aneka_product_id,
       aneka_variant_id: map.aneka_variant_id ?? "",
@@ -243,13 +247,14 @@ export async function executeAnekaOrder(
   if (!pay.ok) return gagal(pay.detail);
 
   // 1b. Tentukan varian produk ber-varian yang belum dipetakan manual
-  //     (data varian diambil dari halaman produk Aneka).
+  //     (data varian diambil dari halaman produk Aneka; nama varian pesanan
+  //     sku_name jadi petunjuk pencocokan, fallback ke nama produk).
   for (const it of payload.items) {
     if (it.aneka_variant_id) continue;
     const v = await anekaResolveVariant(
       login.session,
       it.aneka_product_id,
-      it.product_name,
+      it.sku_name || it.product_name,
     );
     if (!v.ok) return gagal(v.detail);
     if (v.variantId) it.aneka_variant_id = v.variantId;

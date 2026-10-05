@@ -561,6 +561,21 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
           await recordTiktokOrderFailure(o.order_id, shop.shop_id, alasan);
           continue;
         }
+        // Lengkapi nama varian (sku_name) tiap item dari detail pesanan —
+        // petunjuk utama mencocokkan varian Aneka saat checkout otomatis.
+        if (detail.ok) {
+          const det = detail.orders.find((d) => d.id === o.order_id);
+          if (det) {
+            for (const it of o.items) {
+              if (it.sku_name) continue;
+              const li = det.line_items.find(
+                (x) =>
+                  x.product_id === it.product_id && x.sku_id === it.sku_id,
+              );
+              if (li?.sku_name) it.sku_name = li.sku_name;
+            }
+          }
+        }
         const prep = await prepareAnekaExec(
           shop,
           o,

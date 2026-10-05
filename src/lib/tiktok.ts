@@ -259,6 +259,10 @@ export type TiktokOrderSummary = {
     sku_id: string;
     product_name: string;
     sku_count: number;
+    /** Nama varian pesanan (mis. "100 ml", "BLACK - S") — dipakai untuk
+     *  mencocokkan varian Aneka saat checkout otomatis. */
+    sku_name?: string;
+    seller_sku?: string;
   }[];
 };
 
@@ -372,6 +376,8 @@ export async function getTiktokOrders(
               sku_id: String(i.sku_id ?? ""),
               product_name: String(i.product_name ?? ""),
               sku_count: qty,
+              sku_name: String(i.sku_name ?? ""),
+              seller_sku: String(i.seller_sku ?? ""),
             };
           }),
         };
