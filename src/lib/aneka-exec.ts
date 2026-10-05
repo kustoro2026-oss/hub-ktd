@@ -26,12 +26,15 @@ import {
 } from "@/lib/aneka-checkout";
 import {
   appendTiktokOrderExecLog,
+  claimTiktokOrderExecRunning,
   clearTiktokOrderExecLog,
   getAnekaProductMap,
   getTiktokOrderExec,
+  listTiktokShopTokens,
   saveTiktokOrderExec,
 } from "@/lib/db";
-import type { TiktokOrderSummary } from "@/lib/tiktok";
+import { getTiktokOrderDetail, type TiktokOrderSummary } from "@/lib/tiktok";
+import { prepareShop } from "@/lib/tiktok-orders";
 import {
   NOTIF_TEMPLATE,
   ownerNumber,
@@ -209,6 +212,71 @@ export async function cancelAnekaExec(orderId: string): Promise<void> {
   });
 }
 
+/** Jeda minimal sebelum baris "berjalan" yang macet (proses terputus di
+ *  tengah) boleh diambil alih. Rantai dibatasi 60 detik (maxDuration route),
+ *  jadi baris "berjalan" dengan jejak lebih tua dari ini pasti sudah mati. */
+const BERJALAN_MIN_MS = 2 * 60 * 1000;
+
+/** UTC "YYYY-MM-DD HH:MM:SS" → epoch ms (stempel log langkah eksekusi). */
+function parseUtcMs(s: string): number {
+  const t = Date.parse(s.replace(" ", "T") + "Z");
+  return Number.isFinite(t) ? t : 0;
+}
+
+/** Pastikan pesanan TikTok belum dibatalkan pembeli — dipanggil TEPAT sebelum
+ *  rantai pembayaran supaya saldo Aneka tidak terpakai untuk pesanan yang
+ *  batal di tengah antrean. Verifikasi gagal = hentikan (lebih aman menunda
+ *  daripada membayar pesanan yang mungkin sudah batal). */
+async function tiktokOrderStillActive(
+  orderId: string,
+): Promise<{ ok: boolean; detail: string }> {
+  const shops = await listTiktokShopTokens();
+  if (shops.length === 0) {
+    return {
+      ok: false,
+      detail:
+        "Tidak ada toko TikTok Shop terotorisasi — status pesanan tidak bisa diverifikasi, eksekusi dihentikan",
+    };
+  }
+  let prepareFail: string | null = null;
+  for (const shop of shops) {
+    const prep = await prepareShop(shop);
+    if (!prep.ok) {
+      prepareFail = prep.detail;
+      continue;
+    }
+    const detail = await getTiktokOrderDetail(
+      { cipher: prep.cipher, access_token: prep.access_token },
+      [orderId],
+    );
+    if (!detail.ok) {
+      return {
+        ok: false,
+        detail: `Status pesanan TikTok tidak bisa diverifikasi (${detail.detail}) — eksekusi dihentikan demi keamanan, coba lagi nanti`,
+      };
+    }
+    const o = detail.orders.find((d) => d.id === orderId);
+    if (!o) {
+      return {
+        ok: false,
+        detail:
+          "Pesanan tidak ditemukan lagi di TikTok Shop — eksekusi dihentikan",
+      };
+    }
+    if (o.status === "CANCELLED" || o.status === "CANCELED") {
+      return {
+        ok: false,
+        detail: "Pesanan dibatalkan pembeli — eksekusi dihentikan",
+      };
+    }
+    return { ok: true, detail: o.status };
+  }
+  return {
+    ok: false,
+    detail: `Status pesanan TikTok tidak bisa diverifikasi (${prepareFail ?? "kredensial toko gagal"}) — eksekusi dihentikan demi keamanan, coba lagi nanti`,
+  };
+}
+
 /** Jalankan rantai checkout Aneka penuh untuk satu antrean "menunggu"
  *  (atau coba ulang baris "gagal"). Sukses → status "selesai" + ID pesanan
  *  Aneka dikirim ke WA; gagal → status "gagal" + keterangan (bisa dicoba
@@ -223,6 +291,77 @@ export async function executeAnekaOrder(
   }
   if (row.status === "batal") {
     return { ok: false, detail: "Pesanan ini dibatalkan" };
+  }
+
+  // Baris "berjalan" berarti ada percobaan yang mungkin terputus di tengah
+  // (batas waktu serverless, tab ditutup). Pulihkan dengan hati-hati —
+  // JANGAN pernah membayar dua kali.
+  if (row.status === "berjalan") {
+    const lines = row.log.trim().split("\n").filter(Boolean);
+    const last = lines[lines.length - 1] ?? "";
+    const ts = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.exec(last)?.[0] ?? "";
+    const ageMs = ts ? Date.now() - parseUtcMs(ts) : Number.POSITIVE_INFINITY;
+    if (ageMs < BERJALAN_MIN_MS) {
+      return {
+        ok: false,
+        detail: "Eksekusi masih berjalan — muat ulang halaman sebentar lagi",
+      };
+    }
+    // Terputus SETELAH pembayaran lolos → jangan bayar ulang. Verifikasi
+    // lewat riwayat Aneka berdasarkan payment_id yang tercatat di log.
+    if (row.log.includes("pembayaran/process | berhasil")) {
+      const payId = /payment_id (\d+)/.exec(row.log)?.[1] ?? "";
+      if (!payId) {
+        return {
+          ok: false,
+          detail:
+            "Percobaan sebelumnya sudah membayar tetapi payment_id tidak tercatat — periksa riwayat Aneka sebelum mencoba lagi",
+        };
+      }
+      const login = await anekaLogin();
+      if (!login.ok) {
+        return {
+          ok: false,
+          detail: `Percobaan sebelumnya sudah membayar (payment ${payId}) tetapi login untuk verifikasi gagal — periksa riwayat Aneka sebelum mencoba lagi`,
+        };
+      }
+      const found = await anekaFindOrderByPayment(login.session, payId);
+      if (found.ok && found.orderCode) {
+        const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+        await saveTiktokOrderExec({
+          order_id: orderId,
+          status: "selesai",
+          payload: row.payload,
+          aneka_payment_id: payId,
+          aneka_order_id: found.orderCode,
+          detail: "",
+          executed_at: nowUtc,
+        });
+        await appendTiktokOrderExecLog(
+          orderId,
+          `${nowUtc} | pemulihan | pembayaran sebelumnya terverifikasi — ${found.orderCode}`,
+        );
+        await sendExecNotice(
+          `Eksekusi Aneka BERHASIL untuk pesanan ${orderId} (dipulihkan dari percobaan terputus).\nID pesanan Aneka: ${found.orderCode}`,
+        );
+        return {
+          ok: true,
+          detail: `Dipulihkan — ID pesanan Aneka: ${found.orderCode}`,
+        };
+      }
+      return {
+        ok: false,
+        detail: `Pembayaran sudah diproses (payment ${payId}) tetapi kode pesanan belum terbaca di riwayat — periksa riwayat Aneka sebelum mencoba lagi`,
+      };
+    }
+    // Terputus SEBELUM pembayaran — aman diulang: kembalikan ke "gagal"
+    // supaya klaim atomik di bawah bisa mengambil alih.
+    await saveTiktokOrderExec({
+      order_id: orderId,
+      status: "gagal",
+      payload: row.payload,
+      detail: "Terputus di tengah — dicoba ulang",
+    });
   }
 
   let payload: AnekaExecPayload;
@@ -248,23 +387,48 @@ export async function executeAnekaOrder(
     return { ok: false, detail };
   };
 
-  // 1. Login + buat pembayaran (payment_id baru setiap percobaan).
-  //    Tiap langkah dicatat ke kolom log baris ini — ditulis langsung per
-  //    langkah supaya bila proses serverless terputus (mis. batas waktu),
-  //    jejak sampai langkah terakhir tetap tersimpan untuk diagnosa.
+  // 1. Klaim atomik: hanya SATU permintaan Setuju yang boleh menjalankan
+  //    rantai — mencegah dua tab/klik bersamaan membayar dua kali. Tiap
+  //    langkah berikutnya dicatat ke kolom log baris ini — ditulis langsung
+  //    per langkah supaya bila proses serverless terputus (mis. batas
+  //    waktu), jejak sampai langkah terakhir tetap tersimpan untuk diagnosa.
+  const claimed = await claimTiktokOrderExecRunning(orderId);
+  if (!claimed) {
+    return {
+      ok: false,
+      detail:
+        "Pesanan ini sedang dieksekusi atau sudah diproses — muat ulang halaman",
+    };
+  }
   await clearTiktokOrderExecLog(orderId);
-  await saveTiktokOrderExec({
-    order_id: orderId,
-    status: "berjalan",
-    payload: row.payload,
-    detail: "",
-  });
   const logStep = async (langkah: string, pesan: string) => {
     const t = new Date().toISOString().slice(0, 19).replace("T", " ");
     await appendTiktokOrderExecLog(orderId, `${t} | ${langkah} | ${pesan}`);
   };
 
   await logStep("mulai", "rantai checkout Aneka dijalankan");
+
+  // 2. Pastikan pesanan TikTok masih aktif (belum dibatalkan pembeli)
+  //    SEBELUM memindahkan saldo — mencegah bayar pesanan yang batal.
+  const aktif = await tiktokOrderStillActive(orderId);
+  if (!aktif.ok) {
+    await logStep("cek-pesanan", `GAGAL — ${aktif.detail}`);
+    const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+    await saveTiktokOrderExec({
+      order_id: orderId,
+      status: "batal",
+      payload: row.payload,
+      detail: aktif.detail,
+      executed_at: nowUtc,
+    });
+    await sendExecNotice(
+      `Eksekusi Aneka DIBATALKAN untuk pesanan ${orderId}: ${aktif.detail}`,
+    );
+    return { ok: false, detail: aktif.detail };
+  }
+  await logStep("cek-pesanan", `pesanan masih aktif (status ${aktif.detail})`);
+
+  // 3. Login + buat pembayaran (payment_id baru setiap percobaan).
   const login = await anekaLogin();
   if (!login.ok) {
     await logStep("login", `GAGAL — ${login.detail}`);

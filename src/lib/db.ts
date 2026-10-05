@@ -1384,3 +1384,19 @@ export async function saveTiktokOrderExec(e: {
     e.executed_at ?? "",
   ]);
 }
+
+/** Klaim atomik antrean eksekusi → status "berjalan". HANYA baris berstatus
+ *  "menunggu" atau "gagal" yang boleh diklaim — mengembalikan false bila
+ *  baris sedang berjalan (mencegah dua klik Setuju bersamaan membayar dua
+ *  kali di Aneka) atau sudah selesai/batal. */
+export async function claimTiktokOrderExecRunning(
+  orderId: string,
+): Promise<boolean> {
+  const r = await queryOne<{ order_id: string }>(
+    `UPDATE tiktok_order_exec SET status = 'berjalan', detail = ''
+     WHERE order_id = ? AND status IN ('menunggu', 'gagal')
+     RETURNING order_id`,
+    [orderId],
+  );
+  return !!r;
+}

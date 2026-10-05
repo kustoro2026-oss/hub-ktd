@@ -35,6 +35,16 @@ function ExecActions({ row }: { row: ExecRow }) {
   const [error, setError] = useState("");
 
   async function act(action: "setuju" | "batalkan") {
+    // Konfirmasi eksplisit sebelum memindahkan saldo Aneka — mencegah
+    // salah klik baris yang salah terbayar.
+    if (
+      action === "setuju" &&
+      !window.confirm(
+        `Yakin jalankan checkout Aneka untuk pesanan ${row.order_id}?\nSaldo Aneka akan terpotong sekitar ${row.total_modal} (belum termasuk ongkos pengemasan).\nTekan OK untuk melanjutkan, Batal untuk mundur.`,
+      )
+    ) {
+      return;
+    }
     setBusy(action);
     setError("");
     try {
