@@ -3,9 +3,20 @@
 // API publik — alurnya ditiru persis dari form asli (ditemukan lewat probe):
 //
 //   login → POST /payment/create (JSON kosong, header X-CSRF-TOKEN) →
-//   POST /variant/save (FormData per produk) → GET /checkout-barang/{id} →
-//   POST /pembayaran/process (multipart: resi_number[i], resi_file[i],
-//   payment_category=wallet, wallet_source=wallet).
+//   GET /products/{id} (resolve varian bila produk ber-varian) →
+//   POST /variant/save (FormData per produk) → GET /checkout-barang/{id}
+//   (token _token + id baris item_resi[]) → POST /pembayaran/process
+//   (multipart: resi_number[i], resi_file[i], item_resi[jual_id]=1,
+//   payment_category=wallet, wallet_source=wallet) → verifikasi kode
+//   ORDER-{payment_id}-... di /riwayat-pemesanan.
+//
+// Catatan perilaku situs (hasil probe 2026-10):
+//   - /payment/create SELALU membuat payment baru (bukan reuse).
+//   - /variant/save MENIMPA qty produk yang sama (aman diulang); menolak
+//     produk ber-varian tanpa variant_id[pid]; jumlah_resi[pid]=0 valid.
+//   - Gagal validasi /pembayaran/process = 302 kembali ke checkout-barang.
+//   - Riwayat menampilkan kode ORDER-{payment_id}-{timestamp} sebagai teks
+//     polos (tanpa tautan detail).
 //
 // Situs sering error saat beban tinggi (Cloudflare 522) — setiap fetch
 // dibungkus coba-ulang dengan jeda. Sesi (cookie + token CSRF) hidup hanya
@@ -240,11 +251,116 @@ export async function anekaVariantSave(
   return { ok: true };
 }
 
-/** Token _token dari form /pembayaran/process di halaman checkout. */
+/** Tentukan variant_id untuk produk Aneka (data varian disematkan sebagai
+ *  JSON di atribut onclick halaman produk — harus login). Tanpa varian →
+ *  ok tanpa variantId. Satu varian → dipakai langsung. Banyak varian →
+ *  dicocokkan ukuran dari nama produk TikTok (mis. "100 ml" → size "100"). */
+export async function anekaResolveVariant(
+  s: AnekaSession,
+  productId: string,
+  tiktokName: string,
+): Promise<
+  { ok: true; variantId?: string; label?: string } | { ok: false; detail: string }
+> {
+  try {
+    const res = await fetchRetry(s.cookie, `${BASE}/products/${productId}`, {
+      redirect: "manual",
+    });
+    if (res.status >= 400) {
+      return {
+        ok: false,
+        detail: `Halaman produk ${productId} tidak terbuka (status ${res.status})`,
+      };
+    }
+    const html = await res.text();
+    const re = new RegExp(
+      `&quot;id&quot;:${productId},[\\s\\S]{0,300}?&quot;has_variants&quot;:(true|false)[\\s\\S]{0,300}?&quot;variants&quot;:(\\[[^\\]]*\\])`,
+    );
+    const m = re.exec(html);
+    if (!m) {
+      return {
+        ok: false,
+        detail: `Data varian produk ${productId} tidak ditemukan di halaman produk`,
+      };
+    }
+    if (m[1] !== "true") return { ok: true }; // produk tanpa varian (spt #57)
+    const json = m[2]
+      .replace(/&quot;/g, '"')
+      .replace(/&amp;/g, "&")
+      .replace(/&#0?39;/g, "'")
+      .replace(/\\\//g, "/");
+    let variants: {
+      id: number | string;
+      name?: string;
+      size?: string | null;
+      label?: string;
+      stock?: number | null;
+    }[];
+    try {
+      variants = JSON.parse(json);
+    } catch {
+      return {
+        ok: false,
+        detail: `Data varian produk ${productId} tidak bisa dibaca`,
+      };
+    }
+    const aktif = variants.filter(
+      (v) => v.stock === null || v.stock === undefined || Number(v.stock) > 0,
+    );
+    const list = aktif.length > 0 ? aktif : variants;
+    if (list.length === 0) {
+      return { ok: false, detail: `Produk ${productId} tidak punya varian aktif` };
+    }
+    if (list.length === 1) {
+      const v = list[0];
+      return { ok: true, variantId: String(v.id), label: v.label ?? v.name };
+    }
+    // Banyak varian → cocokkan ukuran dari nama produk TikTok.
+    const sizeTok =
+      /(\d+(?:[.,]\d+)?)\s*(ml|milliliter|mililiter|gram|gr|g|kg|kilogram|l|liter|pcs|sachet|sak|butir|cm)\b/i.exec(
+        tiktokName,
+      );
+    if (sizeTok) {
+      const num = sizeTok[1].toLowerCase();
+      const unit = sizeTok[2].toLowerCase();
+      const hits = list.filter((v) => {
+        const size = String(v.size ?? "").trim().toLowerCase().replace(/\s+/g, "");
+        const label = String(v.label ?? "").toLowerCase();
+        const name = String(v.name ?? "").toLowerCase();
+        return (
+          size === num + unit ||
+          size === num ||
+          label.includes(num) ||
+          name.includes(num)
+        );
+      });
+      if (hits.length === 1) {
+        const v = hits[0];
+        return { ok: true, variantId: String(v.id), label: v.label ?? v.name };
+      }
+    }
+    return {
+      ok: false,
+      detail: `Produk ${productId} punya ${list.length} varian dan ukuran tidak jelas dari nama TikTok "${tiktokName}". Pilihan: ${list
+        .map((v) => `${v.id} = ${v.label ?? v.name ?? "?"}`)
+        .join("; ")}`,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Gagal membaca varian produk ${productId}: ${e instanceof Error ? e.message : "kesalahan tidak dikenal"}`,
+    };
+  }
+}
+
+/** Token _token dari form /pembayaran/process di halaman checkout, plus id
+ *  baris keranjang (jual) untuk penugasan resi item_resi[jual_id]. */
 export async function anekaCheckoutToken(
   s: AnekaSession,
   paymentId: string,
-): Promise<{ ok: true; token: string } | { ok: false; detail: string }> {
+): Promise<
+  { ok: true; token: string; itemResiIds: string[] } | { ok: false; detail: string }
+> {
   try {
     const res = await fetchRetry(
       s.cookie,
@@ -260,7 +376,10 @@ export async function anekaCheckoutToken(
         detail: `Halaman checkout tidak memuat token (status ${res.status})`,
       };
     }
-    return { ok: true, token };
+    const itemResiIds = [...html.matchAll(/name="item_resi\[(\d+)\]"/g)].map(
+      (m) => m[1],
+    );
+    return { ok: true, token, itemResiIds };
   } catch (e) {
     return {
       ok: false,
@@ -269,11 +388,14 @@ export async function anekaCheckoutToken(
   }
 }
 
-/** Kirim pembayaran akhir: upload label resi + bayar pakai saldo (wallet). */
+/** Kirim pembayaran akhir: upload label resi + bayar pakai saldo (wallet).
+ *  itemResiIds = id baris keranjang dari halaman checkout (item_resi[jual_id]
+ *  di form asli; semua ditugaskan ke slot resi 1 = satu paket). */
 export async function anekaProcessPayment(
   s: AnekaSession,
   paymentId: string,
   token: string,
+  itemResiIds: string[],
   resi: { number: string; pdf: Buffer },
 ): Promise<{ ok: true } | { ok: false; detail: string }> {
   try {
@@ -299,14 +421,16 @@ export async function anekaProcessPayment(
     if (lampiran) fd.append("resi_lampiran_diakui", "1");
     fd.append("payment_category", "wallet");
     fd.append("wallet_source", "wallet");
+    for (const id of itemResiIds) fd.append(`item_resi[${id}]`, "1");
 
     const res = await fetchRetry(s.cookie, `${BASE}/pembayaran/process`, {
       method: "POST",
       redirect: "manual",
       body: fd,
     });
-    // Sukses = JSON success ATAU pengalihan (riwayat/sukses) bukan kembali
-    // ke halaman checkout/login.
+
+    // Sukses = JSON success ATAU pengalihan ke halaman sukses. Gagal
+    // validasi = 302 kembali ke checkout-barang (terbukti lewat probe).
     const contentType = res.headers.get("content-type") ?? "";
     if (contentType.includes("application/json")) {
       const data = (await res.json().catch(() => ({}))) as {
@@ -320,15 +444,35 @@ export async function anekaProcessPayment(
       };
     }
     const loc = res.headers.get("location") ?? "";
-    if (res.status >= 200 && res.status < 400 && !loc.includes("login")) {
+    if (res.status >= 400) {
+      const body = await res.text();
+      const pesan =
+        /(?:error|gagal)[^<]{0,160}/i.exec(body)?.[0]?.trim() || "";
+      return {
+        ok: false,
+        detail: `Pembayaran gagal (status ${res.status}): ${pesan || "tanpa keterangan"}`,
+      };
+    }
+    if (loc.includes("checkout-barang") || loc.includes("/login")) {
+      return {
+        ok: false,
+        detail: "Pembayaran ditolak situs (kembali ke halaman checkout) — periksa saldo wallet, varian, dan jumlah resi",
+      };
+    }
+    if (
+      loc.includes("riwayat") ||
+      loc.includes("sukses") ||
+      loc.includes("berhasil")
+    ) {
       return { ok: true };
     }
-    const body = await res.text();
-    const pesan =
-      /(?:error|gagal)[^<]{0,160}/i.exec(body)?.[0]?.trim() || "";
+    // Respons tak dikenali → pastikan lewat riwayat (kode ORDER-{payment_id})
+    // sebelum menyatakan gagal, supaya coba-ulang tidak membayar dua kali.
+    const found = await anekaFindOrderByPayment(s, paymentId);
+    if (found.ok && found.orderCode) return { ok: true };
     return {
       ok: false,
-      detail: `Pembayaran gagal (status ${res.status}): ${pesan || "tanpa keterangan"}`,
+      detail: "Respons pembayaran tak dikenali dan pesanan belum tampak di riwayat — periksa manual sebelum mencoba lagi",
     };
   } catch (e) {
     return {
@@ -338,7 +482,29 @@ export async function anekaProcessPayment(
   }
 }
 
-/** ID pesanan Aneka terbaru dari halaman riwayat (setelah pembayaran). */
+/** Cari kode pesanan di riwayat berdasarkan payment_id (ORDER-{id}-{ts}). */
+export async function anekaFindOrderByPayment(
+  s: AnekaSession,
+  paymentId: string,
+): Promise<{ ok: true; orderCode: string } | { ok: false; detail: string }> {
+  try {
+    const res = await fetchRetry(
+      s.cookie,
+      `${BASE}/riwayat-pemesanan`,
+      { redirect: "manual" },
+    );
+    const html = await res.text();
+    const m = new RegExp(`ORDER-${paymentId}-\\d{6,}`).exec(html);
+    return { ok: true, orderCode: m?.[0] ?? "" };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Gagal membaca riwayat: ${e instanceof Error ? e.message : "kesalahan tidak dikenal"}`,
+    };
+  }
+}
+
+/** Kode pesanan Aneka TERBARU dari halaman riwayat (baris teratas). */
 export async function anekaNewestOrderId(
   s: AnekaSession,
 ): Promise<{ ok: true; orderId: string } | { ok: false; detail: string }> {
@@ -349,10 +515,8 @@ export async function anekaNewestOrderId(
       { redirect: "manual" },
     );
     const html = await res.text();
-    const m =
-      /riwayat-pemesanan\/(\d{4,})/.exec(html) ??
-      /(?:ID\s*Pesanan|Order\s*ID)[^\d]{0,20}(\d{4,})/i.exec(html);
-    return { ok: true, orderId: m?.[1] ?? "" };
+    const m = /ORDER-(\d{4,})-(\d{10})/.exec(html);
+    return { ok: true, orderId: m?.[0] ?? "" };
   } catch (e) {
     return {
       ok: false,
