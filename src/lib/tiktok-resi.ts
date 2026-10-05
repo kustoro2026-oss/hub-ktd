@@ -31,6 +31,11 @@ import {
   recordTiktokOrderFailure,
 } from "@/lib/db";
 import {
+  cancelAnekaExec,
+  checkAnekaExecutable,
+  prepareAnekaExec,
+} from "@/lib/aneka-exec";
+import {
   downloadShippingDocument,
   getPackageDetail,
   getPackageHandoverTimeSlots,
@@ -449,6 +454,8 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
 
       // Pesanan dibatalkan: kabari admin (sekali) — resi tidak dikirim.
       if (cancelled) {
+        // Batalkan juga antrean eksekusi Aneka bila sempat disiapkan.
+        await cancelAnekaExec(o.order_id);
         const silent =
           baseline ||
           prev?.notify === "skip" ||
@@ -524,6 +531,65 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
 
       // Masa tunggu selesai, atau percobaan ulang untuk kiriman yang gagal.
       newOrders++;
+
+      // Fase 2: bila SEMUA produk pesanan sudah dipetakan ke Aneka, jangan
+      // kirim resi — siapkan eksekusi semi-otomatis (tunggu tombol Setuju
+      // di halaman Eksekusi; rantai checkout Aneka baru dijalankan saat
+      // disetujui supaya tidak menumpuk pembayaran mangkrak).
+      const execCheck = await checkAnekaExecutable(o);
+      if (execCheck.ok) {
+        const official = await getOfficialResiForCred(cred, o.order_id);
+        if (!official.ok) {
+          errors.push(`${shop.shop_name}: ${o.order_id}: ${official.detail}`);
+          await recordTiktokOrderFailure(
+            o.order_id,
+            shop.shop_id,
+            `gagal: ${official.detail}`,
+          );
+          continue;
+        }
+        // Satu slot resi Aneka per pesanan (satu paket = satu label).
+        // Pesanan multi-paket tidak bisa diwakili satu label — proses manual.
+        const detail = await getTiktokOrderDetail(cred, [o.order_id]);
+        const pkgs = detail.ok
+          ? (detail.orders.find((d) => d.id === o.order_id)?.package_list ??
+              [])
+          : [];
+        if (pkgs.length > 1) {
+          const alasan = `gagal: pesanan multi-paket (${pkgs.length} paket) — eksekusi Aneka hanya satu slot resi, proses manual`;
+          errors.push(`${shop.shop_name}: ${o.order_id}: ${alasan}`);
+          await recordTiktokOrderFailure(o.order_id, shop.shop_id, alasan);
+          continue;
+        }
+        const prep = await prepareAnekaExec(
+          shop,
+          o,
+          {
+            pdf: official.pdf,
+            tracking_number: official.tracking_number,
+          },
+        );
+        if (prep.ok) {
+          await markTiktokOrderSeen(
+            o.order_id,
+            shop.shop_id,
+            "eksekusi:menunggu",
+          );
+          sent.push(
+            `${shop.shop_name} ${o.order_id} → menunggu persetujuan Aneka`,
+          );
+        } else {
+          errors.push(`${shop.shop_name}: ${o.order_id}: ${prep.detail}`);
+          await recordTiktokOrderFailure(
+            o.order_id,
+            shop.shop_id,
+            `gagal: ${prep.detail}`,
+          );
+        }
+        continue;
+      }
+
+      // Produk belum terpetakan ke Aneka — jalur lama: kirim label ke WA.
       const official = await getOfficialResiForCred(cred, o.order_id);
       if (!official.ok) {
         errors.push(`${shop.shop_name}: ${o.order_id}: ${official.detail}`);

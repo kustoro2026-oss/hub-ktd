@@ -22,6 +22,7 @@ import {
   ChevronDown,
   Boxes,
   Link2,
+  PlayCircle,
 } from "lucide-react";
 
 export type NavItem = {
@@ -63,6 +64,11 @@ export const NAV: NavSection[] = [
             href: "/marketplace/tiktok/pesanan",
             label: "Pesanan",
             Icon: Package,
+          },
+          {
+            href: "/marketplace/tiktok/eksekusi",
+            label: "Eksekusi Pesanan",
+            Icon: PlayCircle,
           },
           { href: "", label: "Produk", Icon: Boxes, segera: true },
         ],

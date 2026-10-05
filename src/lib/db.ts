@@ -273,6 +273,18 @@ function migrateSqlite(db: DatabaseSync) {
       enabled INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
+
+    CREATE TABLE IF NOT EXISTS tiktok_order_exec (
+      order_id TEXT PRIMARY KEY,
+      shop_id TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'menunggu',
+      payload TEXT NOT NULL DEFAULT '',
+      aneka_payment_id TEXT NOT NULL DEFAULT '',
+      aneka_order_id TEXT NOT NULL DEFAULT '',
+      detail TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      executed_at TEXT NOT NULL DEFAULT ''
+    );
   `);
 
   // Migrasi DB lama: kolom shop_cipher untuk panggilan API pesanan.
@@ -451,6 +463,18 @@ async function migratePg(pool: Pool) {
       aneka_product_name TEXT NOT NULL DEFAULT '',
       enabled INTEGER NOT NULL DEFAULT 1,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS tiktok_order_exec (
+      order_id TEXT PRIMARY KEY,
+      shop_id TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'menunggu',
+      payload TEXT NOT NULL DEFAULT '',
+      aneka_payment_id TEXT NOT NULL DEFAULT '',
+      aneka_order_id TEXT NOT NULL DEFAULT '',
+      detail TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      executed_at TEXT NOT NULL DEFAULT ''
     );
   `);
 
@@ -1158,4 +1182,76 @@ export async function deleteAnekaProductMap(
     "DELETE FROM aneka_product_map WHERE tiktok_product_id = ?",
     [tiktokProductId],
   );
+}
+
+// ---------- Eksekusi pesanan TikTok → Aneka (Fase 2, semi-otomatis) ----------
+
+export type TiktokOrderExec = {
+  order_id: string;
+  shop_id: string;
+  status: string;
+  payload: string;
+  aneka_payment_id: string;
+  aneka_order_id: string;
+  detail: string;
+  created_at: string;
+  executed_at: string;
+};
+
+/** Satu baris eksekusi pesanan (null = belum pernah disiapkan). */
+export async function getTiktokOrderExec(
+  orderId: string,
+): Promise<TiktokOrderExec | null> {
+  return (
+    (await queryOne<TiktokOrderExec>(
+      "SELECT * FROM tiktok_order_exec WHERE order_id = ?",
+      [orderId],
+    )) ?? null
+  );
+}
+
+/** Semua baris eksekusi (menunggu persetujuan di depan, lalu terbaru). */
+export async function listTiktokOrderExecs(): Promise<TiktokOrderExec[]> {
+  return queryAll<TiktokOrderExec>(
+    `SELECT * FROM tiktok_order_exec
+     ORDER BY CASE status WHEN 'menunggu' THEN 0 ELSE 1 END, created_at DESC`,
+  );
+}
+
+/** Simpan/timpa baris eksekusi (upsert — persiapan ulang menimpa baris
+ *  lama, mis. "gagal" → "menunggu" setelah percobaan berikutnya). */
+export async function saveTiktokOrderExec(e: {
+  order_id: string;
+  shop_id?: string;
+  status?: string;
+  payload?: string;
+  aneka_payment_id?: string;
+  aneka_order_id?: string;
+  detail?: string;
+  executed_at?: string;
+}): Promise<void> {
+  const sql =
+    dbMode() === "pg"
+      ? `INSERT INTO tiktok_order_exec (order_id, shop_id, status, payload, aneka_payment_id, aneka_order_id, detail, executed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (order_id) DO UPDATE SET shop_id = EXCLUDED.shop_id, status = EXCLUDED.status,
+           payload = EXCLUDED.payload, aneka_payment_id = EXCLUDED.aneka_payment_id,
+           aneka_order_id = EXCLUDED.aneka_order_id, detail = EXCLUDED.detail,
+           executed_at = EXCLUDED.executed_at`
+      : `INSERT INTO tiktok_order_exec (order_id, shop_id, status, payload, aneka_payment_id, aneka_order_id, detail, executed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (order_id) DO UPDATE SET shop_id = excluded.shop_id, status = excluded.status,
+           payload = excluded.payload, aneka_payment_id = excluded.aneka_payment_id,
+           aneka_order_id = excluded.aneka_order_id, detail = excluded.detail,
+           executed_at = excluded.executed_at`;
+  await queryRun(sql, [
+    e.order_id,
+    e.shop_id ?? "",
+    e.status ?? "menunggu",
+    e.payload ?? "",
+    e.aneka_payment_id ?? "",
+    e.aneka_order_id ?? "",
+    e.detail ?? "",
+    e.executed_at ?? "",
+  ]);
 }
