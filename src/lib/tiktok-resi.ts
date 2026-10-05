@@ -12,11 +12,13 @@
 //     dikirim — memberi kesempatan pembeli membatalkan. Selama menunggu
 //     statusnya "menunggu:<epoch_ms>"; kalau dibatalkan di tengah tunggu,
 //     notifikasi pembatalan menggantikan kirim resi.
-//  6. Setelah masa tunggu: ambil dokumen pengiriman resmi (SHIPPING_LABEL)
-//     dari API TikTok Shop — label kirim PDF persis seperti menu "Cetak Resi"
-//     aplikasi — lalu kirim ke WA admin lewat rantai: dokumen bebas (window
-//     24 jam) → template dokumen resi_pesanan (bebas window, menunggu review
-//     Meta) → template teks order_alert_ktd2 berisi tautan halaman Pesanan.
+//  6. Setelah masa tunggu: ambil dokumen cetak resmi dari API TikTok Shop —
+//     label kirim (SHIPPING_LABEL, A6) + daftar pengemasan (PACKING_SLIP, A6)
+//     + daftar pengambilan barang (PICKUP_LIST, A4, bila API mendukung)
+//     digabung jadi satu PDF persis seperti dialog "Cetak halaman" aplikasi —
+//     lalu kirim ke WA admin lewat rantai: dokumen bebas (window 24 jam) →
+//     template dokumen resi_pesanan (bebas window, menunggu review Meta) →
+//     template teks order_alert_ktd2 berisi tautan halaman Pesanan.
 //  7. Kirim gagal ditandai + hitungan percobaan naik — dicoba ulang pada
 //     pengecekan berikutnya sampai batas, lalu dihentikan (label tetap bisa
 //     dibuka manual dari halaman Pesanan).
@@ -40,6 +42,7 @@ import {
 } from "@/lib/tiktok";
 import { prepareShop } from "@/lib/tiktok-orders";
 import { buildResiPdf } from "@/lib/resi";
+import { PDFDocument } from "pdf-lib";
 import {
   NOTIF_TEMPLATE,
   ownerNumber,
@@ -58,6 +61,67 @@ const MAX_SEND_ATTEMPTS = 3;
  *  pembeli membatalkan supaya resi tidak terkirim percuma. */
 const NEW_ORDER_WAIT_MS =
   (Number(process.env.TIKTOK_RESI_DELAY_MINUTES) || 15) * 60 * 1000;
+
+/** Satu jenis dokumen yang diminta saat "Cetak Resi" — urutan sesuai dialog
+ *  "Cetak halaman" aplikasi TikTok Shop. */
+export type ResiDocInfo = { type: string; label: string; size: string };
+
+/** Dokumen cetak resi lengkap: label kirim (wajib) + daftar pengemasan +
+ *  daftar pengambilan barang (tambahan — dilewati bila API menolak). */
+const RESI_DOCS: ResiDocInfo[] = [
+  { type: "SHIPPING_LABEL", label: "Label pengiriman", size: "A6" },
+  { type: "PACKING_SLIP", label: "Daftar pengemasan", size: "A6" },
+  { type: "PICKUP_LIST", label: "Daftar pengambilan barang", size: "A4" },
+];
+
+/** Hasil cetak resi resmi: PDF gabungan + daftar dokumen ikut/dilewati. */
+export type ResiPdfResult =
+  | {
+      ok: true;
+      pdf: Buffer;
+      tracking_number: string;
+      docs: ResiDocInfo[];
+      skipped: ResiDocInfo[];
+    }
+  | { ok: false; detail: string };
+
+/** Hasil cetak resi resmi + info penjadwalan (arranged = penjemputan baru
+ *  saja dijadwalkan otomatis karena pesanan masih menunggu kirim). */
+export type OfficialResiResult =
+  | {
+      ok: true;
+      pdf: Buffer;
+      tracking_number: string;
+      docs: ResiDocInfo[];
+      skipped: ResiDocInfo[];
+      arranged: boolean;
+    }
+  | { ok: false; detail: string };
+
+/** Gabung beberapa PDF resmi (boleh beda ukuran halaman) menjadi satu file. */
+async function mergePdfBuffers(buffers: Buffer[]): Promise<Buffer> {
+  const out = await PDFDocument.create();
+  for (const buf of buffers) {
+    const src = await PDFDocument.load(buf, { ignoreEncryption: true });
+    const pages = await out.copyPages(src, src.getPageIndices());
+    for (const page of pages) out.addPage(page);
+  }
+  return Buffer.from(await out.save());
+}
+
+/** Keterangan singkat isi PDF resi untuk caption WA/riwayat. */
+function resiDocsLabel(r: {
+  docs: ResiDocInfo[];
+  skipped: ResiDocInfo[];
+  arranged: boolean;
+}): string {
+  const extra = r.docs.length > 1 ? ` + ${r.docs.length - 1} dokumen` : "";
+  const skip =
+    r.skipped.length > 0
+      ? ` (tanpa: ${r.skipped.map((d) => d.label).join(", ")})`
+      : "";
+  return `label resmi${extra}${r.arranged ? " + penjemputan dijadwalkan" : ""}${skip}`;
+}
 
 export type ResiCheckResult = {
   ok: boolean;
@@ -94,26 +158,72 @@ async function findPackageIdForOrder(
   return { ok: true, packageId: pkg.id };
 }
 
-/** Ambil PDF label kirim RESMI TikTok Shop untuk satu pesanan lewat jalur
- *  fulfillment (per package_id) — ini API yang sama dengan menu "Cetak
- *  Resi" aplikasi. Label hanya tersedia setelah paket diatur kirimnya. */
+/** Ambil dokumen cetak RESMI TikTok Shop untuk satu pesanan lewat jalur
+ *  fulfillment (per package_id) — sama seperti dialog "Cetak halaman"
+ *  aplikasi: label kirim (A6) + daftar pengemasan (A6) + daftar pengambilan
+ *  barang (A4) digabung jadi satu PDF. Label wajib — tanpa label, gagal.
+ *  Dokumen tambahan yang ditolak API dicatat di `skipped` tanpa membatalkan. */
 async function fetchOfficialResiPdf(
   cred: { cipher: string; access_token: string },
   orderId: string,
-): Promise<
-  | { ok: true; pdf: Buffer; tracking_number: string }
-  | { ok: false; detail: string }
-> {
+): Promise<ResiPdfResult> {
   const pkgId = await findPackageIdForOrder(cred, orderId);
   if (!pkgId.ok) return { ok: false, detail: pkgId.detail };
 
-  const pkg = await getPackageShippingDocument(cred, pkgId.packageId);
-  if (!pkg.ok) return { ok: false, detail: pkg.detail };
+  const [wajib, ...tambahan] = RESI_DOCS;
+  const label = await getPackageShippingDocument(
+    cred,
+    pkgId.packageId,
+    wajib.type,
+    wajib.size,
+  );
+  if (!label.ok) return { ok: false, detail: label.detail };
+  const labelDl = await downloadShippingDocument(label.doc_url);
+  if (!labelDl.ok) return { ok: false, detail: labelDl.detail };
 
-  const dl = await downloadShippingDocument(pkg.doc_url);
-  if (!dl.ok) return { ok: false, detail: dl.detail };
+  const buffers = [labelDl.pdf];
+  const docs: ResiDocInfo[] = [wajib];
+  const skipped: ResiDocInfo[] = [];
 
-  return { ok: true, pdf: dl.pdf, tracking_number: pkg.tracking_number };
+  for (const doc of tambahan) {
+    const res = await getPackageShippingDocument(
+      cred,
+      pkgId.packageId,
+      doc.type,
+      doc.size,
+    );
+    if (!res.ok) {
+      skipped.push(doc);
+      continue;
+    }
+    const dl = await downloadShippingDocument(res.doc_url);
+    if (!dl.ok) {
+      skipped.push(doc);
+      continue;
+    }
+    buffers.push(dl.pdf);
+    docs.push(doc);
+  }
+
+  let pdf = buffers[0];
+  if (buffers.length > 1) {
+    try {
+      pdf = await mergePdfBuffers(buffers);
+    } catch {
+      // PDF resmi memakai fitur yang tidak didukung library penggabung —
+      // cetak label saja, dokumen tambahan dicatat sebagai dilewati.
+      skipped.push(...docs.slice(1));
+      docs.splice(1);
+    }
+  }
+
+  return {
+    ok: true,
+    pdf,
+    tracking_number: label.tracking_number,
+    docs,
+    skipped,
+  };
 }
 
 /** Kirim resi satu pesanan ke nomor admin; kembalikan hasil untuk riwayat.
@@ -187,9 +297,7 @@ export async function sendResiForOrder(
 
     const result = await sendResiPdf(orderId, null, shop.shop_name, {
       pdf: official.pdf,
-      label: official.arranged
-        ? "label resmi + penjemputan dijadwalkan"
-        : "label resmi",
+      label: resiDocsLabel(official),
     });
     if (result.startsWith("ok")) {
       await markTiktokOrderSeen(orderId, shop.shop_id, result);
@@ -350,9 +458,7 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
 
       const result = await sendResiPdf(o.order_id, null, shop.shop_name, {
         pdf: official.pdf,
-        label: official.arranged
-          ? "label resmi + penjemputan dijadwalkan"
-          : "label resmi",
+        label: resiDocsLabel(official),
       });
       if (result.startsWith("ok")) {
         await markTiktokOrderSeen(o.order_id, shop.shop_id, result);
@@ -463,18 +569,15 @@ export async function arrangeShipmentForOrder(
   return { ok: false, result: "Pesanan tidak ditemukan di toko terotorisasi" };
 }
 
-/** Ambil label kirim RESMI untuk satu pesanan — meniru persis alur aplikasi
- *  TikTok Shop: bila label belum tersedia karena pesanan masih "Menunggu
- *  kirim" (AWAITING_SHIPMENT), jadwalkan penjemputan dulu (slot tercepat)
- *  lalu ambil labelnya — status pesanan otomatis berubah jadi "Menunggu
- *  pickup", dan selanjutnya resi bisa dicetak ulang kapan saja. */
+/** Ambil dokumen cetak RESMI untuk satu pesanan — meniru persis alur
+ *  aplikasi TikTok Shop: bila label belum tersedia karena pesanan masih
+ *  "Menunggu kirim" (AWAITING_SHIPMENT), jadwalkan penjemputan dulu (slot
+ *  tercepat) lalu ambil dokumennya — status pesanan otomatis berubah jadi
+ *  "Menunggu pickup", dan selanjutnya resi bisa dicetak ulang kapan saja. */
 export async function getOfficialResiForCred(
   cred: { cipher: string; access_token: string },
   orderId: string,
-): Promise<
-  | { ok: true; pdf: Buffer; tracking_number: string; arranged: boolean }
-  | { ok: false; detail: string }
-> {
+): Promise<OfficialResiResult> {
   // 1. Coba label langsung (logistics → cadangan fulfillment).
   const direct = await fetchOfficialResiPdf(cred, orderId);
   if (direct.ok) return { ...direct, arranged: false };
@@ -500,13 +603,11 @@ export async function getOfficialResiForCred(
   return { ...after, arranged: true };
 }
 
-/** Ambil label kirim resmi untuk satu pesanan (loop semua toko terotorisasi). */
+/** Ambil dokumen cetak resmi untuk satu pesanan (loop semua toko
+ *  terotorisasi). */
 export async function getOfficialResiForOrder(
   orderId: string,
-): Promise<
-  | { ok: true; pdf: Buffer; tracking_number: string; arranged: boolean }
-  | { ok: false; detail: string }
-> {
+): Promise<OfficialResiResult> {
   const shops = await listTiktokShopTokens();
   for (const shop of shops) {
     const prep = await prepareShop(shop);

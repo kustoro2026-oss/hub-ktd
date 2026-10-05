@@ -24,12 +24,16 @@ export async function GET(
 
   const res = await getOfficialResiForOrder(order_id);
   if (res.ok) {
-    return new Response(new Uint8Array(res.pdf), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `inline; filename="resi-${order_id}.pdf"`,
-      },
-    });
+    // Header ASCII (kode jenis dokumen) — nilai non-ASCII ditolak server.
+    const headers: Record<string, string> = {
+      "Content-Type": "application/pdf",
+      "Content-Disposition": `inline; filename="resi-${order_id}.pdf"`,
+      "X-Resi-Docs": res.docs.map((d) => d.type).join(","),
+    };
+    if (res.skipped.length > 0) {
+      headers["X-Resi-Skipped"] = res.skipped.map((d) => d.type).join(",");
+    }
+    return new Response(new Uint8Array(res.pdf), { headers });
   }
 
   // Label resmi tidak tersedia — tampilkan keterangan + alasan dari API.

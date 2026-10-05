@@ -604,10 +604,14 @@ export type TiktokShippingDocumentResult =
   | { ok: false; detail: string };
 
 /** GET /fulfillment/202309/packages/{package_id}/shipping_documents — jalur
- *  cadangan dokumen resmi per paket (butuh paket sudah diatur kirimnya). */
+ *  cadangan dokumen resmi per paket (butuh paket sudah diatur kirimnya).
+ *  documentType: SHIPPING_LABEL / PACKING_SLIP / PICKUP_LIST / ...
+ *  documentSize: A6 / A5 (ukuran kertas hasil cetak). */
 export async function getPackageShippingDocument(
   shop: { cipher: string; access_token: string },
   packageId: string,
+  documentType = "SHIPPING_LABEL",
+  documentSize = "A6",
 ): Promise<TiktokShippingDocumentResult> {
   const { appKey, appSecret, ready } = tiktokEnv();
   if (!ready || shop.cipher === "") {
@@ -621,7 +625,8 @@ export async function getPackageShippingDocument(
     app_key: appKey,
     shop_cipher: shop.cipher,
     timestamp: Math.floor(Date.now() / 1000).toString(),
-    document_type: "SHIPPING_LABEL",
+    document_type: documentType,
+    document_size: documentSize,
   };
   const sign = signRequest(appSecret, path, params);
   const qs = new URLSearchParams({ ...params, sign });
