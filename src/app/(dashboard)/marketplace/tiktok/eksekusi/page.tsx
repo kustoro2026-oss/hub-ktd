@@ -15,15 +15,39 @@ function fmtRp(n: number): string {
   return "Rp" + n.toLocaleString("id-ID");
 }
 
-/** Timestamp DB (SQLite "YYYY-MM-DD HH:MM:SS" lokal / PG ISO UTC) → WIB. */
+/**
+ * Timestamp DB → WIB. Semua timestamp di tabel tiktok_order_exec tersimpan
+ * UTC: PG dinormalisasi db.ts menjadi "YYYY-MM-DD HH:MM:SS" (UTC, tanpa Z),
+ * SQLite menyimpan nowUtc dengan format yang sama. String berspasi karena
+ * itu UTC, bukan WIB.
+ */
 function waktuWib(s: string): string {
   if (!s) return "";
-  const iso = s.includes("T") ? s : s.replace(" ", "T") + "+07:00";
+  const iso = s.includes("T") ? s : s.replace(" ", "T") + "Z";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return s;
   const w = new Date(d.getTime() + 7 * 3600 * 1000);
   const p = (n: number) => String(n).padStart(2, "0");
   return `${p(w.getUTCDate())}/${p(w.getUTCMonth() + 1)}/${w.getUTCFullYear()} ${p(w.getUTCHours())}.${p(w.getUTCMinutes())} WIB`;
+}
+
+/** Ubah jejak langkah (tiap baris "YYYY-MM-DD HH:MM:SS | ..." UTC) jadi WIB
+ *  untuk tampilan — kolom log di DB tetap UTC (dipakai pemulihan). */
+function logWib(log: string): string {
+  if (!log) return "";
+  return log
+    .split("\n")
+    .map((line) => {
+      const m = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.exec(line);
+      if (!m) return line;
+      const d = new Date(m[0].replace(" ", "T") + "Z");
+      if (Number.isNaN(d.getTime())) return line;
+      const w = new Date(d.getTime() + 7 * 3600 * 1000);
+      const p = (n: number) => String(n).padStart(2, "0");
+      const wib = `${w.getUTCFullYear()}-${p(w.getUTCMonth() + 1)}-${p(w.getUTCDate())} ${p(w.getUTCHours())}:${p(w.getUTCMinutes())}:${p(w.getUTCSeconds())}`;
+      return line.replace(m[0], wib);
+    })
+    .join("\n");
 }
 
 export default async function EksekusiTikTokPage({
@@ -71,7 +95,7 @@ export default async function EksekusiTikTokPage({
       aneka_payment_id: r.aneka_payment_id,
       aneka_order_id: r.aneka_order_id,
       detail: r.detail,
-      log: r.log,
+      log: logWib(r.log),
       created_at: waktuWib(r.created_at),
       executed_at: waktuWib(r.executed_at),
     };
