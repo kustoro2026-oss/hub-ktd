@@ -58,6 +58,10 @@ export default async function EksekusiTikTokPage({
       status: r.status,
       shop_name: payload?.shop_name ?? "",
       total_modal: fmtRp(payload?.total_modal ?? 0),
+      // Perkiraan potong saldo sebenarnya = modal + ongkos pengemasan
+      // Rp3.000 per resi (satu paket pesanan = satu resi, selalu dihitung
+      // situs Aneka saat pembayaran).
+      total_estimate: fmtRp((payload?.total_modal ?? 0) + 3000),
       items: (payload?.items ?? []).map((it) => ({
         qty: it.qty,
         name: it.product_name ?? it.name ?? "",

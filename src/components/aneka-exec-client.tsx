@@ -11,6 +11,8 @@ export type ExecRow = {
   status: string;
   shop_name: string;
   total_modal: string;
+  /** Perkiraan potong saldo sebenarnya (modal + ongkos pengemasan Rp3.000). */
+  total_estimate: string;
   items: { qty: number; name: string; subtotal: string }[];
   tracking_number: string;
   aneka_order_id: string;
@@ -40,7 +42,7 @@ function ExecActions({ row }: { row: ExecRow }) {
     if (
       action === "setuju" &&
       !window.confirm(
-        `Yakin jalankan checkout Aneka untuk pesanan ${row.order_id}?\nSaldo Aneka akan terpotong sekitar ${row.total_modal} (belum termasuk ongkos pengemasan).\nTekan OK untuk melanjutkan, Batal untuk mundur.`,
+        `Yakin jalankan checkout Aneka untuk pesanan ${row.order_id}?\nSaldo Aneka akan terpotong sekitar ${row.total_estimate} (modal ${row.total_modal} + ongkos pengemasan Rp3.000).\nTekan OK untuk melanjutkan, Batal untuk mundur.`,
       )
     ) {
       return;
@@ -161,6 +163,9 @@ export default function AnekaExecClient({
             ) : null}
             <p className="mt-1 text-xs text-slate-500">
               Total modal: <span className="font-medium">{row.total_modal}</span>
+              {" · "}Potong saldo ±{" "}
+              <span className="font-medium">{row.total_estimate}</span>{" "}
+              (termasuk ongkos pengemasan)
               {row.tracking_number
                 ? ` · No resi: ${row.tracking_number}`
                 : ""}
