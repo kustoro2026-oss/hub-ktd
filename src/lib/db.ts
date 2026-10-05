@@ -262,6 +262,17 @@ function migrateSqlite(db: DatabaseSync) {
       notify TEXT NOT NULL DEFAULT '',
       attempts INTEGER NOT NULL DEFAULT 0
     );
+
+    CREATE TABLE IF NOT EXISTS aneka_product_map (
+      tiktok_product_id TEXT PRIMARY KEY,
+      tiktok_product_name TEXT NOT NULL DEFAULT '',
+      tiktok_sku TEXT NOT NULL DEFAULT '',
+      aneka_product_id TEXT NOT NULL DEFAULT '',
+      aneka_variant_id TEXT NOT NULL DEFAULT '',
+      aneka_product_name TEXT NOT NULL DEFAULT '',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
   `);
 
   // Migrasi DB lama: kolom shop_cipher untuk panggilan API pesanan.
@@ -429,6 +440,17 @@ async function migratePg(pool: Pool) {
       first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       notify TEXT NOT NULL DEFAULT '',
       attempts INTEGER NOT NULL DEFAULT 0
+    );
+
+    CREATE TABLE IF NOT EXISTS aneka_product_map (
+      tiktok_product_id TEXT PRIMARY KEY,
+      tiktok_product_name TEXT NOT NULL DEFAULT '',
+      tiktok_sku TEXT NOT NULL DEFAULT '',
+      aneka_product_id TEXT NOT NULL DEFAULT '',
+      aneka_variant_id TEXT NOT NULL DEFAULT '',
+      aneka_product_name TEXT NOT NULL DEFAULT '',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
 
@@ -1056,4 +1078,84 @@ export async function recordTiktokOrderFailure(
         : "INSERT OR IGNORE INTO tiktok_order_seen (order_id, shop_id, notify, attempts) VALUES (?, ?, ?, 1)";
     await queryRun(sql, [orderId, shopId, notify]);
   }
+}
+
+// ---------- Pemetaan produk TikTok → Aneka (eksekusi pesanan otomatis) ----------
+
+export type AnekaProductMap = {
+  tiktok_product_id: string;
+  tiktok_product_name: string;
+  tiktok_sku: string;
+  aneka_product_id: string;
+  aneka_variant_id: string;
+  aneka_product_name: string;
+  enabled: number;
+  updated_at: string;
+};
+
+/** Semua pemetaan produk tersimpan (kunci: tiktok_product_id). */
+export async function listAnekaProductMaps(): Promise<AnekaProductMap[]> {
+  return queryAll<AnekaProductMap>(
+    "SELECT * FROM aneka_product_map ORDER BY tiktok_product_name COLLATE NOCASE ASC",
+  );
+}
+
+/** Satu pemetaan untuk product_id TikTok tertentu (null = belum dipetakan). */
+export async function getAnekaProductMap(
+  tiktokProductId: string,
+): Promise<AnekaProductMap | null> {
+  return (
+    (await queryOne<AnekaProductMap>(
+      "SELECT * FROM aneka_product_map WHERE tiktok_product_id = ?",
+      [tiktokProductId],
+    )) ?? null
+  );
+}
+
+/** Simpan/timpa pemetaan (upsert). `enabled` = 0 menonaktifkan eksekusi
+ *  otomatis untuk produk itu tanpa menghapus barisnya. */
+export async function saveAnekaProductMap(m: {
+  tiktok_product_id: string;
+  tiktok_product_name?: string;
+  tiktok_sku?: string;
+  aneka_product_id: string;
+  aneka_variant_id?: string;
+  aneka_product_name?: string;
+  enabled?: number;
+}): Promise<void> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const sql =
+    dbMode() === "pg"
+      ? `INSERT INTO aneka_product_map (tiktok_product_id, tiktok_product_name, tiktok_sku, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (tiktok_product_id) DO UPDATE SET tiktok_product_name = EXCLUDED.tiktok_product_name,
+           tiktok_sku = EXCLUDED.tiktok_sku, aneka_product_id = EXCLUDED.aneka_product_id,
+           aneka_variant_id = EXCLUDED.aneka_variant_id, aneka_product_name = EXCLUDED.aneka_product_name,
+           enabled = EXCLUDED.enabled, updated_at = EXCLUDED.updated_at`
+      : `INSERT INTO aneka_product_map (tiktok_product_id, tiktok_product_name, tiktok_sku, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (tiktok_product_id) DO UPDATE SET tiktok_product_name = excluded.tiktok_product_name,
+           tiktok_sku = excluded.tiktok_sku, aneka_product_id = excluded.aneka_product_id,
+           aneka_variant_id = excluded.aneka_variant_id, aneka_product_name = excluded.aneka_product_name,
+           enabled = excluded.enabled, updated_at = excluded.updated_at`;
+  await queryRun(sql, [
+    m.tiktok_product_id,
+    m.tiktok_product_name ?? "",
+    m.tiktok_sku ?? "",
+    m.aneka_product_id,
+    m.aneka_variant_id ?? "",
+    m.aneka_product_name ?? "",
+    m.enabled ?? 1,
+    nowUtc,
+  ]);
+}
+
+/** Hapus pemetaan untuk satu produk TikTok. */
+export async function deleteAnekaProductMap(
+  tiktokProductId: string,
+): Promise<void> {
+  await queryRun(
+    "DELETE FROM aneka_product_map WHERE tiktok_product_id = ?",
+    [tiktokProductId],
+  );
 }

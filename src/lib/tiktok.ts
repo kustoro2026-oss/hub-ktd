@@ -254,7 +254,12 @@ export type TiktokOrderSummary = {
   order_status: string;
   create_time: number;
   update_time: number;
-  items: { product_name: string; sku_count: number }[];
+  items: {
+    product_id: string;
+    sku_id: string;
+    product_name: string;
+    sku_count: number;
+  }[];
 };
 
 /** POST /order/202309/orders/search — daftar pesanan terbaru toko.
@@ -342,6 +347,8 @@ export async function getTiktokOrders(
             }
             if (!qty) qty = 1;
             return {
+              product_id: String(i.product_id ?? ""),
+              sku_id: String(i.sku_id ?? ""),
               product_name: String(i.product_name ?? ""),
               sku_count: qty,
             };
@@ -405,6 +412,8 @@ export type TiktokOrderDetail = {
   } | null;
   line_items: {
     id: string;
+    product_id: string;
+    sku_id: string;
     product_name: string;
     sku_name: string;
     seller_sku: string;
@@ -437,6 +446,8 @@ function parseDetailItem(
     (r.combined_listing_skus as Record<string, unknown>[] | undefined) ?? [];
   return {
     id: str(r.id),
+    product_id: str(r.product_id),
+    sku_id: str(r.sku_id),
     product_name: str(r.product_name),
     sku_name: str(r.sku_name),
     seller_sku: str(r.seller_sku),

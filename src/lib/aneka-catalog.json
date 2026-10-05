@@ -1,0 +1,5368 @@
+{
+ "generatedAt": "2026-10-05T02:48:31.979Z",
+ "source": "jakmall-clone src/lib/products-cache.json (subset Aneka)",
+ "products": [
+  {
+   "id": "2148",
+   "name": "- FERTANI Essen Ikan 120X Kapsul Formula Ikan Liar",
+   "hargaModal": "Rp18.450",
+   "rekomendasiJual": "Rp 59.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1048",
+   "name": "[PG STORE} Penghilang Bau Hewan 500ml | Anti Bakteri & Aman untuk Kucing Anjing | GlowHome Odor Remover",
+   "hargaModal": "Rp26.100",
+   "rekomendasiJual": "Rp 47.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1755",
+   "name": "1 BOX Sheshine Minuman Collagen Mixberry 60g Serbuk Kolagen Rasa Buah Berry 5000mg per Saji",
+   "hargaModal": "Rp43.200",
+   "rekomendasiJual": "Rp 110.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "557",
+   "name": "100 gram ENROFLOXS 25 Enrofloxacin HCl Antibiotik Ikan dan Udang - ENROFLOXS Obat Antibiotik",
+   "hargaModal": "",
+   "rekomendasiJual": "Rp 43.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "2198",
+   "name": "3D Nose Secret BOX / Pemancung Hidung / Pemancung Hidung Praktis",
+   "hargaModal": "Rp22.500",
+   "rekomendasiJual": "Rp 30.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "2274",
+   "name": "3IN1 HAZAPRO Kapsul Herbal 30 Kapsul | Minyak Zaitun Propolis Habbatussauda Original",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "31",
+   "name": "4G JOSS - Suplemen Herbal Pria untuk Daya Tahan & Vitalitas Tubuh",
+   "hargaModal": "Rp54.450",
+   "rekomendasiJual": "Rp 165.000",
+   "location": "Ngawi"
+  },
+  {
+   "id": "10",
+   "name": "4G Lucky Herbal Spray Pria Dewasa – Produk Perawatan Pria Praktis untuk Pemakaian Luar",
+   "hargaModal": "Rp47.520",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Ngawi"
+  },
+  {
+   "id": "1055",
+   "name": "8 PCS X 30GR | Detergen Bubuk Viral TikTok | Cloth Stain Remover | Ampuh Hilangkan Noda Jamur & Kuning | Pakaian Bersih Seketika",
+   "hargaModal": "Rp19.350",
+   "rekomendasiJual": "Rp 28.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2278",
+   "name": "Afiagin Kapsul Herbal Ekstrak Tempuyung Alang Alang Meniran 30 Kapsul Original",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "2272",
+   "name": "Afiagrap Herbal Wasir 30 Kapsul Original Ekstrak Daun Ungu Herbal Tradisional BPOM",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "2289",
+   "name": "Afiajoss Kapsul Herbal 30 Kapsul Ekstrak Ginseng Purwoceng Cabe Jawa Jahe Merah",
+   "hargaModal": "Rp38.700",
+   "rekomendasiJual": "Rp 118.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1639",
+   "name": "AL K | Penghilang Bau Amoniak Kandang 1 Liter Cairan Pengurang Bau untuk Kandang Ayam Sapi Kambing Bebek dan Ternak",
+   "hargaModal": "Rp34.200",
+   "rekomendasiJual": "Rp 48.000",
+   "location": "Sukoharjo"
+  },
+  {
+   "id": "307",
+   "name": "Alarm Disc Lock No 1 – Gembok Cakram Motor Alarm Anti Maling Original | Gembok Alarm Anti Pencuri Pengaman Motor Suara Nyaring",
+   "hargaModal": "Rp83.248",
+   "rekomendasiJual": "Rp 182.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "1132",
+   "name": "Alat Pijat Terapi Manual Refleksi Badan | Urut Relaksasi Pria Wanita – Kode 01",
+   "hargaModal": "Rp21.600",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Jakarta Pusat"
+  },
+  {
+   "id": "2134",
+   "name": "Alat Sisir Serit Vacum Vacuum Vakum Penghilang Kutu V Comb Elektrik",
+   "hargaModal": "Rp78.300",
+   "rekomendasiJual": "Rp 125.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "2135",
+   "name": "Alat Tambal Kaca Retak Windshield Kit Glass Car Crack Repair - Hitam",
+   "hargaModal": "Rp13.050",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "1641",
+   "name": "ALBENOL - Obat Cacing Ternak Ampuh | Cacing Hilang, Nafsu Makan Meningkat & Bobot Cepat Naik",
+   "hargaModal": "Rp11.700",
+   "rekomendasiJual": "Rp 18.000",
+   "location": "Sukoharjo"
+  },
+  {
+   "id": "1506",
+   "name": "Albumichenna Premium Ekstrak Ikan Gabus Channa Striata – Suplemen Kapsul Herbal 30 Kapsul 500mg untuk Memelihara Kesehatan, Menambah Zat Gizi, dan Meningkatkan Daya Tahan Tubuh",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 82.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1509",
+   "name": "Albuminox Suplemen Ekstrak Ikan Gabus Premium 30 Kapsul – Herbal 100% untuk Daya Tahan Tubuh & Pemulihan Luka",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 82.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "544",
+   "name": "Alfa Tox 100 ml - Obat Kutu Ternak - Pembasmi Larva Lalat Gurem Kutu Ampuh 100 ml",
+   "hargaModal": "Rp38.700",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "2196",
+   "name": "All In One Brightening Cream Moisturizer Mencerahkan Wajah",
+   "hargaModal": "Rp48.600",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "1646",
+   "name": "Ampuh Super 3 Pcs Pembasmi Lalat Ternak untuk Kandang Sapi Kambing Ayam Bebek dan Unggas",
+   "hargaModal": "Rp13.050",
+   "rekomendasiJual": "Rp 18.000",
+   "location": "Sukoharjo"
+  },
+  {
+   "id": "1113",
+   "name": "Ansara-Dress Brokat Anak",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1559",
+   "name": "Anti Jamur Dinding & Plafon 250ml Dr. Haechung – Cairan Pengusir Jamur Rumah Tangga",
+   "hargaModal": "Rp22.950",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1558",
+   "name": "Anti Rayap Cairan Pengusir Rayap 250ml Dr. Haechung – Perlindungan Optimal Rumah & Bangunan",
+   "hargaModal": "Rp22.950",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1554",
+   "name": "Anti Tikus untuk Mesin Mobil 250ml – Perlindungan Maksimal dari Dr. Haechung",
+   "hargaModal": "Rp22.950",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1557",
+   "name": "Anti Tungau Cairan Pengusir Tungau untuk Kasur & Kain Rumah Tangga 250 ml Dr. HaeChung",
+   "hargaModal": "Rp22.950",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2285",
+   "name": "Antibet Kapsul Herbal 30 Kapsul Ekstrak Sambiloto Kumis Kucing Pare Original",
+   "hargaModal": "Rp37.800",
+   "rekomendasiJual": "Rp 116.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1267",
+   "name": "Ar-Habbaths – Kapsul Herbal Probiotik Pereda Pusing & Kepala Berat",
+   "hargaModal": "Rp51.617",
+   "rekomendasiJual": "Rp 61.834",
+   "location": "Madiun"
+  },
+  {
+   "id": "1443",
+   "name": "Arabiyat Oud Al Faris – Parfum Eau De Parfum 100ml – Parfum Timur Tengah Berani dengan Aroma Oud Eksotis yang Tahan Lama",
+   "hargaModal": "Rp210.600",
+   "rekomendasiJual": "Rp 350.000",
+   "location": "Balikpapan"
+  },
+  {
+   "id": "1386",
+   "name": "Arria Slingbag - Tas Selempang Wanita Clutch Ariaccly Bisa Selempang & Dompet Model Bordir Depan Bahan Nilon Waterproof Antiair Tas Dompet Clutch Selempang Wanita",
+   "hargaModal": "Rp55.500",
+   "rekomendasiJual": "Rp 73.810",
+   "location": "Bandung"
+  },
+  {
+   "id": "2262",
+   "name": "Asahan Pisau Mini Portable",
+   "hargaModal": "Rp7.650",
+   "rekomendasiJual": "Rp 18.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1446",
+   "name": "Asam Humat Premium 500gr – Pembenah Tanah Organik Nutrisi Tanaman & Penyubur Akar",
+   "hargaModal": "Rp21.150",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2240",
+   "name": "Aura Blouse Polkadot Brown",
+   "hargaModal": "Rp55.800",
+   "rekomendasiJual": "Rp 83.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "2242",
+   "name": "Aura Blouse Polkadot Cream",
+   "hargaModal": "Rp55.800",
+   "rekomendasiJual": "Rp 83.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "2241",
+   "name": "Aura Blouse Polkadot Hitam",
+   "hargaModal": "Rp55.800",
+   "rekomendasiJual": "Rp 83.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "2243",
+   "name": "Aura Blouse Polkadot Putih",
+   "hargaModal": "Rp55.800",
+   "rekomendasiJual": "Rp 83.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "2239",
+   "name": "Aurel Blouse Polkadot Butter Yellow",
+   "hargaModal": "Rp55.800",
+   "rekomendasiJual": "Rp 83.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1031",
+   "name": "Aurora-Dress Princess Anak",
+   "hargaModal": "Rp30.600",
+   "rekomendasiJual": "Rp 41.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1284",
+   "name": "Ayumi Slingbag - Tas Selempang Slingbag Wanita Ayumi Tas Selempang Terbaru Bahan Semikulit Sintesis Tali Webbing Nilon Simple Premium Warna Hitam Coklat",
+   "hargaModal": "Rp60.750",
+   "rekomendasiJual": "Rp 81.500",
+   "location": "Bandung"
+  },
+  {
+   "id": "1275",
+   "name": "B10 THS DAILY – Minuman Herbal Probiotik untuk Kesehatan Harian",
+   "hargaModal": "Rp106.499",
+   "rekomendasiJual": "Rp 136.265",
+   "location": "Madiun"
+  },
+  {
+   "id": "1478",
+   "name": "Baju Anak Setelan Ellie 1 – Setelan Anak Laki-Laki & Perempuan Usia 1-8 Tahun, Cotton Premium, Nyaman & Aman Untuk Aktivitas Sehari-hari",
+   "hargaModal": "Rp70.200",
+   "rekomendasiJual": "Rp 91.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1513",
+   "name": "Baju Kaos Anak Unisex – Set Kaos Lembut & Nyaman Usia 6-12 Tahun Cotton Combed 24s",
+   "hargaModal": "Rp40.950",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1512",
+   "name": "Baju Kaos Anak Unisex 4pcs – Set Kaos Lembut & Nyaman Usia 6-12 Tahun Cotton Combed 24s",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 74.400",
+   "location": "Bandung"
+  },
+  {
+   "id": "986",
+   "name": "Baju Koko Batik Kobata Coksu",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "737",
+   "name": "Baju Koko Batik Kobata Hitam",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "987",
+   "name": "Baju Koko Batik Kobata Navy",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "988",
+   "name": "Baju Koko Batik Kobata Putih",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "402",
+   "name": "Baju Koko Haibah Lengan Panjang Abu Muda Kain Katun Polymicro Signature",
+   "hargaModal": "Rp32.400",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "401",
+   "name": "Baju Koko Haibah Lengan Panjang Biru Kain Katun Polymicro Signature",
+   "hargaModal": "Rp32.400",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "399",
+   "name": "Baju Koko Haibah Lengan Panjang Hijau Botol Kain Katun Polymicro Signature",
+   "hargaModal": "Rp32.400",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "398",
+   "name": "Baju Koko Haibah Lengan Panjang Hijau Salem Kain Katun Polymicro Signature",
+   "hargaModal": "Rp32.400",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "400",
+   "name": "Baju Koko Haibah Lengan Panjang Hitam Kain Katun Polymicro Signature",
+   "hargaModal": "Rp32.400",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "394",
+   "name": "Baju Koko Haibah Lengan Panjang Krem Kain Katun Polymicro Signature",
+   "hargaModal": "Rp32.400",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "395",
+   "name": "Baju Koko Haibah Lengan Panjang Maroon Kain Katun Polymicro Signature",
+   "hargaModal": "Rp32.400",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "396",
+   "name": "Baju Koko Haibah Lengan Panjang Navy Kain Katun Polymicro Signature",
+   "hargaModal": "Rp32.400",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "397",
+   "name": "Baju Koko Haibah Lengan Panjang Putih Kain Katun Polymicro Signature",
+   "hargaModal": "Rp32.400",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "1108",
+   "name": "Baju Koko Lengan Pendek Motif Al-Kautsar",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1109",
+   "name": "Baju Koko Lengan Pendek Motif Al-Kautsar",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1110",
+   "name": "Baju Koko Lengan Pendek Motif Al-Kautsar",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1111",
+   "name": "Baju Koko Lengan Pendek Motif Al-Kautsar",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1015",
+   "name": "Baju Koko Motif Bordir Jasuke Lengan Pendek",
+   "hargaModal": "Rp32.400",
+   "rekomendasiJual": "Rp 60.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1016",
+   "name": "Baju Koko Motif Bordir Jasuke Lengan Pendek",
+   "hargaModal": "Rp32.400",
+   "rekomendasiJual": "Rp 60.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1017",
+   "name": "Baju Koko Motif Bordir Jasuke Lengan Pendek",
+   "hargaModal": "Rp32.400",
+   "rekomendasiJual": "Rp 60.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1018",
+   "name": "Baju Koko Motif Bordir Jasuke Lengan Pendek",
+   "hargaModal": "Rp32.400",
+   "rekomendasiJual": "Rp 60.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1019",
+   "name": "Baju Koko Motif Bordir Jasuke Lengan Pendek",
+   "hargaModal": "Rp32.400",
+   "rekomendasiJual": "Rp 60.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1006",
+   "name": "Baju Koko Motif Jasuke Lengan Pendek",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 55.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1007",
+   "name": "Baju Koko Motif Jasuke Lengan Pendek",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 55.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1008",
+   "name": "Baju Koko Motif Jasuke Lengan Pendek",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 55.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1009",
+   "name": "Baju Koko Motif Jasuke Lengan Pendek",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 55.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1010",
+   "name": "Baju Koko Motif Jasuke Lengan Pendek",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 55.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1011",
+   "name": "Baju Koko Motif Jordan Lengan Panjang",
+   "hargaModal": "Rp36.000",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1012",
+   "name": "Baju Koko Motif Jordan Lengan Panjang",
+   "hargaModal": "Rp36.000",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1013",
+   "name": "Baju Koko Motif Jordan Lengan Panjang",
+   "hargaModal": "Rp36.000",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1014",
+   "name": "Baju Koko Motif Jordan Lengan Panjang",
+   "hargaModal": "Rp36.000",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1020",
+   "name": "Baju Koko Motif Jordan Lengan Panjang",
+   "hargaModal": "Rp36.000",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1474",
+   "name": "Baju Polo Kaos Kerah Aston Polos Anak Laki-Laki & Perempuan 1–8 Tahun – Cotton Premium, Nyaman & Aman untuk Anak",
+   "hargaModal": "Rp46.800",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1543",
+   "name": "Baju Setelan Ellie – Oneset Anak Perempuan & Laki-Laki | Series Animal In Zoo Usia 1–12 Tahun",
+   "hargaModal": "Rp62.100",
+   "rekomendasiJual": "Rp 98.900",
+   "location": "Bandung"
+  },
+  {
+   "id": "1539",
+   "name": "Baju Setelan Longsleeve Onset Anak Perempuan & Laki Laki Series Cute Head Animal Usia 1-12 Tahun",
+   "hargaModal": "Rp70.200",
+   "rekomendasiJual": "Rp 108.700",
+   "location": "Bandung"
+  },
+  {
+   "id": "1540",
+   "name": "Baju Slim Oneset Anak Bayi Perempuan Series Unicorn Usia 1-5 Tahun",
+   "hargaModal": "Rp51.300",
+   "rekomendasiJual": "Rp 63.700",
+   "location": "Bandung"
+  },
+  {
+   "id": "278",
+   "name": "BAMBOO CHARCOAL TOOTHPASTE – Pasta Gigi Pemutih Alami & Penyegar Napas",
+   "hargaModal": "Rp9.900",
+   "rekomendasiJual": "Rp 42.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "2221",
+   "name": "Banana Heel Cream 60g Krim Tumit Pecah-Pecah Dan Kering Dan Kasar Ampuh Pelembab Ekstrak Pisang",
+   "hargaModal": "Rp39.600",
+   "rekomendasiJual": "Rp 49.900",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2109",
+   "name": "Batik Aya Samudra JJ 24 Pria Lengan Panjang – Katun Prima Furing Blue Ice JJ 24",
+   "hargaModal": "Rp144.900",
+   "rekomendasiJual": "Rp 225.000",
+   "location": "Sragen"
+  },
+  {
+   "id": "2110",
+   "name": "Batik Garuda Kencana JJ 30 Pria Lengan Panjang – Katun Prima Furing Lasem Kuning Soft JJ 30",
+   "hargaModal": "Rp144.900",
+   "rekomendasiJual": "Rp 225.000",
+   "location": "Sragen"
+  },
+  {
+   "id": "2108",
+   "name": "Batik Jayawikrama JJ 21Pria Lengan Panjang – Katun Prima Furing Teracotta JJ 21",
+   "hargaModal": "Rp144.900",
+   "rekomendasiJual": "Rp 225.000",
+   "location": "Sragen"
+  },
+  {
+   "id": "2105",
+   "name": "Batik Kertanegara JJ 04 Pria Lengan Panjang – Katun Prima Furing Cokelat Mahogany JJ 04",
+   "hargaModal": "Rp144.900",
+   "rekomendasiJual": "Rp 225.000",
+   "location": "Sragen"
+  },
+  {
+   "id": "173",
+   "name": "BATIK PREMIUM BLOUSE BATIK",
+   "hargaModal": "Rp135.000",
+   "rekomendasiJual": "Rp 217.000",
+   "location": "Sragen"
+  },
+  {
+   "id": "2103",
+   "name": "Batik Premium JJ 01 Mahardika Pria Lengan Panjang – Katun Prima Furing Hitam Sogan JJ 01",
+   "hargaModal": "Rp144.900",
+   "rekomendasiJual": "Rp 225.000",
+   "location": "Sragen"
+  },
+  {
+   "id": "2107",
+   "name": "Batik Wira Pratala JJ 20 Pria Lengan Panjang – Katun Prima Furing Warna Taro JJ 20",
+   "hargaModal": "Rp144.900",
+   "rekomendasiJual": "Rp 225.000",
+   "location": "Sragen"
+  },
+  {
+   "id": "2106",
+   "name": "Batik Wiracakra JJ 12 Pria Lengan Panjang – Katun Prima Furing Burgundy Premium",
+   "hargaModal": "Rp144.900",
+   "rekomendasiJual": "Rp 225.000",
+   "location": "Sragen"
+  },
+  {
+   "id": "2104",
+   "name": "Batik Wirasatya JJ 02 Pria Lengan Panjang – Katun Prima Furing Kuning Gading Hitam JJ 02",
+   "hargaModal": "Rp144.900",
+   "rekomendasiJual": "Rp 225.000",
+   "location": "Sragen"
+  },
+  {
+   "id": "2136",
+   "name": "Beewax Wood Seasoning Polish Gel Lilin Lebah Alami Pengkilap Kayu",
+   "hargaModal": "Rp18.000",
+   "rekomendasiJual": "Rp 30.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "1667",
+   "name": "Beli 1 GRATIS 1 Minyak Kemiri Bakar 100ml – Perawatan Rambut Alami, Hitam, Tebal, dan Anti Rontok",
+   "hargaModal": "Rp42.300",
+   "rekomendasiJual": "Rp 125.000",
+   "location": "Klaten"
+  },
+  {
+   "id": "532",
+   "name": "BELLA Slingbag - Tas Selempang Slingbag Wanita BELLA Tas Selempang Anyaman Kepang",
+   "hargaModal": "Rp60.750",
+   "rekomendasiJual": "Rp 90.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1548",
+   "name": "Benih Padi Hibrida Bridantara 8 – Unggul, Tahan Penyakit & Hasil Maksimal 13,2 Ton/Ha",
+   "hargaModal": "Rp115.200",
+   "rekomendasiJual": "Rp 132.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "1781",
+   "name": "Benih Unggul Fertani Berbagai Varian – Benih Sayur dan Buah untuk Kebun, Pekarangan, Pot & Polybag",
+   "hargaModal": "Rp14.400",
+   "rekomendasiJual": "Rp 29.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1375",
+   "name": "Beryl Shoulderbag & Slingbag | Tas Bahu dan Selempang Wanita Beryl Shoulderbag – Bahan Cocoly Longchamp Waterproof Muat Laptop Bisa Selempang dan Tenteng Simple Anti Air",
+   "hargaModal": "Rp71.800",
+   "rekomendasiJual": "Rp 89.683",
+   "location": "Bandung"
+  },
+  {
+   "id": "1272",
+   "name": "Bio Premio Herbal Probiotik Untuk Detox Tubuh dan Sistem Pencernaan Sudah BPOM",
+   "hargaModal": "Rp106.499",
+   "rekomendasiJual": "Rp 136.265",
+   "location": "Madiun"
+  },
+  {
+   "id": "1118",
+   "name": "Black Chia Seed 100gr Kaya Antioksidan",
+   "hargaModal": "Rp32.400",
+   "rekomendasiJual": "Rp 40.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "1119",
+   "name": "Black Chia Seed 200gr Premium",
+   "hargaModal": "Rp46.800",
+   "rekomendasiJual": "Rp 56.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "1235",
+   "name": "Black Garlic Honey Madu Bawang Hitam 250ml",
+   "hargaModal": "Rp65.250",
+   "rekomendasiJual": "Rp 95.000",
+   "location": "Jambi"
+  },
+  {
+   "id": "16",
+   "name": "BLACK MAGIC BA-Penghitam Body Kasar Kendaraan. 100ml",
+   "hargaModal": "Rp21.690",
+   "rekomendasiJual": "Rp 39.000",
+   "location": "Malang"
+  },
+  {
+   "id": "35",
+   "name": "BLACK MAGIC PREMIUM_ R-46 100ml",
+   "hargaModal": "Rp22.950",
+   "rekomendasiJual": "Rp 39.000",
+   "location": "Malang"
+  },
+  {
+   "id": "1428",
+   "name": "Blouse Kemeja Wanita Salur Coklat Formal Elegan Bahan katun Atasan Kantor Lengan Panjang",
+   "hargaModal": "Rp51.300",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1429",
+   "name": "Blouse Kemeja Wanita Salur Pink Formal Elegan Bahan Shakila Atasan Kantor Lengan Panjang",
+   "hargaModal": "Rp51.300",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1347",
+   "name": "Body Lotion Alpha Glow White 400ml – Lotion Pencerah Kulit, Lembap & Perlindungan UV",
+   "hargaModal": "Rp44.100",
+   "rekomendasiJual": "Rp 117.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "331",
+   "name": "Boneka Talking Hamster Peniru Suara Mainan Bayi LUCU IMUT CUTE Plush Toys",
+   "hargaModal": "Rp38.250",
+   "rekomendasiJual": "Rp 68.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "2120",
+   "name": "Boom Essen 30 ml Berbagai Varian – Perisa Umpan Galatama dan Mancing Harian",
+   "hargaModal": "Rp14.400",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "2119",
+   "name": "Boom Essen 60 ml Berbagai Varian – Perisa Umpan Galatama dan Mancing Harian",
+   "hargaModal": "Rp26.550",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "1552",
+   "name": "Booster Sawit Fertani 250 Gram – Pupuk Pelengkap Cair untuk Produktivitas Maksimal",
+   "hargaModal": "Rp14.850",
+   "rekomendasiJual": "Rp 55.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2137",
+   "name": "Bor Portable Cordless Mini Drill Screwdriver 4.2 V",
+   "hargaModal": "Rp86.400",
+   "rekomendasiJual": "Rp 150.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "384",
+   "name": "Bravina Lambung Vit –Madu Herbal Asam Lambung & Maag | 100% Bahan Alami | 320 gram",
+   "hargaModal": "Rp45.900",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Bantul"
+  },
+  {
+   "id": "1664",
+   "name": "Brielle Sandal Wanita Flat – Casual, Stylish & Nyaman untuk Daily Wear",
+   "hargaModal": "Rp144.000",
+   "rekomendasiJual": "Rp 199.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "2197",
+   "name": "Brightening Milky Facial Toner Menyegarkan Mencerahkan Wajah",
+   "hargaModal": "Rp39.600",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "2195",
+   "name": "Brightening Milky Facial Wash Sabun Cuci Muka Mencerahkan Wajah",
+   "hargaModal": "Rp39.600",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "2193",
+   "name": "Brightening Serum Untuk Flek Hitam Bekas Jerawat Mencerahkan Wajah",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "1315",
+   "name": "Bubuk Ajaib Anti Sumbat / Mampet – Mengatasi WC Mampet dan Saluran Tersumbat dengan Cepat Tanpa Sedot WC",
+   "hargaModal": "Rp20.250",
+   "rekomendasiJual": "Rp 28.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1122",
+   "name": "Buku Stiker Lucu Anak TEBAL MURAH / Album Stiker / Buku Koleksi Stiker / Buku Sticker Anak / Mainan Edukasi Anak",
+   "hargaModal": "Rp8.550",
+   "rekomendasiJual": "Rp 15.000",
+   "location": "Jawa Barat"
+  },
+  {
+   "id": "1243",
+   "name": "BUNDLE Buy 1 Get 2 Dress Anak Ceria Satin Velvet – Kupu & Ansara",
+   "hargaModal": "Rp63.000",
+   "rekomendasiJual": "Rp 100.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1244",
+   "name": "Bundling Aurora & Ansara Dress Anak Elegan untuk Acara Spesial",
+   "hargaModal": "Rp67.500",
+   "rekomendasiJual": "Rp 115.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "2247",
+   "name": "BUNDLING BUY 1 GET 1 Nesilly Tablet Pembersih Kloset Aromaterapi / Toilet Cleaning Block Antibakteri Penghilang Bau",
+   "hargaModal": "Rp37.800",
+   "rekomendasiJual": "Rp 89.800",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2175",
+   "name": "Bundling BUY 1 GET 2 Scentnice Hair Spray Pomade",
+   "hargaModal": "Rp13.500",
+   "rekomendasiJual": "Rp 25.900",
+   "location": "Cirebon"
+  },
+  {
+   "id": "1255",
+   "name": "Bundling Dragon Blood Cream 50 Gram - Beli 1 Gratis 1",
+   "hargaModal": "Rp48.420",
+   "rekomendasiJual": "Rp 140.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1452",
+   "name": "Bundling Get 3 Kaki Tabib - Perawatan Kulit Rendaman Kaki (15g)",
+   "hargaModal": "Rp21.150",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1563",
+   "name": "Bundling Get 4 Kaki Tabib - Perawatan Kulit Rendaman Kaki (15g)",
+   "hargaModal": "Rp27.900",
+   "rekomendasiJual": "Rp 93.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1564",
+   "name": "Bundling Get 5 Kaki Tabib - Perawatan Kulit Rendaman Kaki (15g)",
+   "hargaModal": "Rp34.650",
+   "rekomendasiJual": "Rp 115.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1248",
+   "name": "BUNDLING GET 6 (5–20 WATT) - LAMPU LED AMBYAR",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 81.000",
+   "location": "Malang"
+  },
+  {
+   "id": "1324",
+   "name": "Bundling Glow Home | Cairan Anti Sumbat So Easy - 500ml",
+   "hargaModal": "Rp50.850",
+   "rekomendasiJual": "Rp 92.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1322",
+   "name": "Bundling Glow Home Lingerie Wash | Solusi Noda Darah Haid di Celana Dalam | Lembut & Higienis 300ml",
+   "hargaModal": "Rp50.850",
+   "rekomendasiJual": "Rp 92.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1326",
+   "name": "Bundling Glow Home Pembersih Toilet – Foam Cleaner Anti Kerak, Jamur, Noda Air, 500ml",
+   "hargaModal": "Rp50.850",
+   "rekomendasiJual": "Rp 92.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1327",
+   "name": "Bundling Glow Home Semprotan Pembersih Ampuh untuk Dapur Kamar Mandi & Lantai | Angkat Noda Membandel Tanpa Ribet Serbaguna",
+   "hargaModal": "Rp50.850",
+   "rekomendasiJual": "Rp 92.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1319",
+   "name": "Bundling GlowHome Penghilang Bau Hewan 500ml – Penghilang Bau Pesing Hewan",
+   "hargaModal": "Rp50.850",
+   "rekomendasiJual": "Rp 92.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1317",
+   "name": "Bundling Glowhome Penghilang Noda Anti Kerak - Pembersih Alat Dapur & Stainless Steel",
+   "hargaModal": "Rp41.850",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1328",
+   "name": "Bundling Glowhome Semprotan Pembersih Interior Mobil 450ml",
+   "hargaModal": "Rp50.850",
+   "rekomendasiJual": "Rp 95.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1323",
+   "name": "Bundling Glowhome Semprotan Pembersih Kain 500ml - Stain Remover Spray",
+   "hargaModal": "Rp49.050",
+   "rekomendasiJual": "Rp 92.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1318",
+   "name": "Bundling Glowhome Washing Machine Cleaner Liquid 500 ml – Oksigen Aktif & Anti Bakteri",
+   "hargaModal": "Rp45.000",
+   "rekomendasiJual": "Rp 80.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1320",
+   "name": "Bundling Zhongsanqing Clean Wash Gel Pembersih Pakaian Anti Noda Minyak dan Noda Membandel 100ml",
+   "hargaModal": "Rp41.850",
+   "rekomendasiJual": "Rp 68.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1321",
+   "name": "Bundling Zhongshanqing Multi Cleaner 400ml – Pembersih Alami Anti Bau & Segar Tahan Lama",
+   "hargaModal": "Rp41.850",
+   "rekomendasiJual": "Rp 95.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1663",
+   "name": "Byandca Alessia – Sandal Wanita Flat Hak Chunky 2 cm, Minimalis, Stylish, Nyaman untuk Daily Wear & Hangout",
+   "hargaModal": "Rp120.600",
+   "rekomendasiJual": "Rp 185.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "2295",
+   "name": "Cabe Jawa Al Afiat Kapsul Herbal 30 Kapsul | Ekstrak Cabe Jawa Original",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "2293",
+   "name": "CAKAR AYAM Kapsul Herbal 60 Kapsul | Ekstrak Cakar Ayam Original Produk Herbal",
+   "hargaModal": "Rp39.600",
+   "rekomendasiJual": "Rp 115.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "2201",
+   "name": "CCTV E27 WiFi Mini Kamera Full HD 360 Derajat Pengintai Pengawas Pemantau Keamanan Rumah Kantor",
+   "hargaModal": "Rp79.200",
+   "rekomendasiJual": "Rp 135.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "2316",
+   "name": "CCTV IP Camera PTZ Mini Bohlam E27 Wireless Bohlam Lampu Nirkabel HD 1080 Baru Kamera IP Wifi dengan Penglihatan Malam",
+   "hargaModal": "Rp76.500",
+   "rekomendasiJual": "Rp 140.000",
+   "location": "Selatan Banten"
+  },
+  {
+   "id": "1514",
+   "name": "Celana Cargo Jeans Pendek Anak Laki-Laki Seri GILI Usia 3-12 Tahun – Denim Soft Jeans Lembut & Stylish ala Korean Style",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 89.100",
+   "location": "Bandung"
+  },
+  {
+   "id": "1476",
+   "name": "Celana Pendek Anak Laki-Laki & Perempuan Usia 1–12 Tahun – Cotton Premium, Nyaman & Aman Untuk Bermain, Sekolah, dan Aktivitas Harian",
+   "hargaModal": "Rp25.200",
+   "rekomendasiJual": "Rp 32.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1508",
+   "name": "Celana Pendek Chino Anak Laki-laki & Perempuan – Short Chino Soft Pants Usia 1-12 Tahun",
+   "hargaModal": "Rp45.000",
+   "rekomendasiJual": "Rp 59.900",
+   "location": "Bandung"
+  },
+  {
+   "id": "1518",
+   "name": "Celana Short Jeans Anak Laki-Laki Seri Derawan Usia 3–12 Tahun – Soft Jeans Korea Style, Pinggang Elastis, Nyaman & Stylish",
+   "hargaModal": "Rp52.200",
+   "rekomendasiJual": "Rp 79.300",
+   "location": "Bandung"
+  },
+  {
+   "id": "1330",
+   "name": "Cemilan Kucing Strip x20 pcs Mix Rasa Tuna, Salmon, Ayam – Snack Kucing Lembut Favorit Kucing",
+   "hargaModal": "Rp23.400",
+   "rekomendasiJual": "Rp 44.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2232",
+   "name": "Charger 35 Watt Mini Design Smart+ Dual Port GAN III PPS PD",
+   "hargaModal": "Rp108.000",
+   "rekomendasiJual": "Rp 159.000",
+   "location": "Jakarta Timur"
+  },
+  {
+   "id": "1063",
+   "name": "Cincin Kesehatan Batu Hematite Magnet Pria Wanita",
+   "hargaModal": "Rp12.600",
+   "rekomendasiJual": "Rp 19.000",
+   "location": "Jakarta Pusat"
+  },
+  {
+   "id": "2286",
+   "name": "Citrobumin Kapsul Herbal 30 Kapsul Ekstrak Ikan Gabus & Jeruk Nipis Original",
+   "hargaModal": "Rp37.800",
+   "rekomendasiJual": "Rp 113.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1733",
+   "name": "Clean Fresh Pembersih Kaca 1L | Glass Cleaner Serbaguna | Pembersih Kaca, Cermin, Meja & Permukaan Mengilap",
+   "hargaModal": "Rp20.700",
+   "rekomendasiJual": "Rp 34.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "1732",
+   "name": "Clean Fresh Pembersih Kaca Serbaguna 450ml | Glass Cleaner Penghilang Noda Kaca | Pembersih Cermin, Meja & Permukaan Mengilap",
+   "hargaModal": "Rp18.000",
+   "rekomendasiJual": "Rp 25.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "1735",
+   "name": "Clean Fresh Pembersih Kaca Serbaguna 5 Liter",
+   "hargaModal": "Rp59.400",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "1383",
+   "name": "Croco Sling Bag Wanita Korea Premium – Tas Selempang Motif Kulit Buaya Elegan & Stylish",
+   "hargaModal": "Rp47.700",
+   "rekomendasiJual": "Rp 115.000",
+   "location": "Bogor"
+  },
+  {
+   "id": "1394",
+   "name": "Cuka Apel 500ml With Mother",
+   "hargaModal": "Rp29.700",
+   "rekomendasiJual": "Rp 36.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "1116",
+   "name": "Cuka Nanas 250ml With Mother",
+   "hargaModal": "Rp20.700",
+   "rekomendasiJual": "Rp 25.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "1117",
+   "name": "Cuka Nanas 500ml With Mother",
+   "hargaModal": "Rp27.900",
+   "rekomendasiJual": "Rp 32.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "1560",
+   "name": "Daster Cap SekDress Fia Allsize – Batik Cap Rayon Samitex Grade A Adem & Lembut, Busui Friendly, Jahitan Premium, Panjang 130cm, Lingkar Dada 110cm, Limited Stok",
+   "hargaModal": "Rp91.800",
+   "rekomendasiJual": "Rp 106.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "2288",
+   "name": "Daun Bidara Al Afiat Kapsul Herbal 30 Kapsul Ekstrak Daun Bidara Original",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "2271",
+   "name": "Daun Dewa Kapsul Herbal | Ekstrak Daun Dewa 30 Kapsul Original Produk Herbal Tradisional BPOM",
+   "hargaModal": "Rp37.170",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "2290",
+   "name": "Daun Ungu Al Afiat Kapsul Herbal 30 Kapsul Ekstrak Daun Ungu Original",
+   "hargaModal": "Rp37.800",
+   "rekomendasiJual": "Rp 109.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1279",
+   "name": "Davina Slingbag - Tas Selempang Wanita Slingbag Davina Bahan Nilon Cocoly Waterproof Antiair Tas Wanita Banyak Saku Banyak Warna",
+   "hargaModal": "Rp66.150",
+   "rekomendasiJual": "Rp 81.500",
+   "location": "Bandung"
+  },
+  {
+   "id": "176",
+   "name": "DAYKIDZ MADU & KURMA || Dukung Kesehatan Si Kecil",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 55.000",
+   "location": "Ngawi"
+  },
+  {
+   "id": "543",
+   "name": "Delta Plus 55 EC 100ml Cairan Pembasmi Kutu Caplak Tungau untuk Anjing Kucing Kandang dan Lingkungan Hewan",
+   "hargaModal": "Rp38.700",
+   "rekomendasiJual": "Rp 48.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "2140",
+   "name": "Deodorant Spray Reguler SR12 Anti Bau Mencerahkan Kulit",
+   "hargaModal": "Rp35.460",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Istimewa Yogyakarta"
+  },
+  {
+   "id": "530",
+   "name": "Desinfektan Kandang 1 Liter - Destan Plus 1 L - Desinfektan BKC 10% Aroma Segar - Desinfektan",
+   "hargaModal": "Rp37.800",
+   "rekomendasiJual": "Rp 57.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "982",
+   "name": "Detergen Khusus Pakaian Dalam",
+   "hargaModal": "Rp13.500",
+   "rekomendasiJual": "Rp 20.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "983",
+   "name": "Detergen Khusus Pakaian Olahraga",
+   "hargaModal": "Rp16.200",
+   "rekomendasiJual": "Rp 20.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "2292",
+   "name": "Diardis Herbal Cair 60 ML Ekstrak Kunyit Madu Patikan Cina Original | Herbal untuk Lambung",
+   "hargaModal": "Rp37.800",
+   "rekomendasiJual": "Rp 109.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "2203",
+   "name": "Dodo Label Stiker Selotip Transparan Penirus Wajah Mengencangkan Pipi Instan Plester",
+   "hargaModal": "Rp22.500",
+   "rekomendasiJual": "Rp 55.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "473",
+   "name": "Dragon Blood Face Cream 50g Krim Wajah Retinol Placenta untuk Kulit Kusam Kering dan Perawatan Tanda Penuaan",
+   "hargaModal": "Rp24.660",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1185",
+   "name": "Dress Baju Anak Perempuan Kupu Kupu pelangi",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1184",
+   "name": "Dress Baju Anak Perempuan Nayyira Beautiful",
+   "hargaModal": "Rp27.000",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1541",
+   "name": "Dress Ruffle Anak Perempuan Series Unicorn Usia 1-12 Tahun",
+   "hargaModal": "Rp53.100",
+   "rekomendasiJual": "Rp 92.100",
+   "location": "Bandung"
+  },
+  {
+   "id": "531",
+   "name": "Ecovet 200 gram - Antibiotik Herbal untuk Sapi - Ecovet 200 gram - B3G1 - LEBIH EFEKTIF",
+   "hargaModal": "Rp29.700",
+   "rekomendasiJual": "Rp 60.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "1374",
+   "name": "Eliano Shoulderbag | Tas Bahu Wanita Ukuran Besar Big Size Eliano Shoulderbag – Bahan Cocoly Longchamp Waterproof Muat Laptop Simple Anti Air Tas Kuliah Tas Pengajian Warna Hitam Cream Salem",
+   "hargaModal": "Rp70.500",
+   "rekomendasiJual": "Rp 97.619",
+   "location": "Bandung"
+  },
+  {
+   "id": "2125",
+   "name": "Engine Degreaser Pembersih Permukaan Mesin 250 ml",
+   "hargaModal": "Rp19.800",
+   "rekomendasiJual": "Rp 25.000",
+   "location": "Bogor"
+  },
+  {
+   "id": "200",
+   "name": "EROS SERUM VITALITAS PRIA PENINGKAT ENERGI DAN DAYA TAHAN UNTUK PRIA AKTIF 20ML",
+   "hargaModal": "Rp121.500",
+   "rekomendasiJual": "Rp 210.000",
+   "location": "Majalengka"
+  },
+  {
+   "id": "2114",
+   "name": "Essen Hantam 30 ml Berbagai Varian – Perisa Umpan Galatama, Harian, dan Lomba",
+   "hargaModal": "Rp14.400",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "2113",
+   "name": "Essen Hantam 60 ml Berbagai Varian – Perisa Umpan Galatama, Harian, dan Lomba",
+   "hargaModal": "Rp26.550",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "57",
+   "name": "ESSEN IKAN BAWAL BRO AZMI 65ml",
+   "hargaModal": "Rp47.520",
+   "rekomendasiJual": "Rp 86.000",
+   "location": "Malang"
+  },
+  {
+   "id": "62",
+   "name": "ESSEN IKAN BAWAL R-46 65ml",
+   "hargaModal": "Rp27.000",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Malang"
+  },
+  {
+   "id": "59",
+   "name": "ESSEN IKAN EMAS BRO AZMI 65ml",
+   "hargaModal": "Rp55.440",
+   "rekomendasiJual": "Rp 102.000",
+   "location": "Malang"
+  },
+  {
+   "id": "64",
+   "name": "ESSEN IKAN EMAS R-46 65ml",
+   "hargaModal": "Rp46.530",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Malang"
+  },
+  {
+   "id": "58",
+   "name": "ESSEN IKAN PATIN BRO AZMI 65ml",
+   "hargaModal": "Rp45.540",
+   "rekomendasiJual": "Rp 82.000",
+   "location": "Malang"
+  },
+  {
+   "id": "65",
+   "name": "ESSEN JAHAT STRIKE R-46",
+   "hargaModal": "Rp41.580",
+   "rekomendasiJual": "Rp 80.000",
+   "location": "Malang"
+  },
+  {
+   "id": "2118",
+   "name": "Essen Kailtorque 30 ml Berbagai Varian – Perisa Umpan Galatama, Harian, dan Lomba",
+   "hargaModal": "Rp14.400",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "2117",
+   "name": "Essen Kailtorque 60 ml Berbagai Varian – Perisa Umpan Galatama, Harian, dan Lomba",
+   "hargaModal": "Rp26.550",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "63",
+   "name": "ESSEN LUMUT R-46 65ml",
+   "hargaModal": "Rp23.760",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Malang"
+  },
+  {
+   "id": "2116",
+   "name": "Essen Monster Tegang 30 ml Berbagai Varian – Perisa Umpan Galatama dan Mancing Harian",
+   "hargaModal": "Rp14.400",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "2115",
+   "name": "Essen Monster Tegang 60 ml Berbagai Varian – Perisa Umpan Galatama dan Mancing Harian",
+   "hargaModal": "Rp26.550",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "2112",
+   "name": "Essen Pancing Power 30 ml Berbagai Varian – Perisa Umpan untuk Galatama, Harian, dan Lomba",
+   "hargaModal": "Rp14.400",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "2111",
+   "name": "Essen Pancing Power 60 ml Berbagai Varian – Perisa Umpan untuk Galatama, Harian, dan Lomba",
+   "hargaModal": "Rp26.550",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "2124",
+   "name": "Essen Strike Racun 30 ml – Perisa Umpan Galatama, Harian, dan Lomba",
+   "hargaModal": "Rp14.400",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "2123",
+   "name": "Essen Strike Racun 60 ml – Perisa Umpan Galatama, Harian, dan Lomba",
+   "hargaModal": "Rp26.550",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "2122",
+   "name": "Essen Tarik Hantam 30 ml Berbagai Varian – Perisa Umpan Galatama dan Mancing Harian",
+   "hargaModal": "Rp14.400",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "2121",
+   "name": "Essen Tarik Hantam 60 ml Berbagai Varian – Perisa Umpan Galatama dan Mancing Harian",
+   "hargaModal": "Rp26.550",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "1707",
+   "name": "Fertani – Pupuk Organik Cair Tanaman Bunga 100ml | Nutrisi Lengkap Makro & Mikro untuk Tanaman Bunga Lebih Subur, Berbunga Lebih Banyak & Tahan Lama",
+   "hargaModal": "Rp22.950",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2149",
+   "name": "FERTANI Essen Ikan 120X Kapsul Formula Ikan Kolam",
+   "hargaModal": "Rp18.450",
+   "rekomendasiJual": "Rp 59.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2146",
+   "name": "FERTANI Essen Ikan Cair 120X Formula Konsentrat - Penambah Aroma Umpan Pancing Air Tawar (Netto 100ml)",
+   "hargaModal": "Rp15.300",
+   "rekomendasiJual": "Rp 22.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2147",
+   "name": "FERTANI Fish Attractant 120X Professional Fishing Additive 100g",
+   "hargaModal": "Rp29.700",
+   "rekomendasiJual": "Rp 32.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1593",
+   "name": "Fertani Paket 2 Botol – Vitamin B1 Anti Stres Tanaman & Hormon Stimulasi Akar 100ml untuk Pertumbuhan Cepat, Pemulihan & Perakaran Optimal Semua Jenis Tanaman",
+   "hargaModal": "Rp31.950",
+   "rekomendasiJual": "Rp 85.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1592",
+   "name": "Fertani Pestisida Nabati Cair 100ml – Ekstrak Tanaman Alami, Anti Hama Ulat, Kutu Putih, Thrips & Aphid, Aman untuk Semua Jenis Tanaman Buah, Sayur & Hias",
+   "hargaModal": "Rp22.950",
+   "rekomendasiJual": "Rp 55.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1670",
+   "name": "Fertani Pestisida Nabati Cair 500ml – Pupuk Organik Alami, Solusi Perlindungan Tanaman dari Hama, Aman & Efektif, Kemasan Spray Praktis",
+   "hargaModal": "Rp31.950",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1698",
+   "name": "Fertani Pupuk Organik Cair 100ml Nutrisi Makro & Mikro Lengkap Tanaman Sayuran, Aman & Organik, Cocok Semprot Daun atau Siram untuk Hidroponik, Polybag, & Tanah, Hasil Panen Lebih Subur",
+   "hargaModal": "Rp22.950",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1702",
+   "name": "Fertani Pupuk Organik Cair Tanaman Buah 100ml – Nutrisi Makro & Mikro Lengkap untuk Memperkuat Akar, Menyehatkan Tanaman, dan Meningkatkan Hasil Panen Optimal",
+   "hargaModal": "Rp22.950",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1754",
+   "name": "Fertani Suplemen Penggemuk Ikan Air Tawar 250gr Pakan Tambahan untuk Lele Gurame, Nila, Bawal, Mujair, dan Udang",
+   "hargaModal": "Rp23.400",
+   "rekomendasiJual": "Rp 54.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1809",
+   "name": "Fertani Suplemen Penggemuk Ternak Ruminansia 250 Gram – Vitamin Penggemuk Sapi, Kambing & Babi Penambah Nafsu Makan dan Pertumbuhan",
+   "hargaModal": "Rp22.500",
+   "rekomendasiJual": "Rp 55.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1804",
+   "name": "Fertani Suplemen Penggemuk Ternak Unggas 250 Gram – Vitamin Penggemuk Ayam, Bebek, Entok & Burung Puyuh Penambah Nafsu Makan",
+   "hargaModal": "Rp22.500",
+   "rekomendasiJual": "Rp 55.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2145",
+   "name": "Fertani Umpan Pancing 120X",
+   "hargaModal": "Rp16.200",
+   "rekomendasiJual": "Rp 59.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2150",
+   "name": "FERTANI Umpan Pancing 120X Cacing Bloodworm 30gr",
+   "hargaModal": "Rp16.650",
+   "rekomendasiJual": "Rp 59.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2151",
+   "name": "FERTANI Umpan Pancing 120X Udang Antartika Netto 30g",
+   "hargaModal": "Rp16.650",
+   "rekomendasiJual": "Rp 59.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1654",
+   "name": "Flatshoes Jala Amora – Sepatu Flat Wanita Brokat Mesh Tulle Elegan Anti Slip untuk Kerja & Daily Use",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1651",
+   "name": "Flatshoes Jala Belvina – Sepatu Flat Wanita Brokat Mesh Tulle Elegan Anti Slip untuk Kerja & Daily Use",
+   "hargaModal": "Rp53.550",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "2143",
+   "name": "Food Chopper Manual 1.5L | Alat Pemotong Bawang, Cabai, Daging & Sayur | Penggiling Bumbu Serbaguna",
+   "hargaModal": "Rp39.600",
+   "rekomendasiJual": "Rp 50.500",
+   "location": "Surabaya"
+  },
+  {
+   "id": "1222",
+   "name": "G-OXFRESH Deodorant Roll On",
+   "hargaModal": "Rp24.750",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2266",
+   "name": "GAFIRO Kayu Manis & Daun Teh Kapsul Herbal 30 Kapsul | Herbal Praktis Untuk Keseharian",
+   "hargaModal": "Rp37.350",
+   "rekomendasiJual": "Rp 96.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "306",
+   "name": "Game Machine Rhythm Mainan Rhythm Speed Game Digital Tekan Pencet Tombol Ritme Kecepatan Musik Cahaya Hand speed Motorik",
+   "hargaModal": "Rp49.500",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "1454",
+   "name": "Gang Jie + Ghosiah De Nature 50 Kapsul – Herbal Alami untuk Membantu Menjaga Kesehatan Saluran Kemih",
+   "hargaModal": "Rp234.000",
+   "rekomendasiJual": "Rp 295.000",
+   "location": "Cilacap"
+  },
+  {
+   "id": "1453",
+   "name": "Gang Jie De Nature 50 Kapsul – Herbal Alami untuk Membantu Menjaga Kesehatan Saluran Kemih",
+   "hargaModal": "Rp112.500",
+   "rekomendasiJual": "Rp 150.000",
+   "location": "Cilacap"
+  },
+  {
+   "id": "1135",
+   "name": "Gantungan Kunci Kuningan Pixiu & Labu Feng Shui | Aksesoris Pria Wanita Premium",
+   "hargaModal": "Rp16.200",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Jakarta Pusat"
+  },
+  {
+   "id": "2307",
+   "name": "Garlica Al Kanzu Kapsul Herbal 30 Kapsul | Ekstrak Bawang Putih Original",
+   "hargaModal": "Rp38.700",
+   "rekomendasiJual": "Rp 112.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "9",
+   "name": "Garlive Habbatussauda 4in1 60, 100, 200 Kapsul | Suplemen Herbal Imun, Kolesterol, Hipertensi, Asam Urat | BPOM TR 183310871",
+   "hargaModal": "Rp36.000",
+   "rekomendasiJual": "Rp 175.000",
+   "location": "Ngawi"
+  },
+  {
+   "id": "11",
+   "name": "Geebumin – Suplemen Herbal Ekstrak Ikan Kutuk dan Gamat Emas | High Protein | 60 Kapsul | BPOM TR 223045241",
+   "hargaModal": "Rp50.400",
+   "rekomendasiJual": "Rp 150.000",
+   "location": "Ngawi"
+  },
+  {
+   "id": "1047",
+   "name": "Gel Pembersih Zhongsanqing Pakaian Clean Wash Anti Noda Minyak Dan Noda Membandel 100ml",
+   "hargaModal": "Rp22.050",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1331",
+   "name": "Gel Racun Kecoa Ampuh – Umpan Gel Pembasmi Kecoa Cepat, Efektif & Tahan Lama",
+   "hargaModal": "Rp25.650",
+   "rekomendasiJual": "Rp 46.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1332",
+   "name": "Gel Racun Semut Ampuh – Umpan Gel Insektisida Pembasmi Semut Sampai Sarang",
+   "hargaModal": "Rp25.650",
+   "rekomendasiJual": "Rp 46.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1139",
+   "name": "Gelang Pixiu Mantra Om Mani Padme Hum | Gelang Batu Hitam Aksesoris Pria Wanita",
+   "hargaModal": "Rp30.600",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Jakarta Pusat"
+  },
+  {
+   "id": "1129",
+   "name": "Gelang Tali Batu Alam Terapi Original Pria Wanita",
+   "hargaModal": "Rp5.400",
+   "rekomendasiJual": "Rp 7.500",
+   "location": "Jakarta Pusat"
+  },
+  {
+   "id": "1130",
+   "name": "Gelang Tali Feng Shui Gold Simbol Kesuksesan",
+   "hargaModal": "Rp4.500",
+   "rekomendasiJual": "Rp 7.500",
+   "location": "Jakarta Pusat"
+  },
+  {
+   "id": "1138",
+   "name": "Gelang Tali Hoki Tibet | Gelang Tali Simpul Pria Wanita – Hitam & Merah",
+   "hargaModal": "Rp2.070",
+   "rekomendasiJual": "Rp 6.300",
+   "location": "Jakarta Pusat"
+  },
+  {
+   "id": "26",
+   "name": "Gemuk Sintetis Mobil BROAZMI – Pelumas Premium untuk Engsel, Kunci & Sunroof 100gr",
+   "hargaModal": "Rp13.770",
+   "rekomendasiJual": "Rp 29.000",
+   "location": "Malang"
+  },
+  {
+   "id": "68",
+   "name": "Gemuk Sintetis Mobil BROAZMI – Pelumas Premium untuk Engsel, Kunci & Sunroof 200gr",
+   "hargaModal": "Rp19.800",
+   "rekomendasiJual": "Rp 42.000",
+   "location": "Malang"
+  },
+  {
+   "id": "19",
+   "name": "Gentle Clean Interior 250ml - Pembersih Interior Mobil Tidak Lengket | Free Kain Microfiber",
+   "hargaModal": "Rp22.770",
+   "rekomendasiJual": "Rp 40.000",
+   "location": "Malang Jatim"
+  },
+  {
+   "id": "17",
+   "name": "Glass Coating – Pelapis Kaca Mobil Efek Daun Talas 250ml FREE MICROFIBER",
+   "hargaModal": "Rp23.670",
+   "rekomendasiJual": "Rp 41.000",
+   "location": "Malang"
+  },
+  {
+   "id": "1041",
+   "name": "Glow Home | Anti Sumbat WC Saluran Air Wastafel Mampet",
+   "hargaModal": "Rp26.550",
+   "rekomendasiJual": "Rp 47.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1042",
+   "name": "Glow Home Pembersih Toilet Serbaguna – Foam Cleaner Anti Kerak, Jamur, Noda Air, 500ml",
+   "hargaModal": "Rp26.550",
+   "rekomendasiJual": "Rp 47.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1043",
+   "name": "Glow Home Semprotan Pembersih Ampuh untuk Dapur Kamar Mandi & Lantai | Angkat Noda Membandel Tanpa Ribet Serbaguna",
+   "hargaModal": "Rp25.650",
+   "rekomendasiJual": "Rp 47.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1334",
+   "name": "GlowHome Deterjen Baju Kapsul 1 Bungkus (8 Kapsul) – Laundry Pod 3 in 1, Bersih Maksimal Wangi Tahan Lama",
+   "hargaModal": "Rp21.150",
+   "rekomendasiJual": "Rp 28.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1045",
+   "name": "GlowHome Lingerie Wash | Solusi Noda Darah Haid di Celana Dalam | Lembut & Higienis 300ml",
+   "hargaModal": "Rp26.550",
+   "rekomendasiJual": "Rp 47.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1039",
+   "name": "Glowhome Pembersih Stainless Steel dan Anti Lengket 180ml Cairan Penghilang Kerak Noda Hitam Alat Dapur",
+   "hargaModal": "Rp21.600",
+   "rekomendasiJual": "Rp 37.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1280",
+   "name": "Glowhome Semprotan Pembersih Interior Mobil 450ml",
+   "hargaModal": "Rp26.550",
+   "rekomendasiJual": "Rp 47.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1044",
+   "name": "Glowhome Semprotan Pembersih Kain 500ml - Stain Remover Spray, Hilangkan Noda Minyak & Tinta",
+   "hargaModal": "Rp25.200",
+   "rekomendasiJual": "Rp 47.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1333",
+   "name": "GlowHome Semprotan Pembersih Kulkas 450ml – Cairan Pembersih Noda Membandel Praktis Tanpa Ribet",
+   "hargaModal": "Rp26.550",
+   "rekomendasiJual": "Rp 46.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1049",
+   "name": "Glowhome Washing Machine Cleaner Liquid 500 ml – Oksigen Aktif & Anti Bakteri",
+   "hargaModal": "Rp24.750",
+   "rekomendasiJual": "Rp 42.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1684",
+   "name": "Glucosyifa 60 Kapsul – Herbal untuk Membantu Meringankan Gejala Kencing Manis dan Menjaga Kadar Gula Darah",
+   "hargaModal": "Rp117.000",
+   "rekomendasiJual": "Rp 165.000",
+   "location": "Bantul"
+  },
+  {
+   "id": "1270",
+   "name": "Glutamin Pro – Penyedap Masakan dengan Probiotik 30 sachet @ 5 gram",
+   "hargaModal": "Rp51.617",
+   "rekomendasiJual": "Rp 61.834",
+   "location": "Madiun"
+  },
+  {
+   "id": "1565",
+   "name": "Grainvit Minuman sereal multigrain (1 Box)",
+   "hargaModal": "Rp64.800",
+   "rekomendasiJual": "Rp 109.000",
+   "location": "Sukun Malang"
+  },
+  {
+   "id": "1742",
+   "name": "Graphic Tee Chibi Swordsman Putih/Hitam Kaos Anime Style Pria Wanita Cotton Combed 30s Regular Fit",
+   "hargaModal": "Rp75.600",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1746",
+   "name": "Graphic Tee Statue God Putih/Hitam Kaos Anime Style Pria Wanita Cotton Combed 30s Regular Fit",
+   "hargaModal": "Rp75.600",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "369",
+   "name": "Great Vanilla Bean Gourmet 1 pods",
+   "hargaModal": "Rp19.800",
+   "rekomendasiJual": "Rp 24.400",
+   "location": "Jakarta Selatan"
+  },
+  {
+   "id": "370",
+   "name": "Great Vanilla Bean Gourmet 2 pods",
+   "hargaModal": "Rp32.760",
+   "rekomendasiJual": "Rp 44.400",
+   "location": "Jakarta Selatan"
+  },
+  {
+   "id": "368",
+   "name": "Great Vanilla extract 100 ml",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 77.700",
+   "location": "Jakarta Selatan"
+  },
+  {
+   "id": "367",
+   "name": "Great Vanilla extract 50 ml",
+   "hargaModal": "Rp30.600",
+   "rekomendasiJual": "Rp 40.800",
+   "location": "Jakarta Selatan"
+  },
+  {
+   "id": "2177",
+   "name": "HAIR CARE ESSENCE 10OML",
+   "hargaModal": "Rp13.500",
+   "rekomendasiJual": "Rp 19.900",
+   "location": "Cirebon"
+  },
+  {
+   "id": "646",
+   "name": "Hanin Kemeja Abu",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 77.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "2245",
+   "name": "Hanin Kemeja Burgundy",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 78.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "638",
+   "name": "Hanin Kemeja Cream",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 77.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "623",
+   "name": "Hanin Kemeja Dusty Pink",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 77.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "625",
+   "name": "Hanin Kemeja Hitam",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 77.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "642",
+   "name": "Hanin Kemeja Ijo Botol",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 77.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "2252",
+   "name": "Hanin Kemeja Kunyit",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 78.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "2250",
+   "name": "Hanin Kemeja Latte",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 77.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "621",
+   "name": "Hanin Kemeja Lavender",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 77.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "644",
+   "name": "Hanin Kemeja Lemon",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 77.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "2251",
+   "name": "Hanin Kemeja Mahogany",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 77.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "634",
+   "name": "Hanin Kemeja Navy",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 77.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "636",
+   "name": "Hanin Kemeja Olive",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 77.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "640",
+   "name": "Hanin Kemeja Putih",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 77.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "648",
+   "name": "Hanin Kemeja Teracota",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 78.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "2244",
+   "name": "Hanin Kemeja Wardah",
+   "hargaModal": "Rp54.900",
+   "rekomendasiJual": "Rp 78.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1553",
+   "name": "Hantavirus Anti Tikus Semprot Rumah & Keluarga – Formula Premium Aman & Efektif",
+   "hargaModal": "Rp22.950",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1486",
+   "name": "Happy Little Blossom Dress Anak Perempuan Usia 1–4 Tahun – Cotton Combed 24s Bordir Bunga",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 70.500",
+   "location": "Bandung"
+  },
+  {
+   "id": "1489",
+   "name": "Happy Little Dress Amaryllis Anak Perempuan Usia 1–6 Tahun – Cotton Combed 24s Lembut & Adem",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 71.700",
+   "location": "Bandung"
+  },
+  {
+   "id": "1490",
+   "name": "Happy Little Dress Aster Anak Perempuan Usia 1–4 Tahun – Cotton Combed 24s Lembut & Adem",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 70.500",
+   "location": "Bandung"
+  },
+  {
+   "id": "1532",
+   "name": "Happy Little Dress Camellia Anak Perempuan 1-4 Tahun – Dress Balita Motif Pita, Lembut & Nyaman",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 70.500",
+   "location": "Bandung"
+  },
+  {
+   "id": "1493",
+   "name": "Happy Little Dress Freesia Anak Perempuan Usia 1–4 Tahun – Cotton Combed 24s dengan Tali Pita",
+   "hargaModal": "Rp55.800",
+   "rekomendasiJual": "Rp 73.500",
+   "location": "Bandung"
+  },
+  {
+   "id": "1497",
+   "name": "Happy Little Dress Lusy Anak Perempuan Usia 1–4 Tahun – Cotton Combed 24s Lembut & Adem",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 74.400",
+   "location": "Bandung"
+  },
+  {
+   "id": "1482",
+   "name": "Happy Little Dress Orchid Anak Perempuan 5–6 Tahun – Dress Cantik Bordir Bunga Pastel, Aksesoris Kupu-Kupu, Cotton Combed 24s, Lembut & Nyaman untuk Balita",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 74.400",
+   "location": "Bandung"
+  },
+  {
+   "id": "291",
+   "name": "Headphone Bluetooth P47 Realme Wireless headphone earphone earpod headset handsfree music gaming",
+   "hargaModal": "Rp29.700",
+   "rekomendasiJual": "Rp 82.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "286",
+   "name": "Headphone Kucing Bluetooth Gaming Cat Ears Wireless RGB Led Light Stereo Bando Headset Gaming Kucing",
+   "hargaModal": "Rp30.150",
+   "rekomendasiJual": "Rp 92.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "304",
+   "name": "Headphone Wireless Beruang MZ002 Bluetooth V5.3 Headset Full Bass Stereo Cartoon Bear Face Stereo Folding HK",
+   "hargaModal": "Rp46.800",
+   "rekomendasiJual": "Rp 105.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "303",
+   "name": "Headphone Wireless Telinga Kelinci Bluetooth V5.3 Headset Full Bass Stereo LED RGB Rabbit Ear Stereo Folding HK",
+   "hargaModal": "Rp45.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "2287",
+   "name": "Hemorofit Al Afiat Kapsul Herbal 30 Kapsul | Ekstrak Daun Ungu Gamat Emas Pegagan",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "2300",
+   "name": "Hepatofit Kapsul Herbal 30 Kapsul | Ekstrak Temulawak Meniran Akar Jereju",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 114.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "538",
+   "name": "Herbal Hemorrhoids Spray – Semprot Wasir Herbal 30ml",
+   "hargaModal": "Rp18.900",
+   "rekomendasiJual": "Rp 30.200",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1637",
+   "name": "Herbaracik - Obat Ayam Herbal Flu Pilek Snot Cekreh Aratan Booster Unggas",
+   "hargaModal": "Rp34.200",
+   "rekomendasiJual": "Rp 40.000",
+   "location": "Sukoharjo"
+  },
+  {
+   "id": "1445",
+   "name": "Herbisida Pembasmi Rumput 250gr – Obat Rumput Liar Hingga Akar Cepat & Efektif",
+   "hargaModal": "Rp21.150",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2296",
+   "name": "HERFUS Kapsul Herbal 30 Kapsul | Ekstrak Manjakani Original Produk Jamu",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "2297",
+   "name": "Hersakis Kapsul Herbal 30 Kapsul | Ekstrak Temu Putih Rumput Mutiara Sambiloto",
+   "hargaModal": "Rp44.100",
+   "rekomendasiJual": "Rp 129.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "2283",
+   "name": "Hersidar Herbal Capsule 60 Kapsul | Meredakan Rasa Gatal dan Menekan Peradangan",
+   "hargaModal": "Rp44.100",
+   "rekomendasiJual": "Rp 129.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1252",
+   "name": "Hewanic Mix Cat Grass & Snack – Camilan Kucing Sehat dan Bergizi!",
+   "hargaModal": "Rp169.830",
+   "rekomendasiJual": "Rp 225.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "498",
+   "name": "Homemade 180x200x20cm Karakter Anak Laki-Laki Set Sarung Bantal Guling Bahan Lembut Jahitan Rapi Packing Tas Mica",
+   "hargaModal": "Rp85.500",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Sragen"
+  },
+  {
+   "id": "2263",
+   "name": "Hot Pants (3pcs) Size M,L,XL,XXL,XXXL",
+   "hargaModal": "Rp36.000",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "42",
+   "name": "INSTANT COATING R-46",
+   "hargaModal": "Rp19.800",
+   "rekomendasiJual": "Rp 43.000",
+   "location": "Malang"
+  },
+  {
+   "id": "43",
+   "name": "INTERIOR CLEANER R-46",
+   "hargaModal": "Rp23.670",
+   "rekomendasiJual": "Rp 59.000",
+   "location": "Malang"
+  },
+  {
+   "id": "2138",
+   "name": "Jaysuing Lem Perekat Trasnparan Anti Bocor Rembes Waterproof Original- 300 Gr",
+   "hargaModal": "Rp21.150",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "1547",
+   "name": "JetPro Pupuk Pelengkap Cair – Zat Pengatur Tumbuh & Andalan Indonesia, Plus GA3, Perekat & Anti Jamur – Formula Lengkap untuk Padi, Sayuran, Buah & Tanaman Hias",
+   "hargaModal": "Rp47.700",
+   "rekomendasiJual": "Rp 67.500",
+   "location": "Jombang"
+  },
+  {
+   "id": "1562",
+   "name": "JetPro Pupuk Pelengkap Cair Multifungsi 100ml – Nutrisi Tanaman Buah, Sayur, Kebun & Tanaman Hias",
+   "hargaModal": "Rp21.600",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "2305",
+   "name": "Jinten Hitam Habbatussauda 30 Kapsul | Antioksidan Alami Pilihan Ekstrak Habbatussauda Original",
+   "hargaModal": "Rp42.300",
+   "rekomendasiJual": "Rp 119.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1581",
+   "name": "Joemen S 13 – Sandal Pria Original Premium, Kulit Kanvas, Non-Slip Karet, Stylish & Nyaman untuk Kerja, Kuliah, Gunung, dan Aktivitas Sehari-hari",
+   "hargaModal": "Rp76.500",
+   "rekomendasiJual": "Rp 90.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1759",
+   "name": "Joemen S31 Sandal Japit Pria Original Kulit Sintetis Anti Slip Casual Fashion Ringan Empuk",
+   "hargaModal": "Rp60.300",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1760",
+   "name": "Joemen S37 Sandal Japit Pria Original Kulit Sintetis Anti Slip Fashion Casual Ringan Empuk Harian",
+   "hargaModal": "Rp60.300",
+   "rekomendasiJual": "Rp 80.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1611",
+   "name": "Joemen Sandal Jepit Kulit Anti Putus Pria Original 100% Brand Lokal Casual Terbaru S 60 – Ringan Empuk Nyaman Anti Slip",
+   "hargaModal": "Rp49.500",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1499",
+   "name": "Jubah Gamis Anak Laki-Laki Premium Usia 1–12 Tahun – Katun Oxford Adem untuk Ibadah & Acara Formal",
+   "hargaModal": "Rp77.634",
+   "rekomendasiJual": "Rp 108.700",
+   "location": "Bandung"
+  },
+  {
+   "id": "2231",
+   "name": "Kabel Charger Silicone 65W Type-C to Type-C 1M C939",
+   "hargaModal": "Rp27.900",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Jakarta Timur"
+  },
+  {
+   "id": "1551",
+   "name": "Kaftan Cunda Allsize Jumbo Gamis Kaftan Rayon Super Tebal Wudhu Friendly LD 160 PB 135 – Untuk BB 60-110 Kg",
+   "hargaModal": "Rp81.000",
+   "rekomendasiJual": "Rp 95.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1137",
+   "name": "Kalung Liontin Giok Tibet Tali Hoki | Aksesoris Relaksasi Pria Wanita",
+   "hargaModal": "Rp15.300",
+   "rekomendasiJual": "Rp 32.000",
+   "location": "Jakarta Pusat"
+  },
+  {
+   "id": "2253",
+   "name": "Kalung Liontin Shio 12 - Kalung Shio Bulan Kelahiran",
+   "hargaModal": "Rp12.150",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Jakarta Pusat"
+  },
+  {
+   "id": "1056",
+   "name": "Kalung Tali Taring Black Serat Original Feng Shui",
+   "hargaModal": "Rp2.250",
+   "rekomendasiJual": "Rp 5.000",
+   "location": "Jakarta Pusat"
+  },
+  {
+   "id": "1643",
+   "name": "Kalvolac 1kg Susu Pengganti Induk Pedet Cempe Anak Sapi Kambing Domba untuk Nutrisi Ternak Muda",
+   "hargaModal": "Rp40.500",
+   "rekomendasiJual": "Rp 60.000",
+   "location": "Sukoharjo"
+  },
+  {
+   "id": "1549",
+   "name": "Kangaroo Sweater 2 in 1 - Sweater Selimut Multifungsi Cardigan Selimut Ibu dan Bayi Jaket Gendong Bayi",
+   "hargaModal": "Rp165.600",
+   "rekomendasiJual": "Rp 190.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1653",
+   "name": "Kangaroo Sweater Hoodie 2 in 1 – Sweater Selimut Multifungsi untuk Ibu & Bayi, Cardigan Gendong Bayi, Jaket Hangat Mom & Dad, Waffle Premium",
+   "hargaModal": "Rp170.100",
+   "rekomendasiJual": "Rp 234.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1504",
+   "name": "Kaos Anak Laki-Laki & Perempuan Lengan Pendek Series Dino Part 2 – Usia 1-14 Tahun, Cotton Combed 24s",
+   "hargaModal": "Rp41.850",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1484",
+   "name": "Kaos Anak Laki-Laki Teddy Bear Series Usia 3–12 Tahun – Cotton Combed 24s Premium SNI",
+   "hargaModal": "Rp42.750",
+   "rekomendasiJual": "Rp 58.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1507",
+   "name": "Kaos Anak Lengan Pendek Cute Animal Series – Atasan Anak Perempuan & Laki-Laki Usia 1-6 Tahun Cotton Combed 24s",
+   "hargaModal": "Rp41.850",
+   "rekomendasiJual": "Rp 49.900",
+   "location": "Bandung"
+  },
+  {
+   "id": "1505",
+   "name": "Kaos Atasan Anak Laki Laki & Perempuan Series Cute Animal 2 Usia 3-12 Tahun Cotton Combed 24s",
+   "hargaModal": "Rp41.850",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1516",
+   "name": "Kaos Atasan Anak Laki-Laki & Perempuan DINO REX Usia 3-12 Tahun – Kaos Motif Dinosaurus Lembut & Nyaman Cotton Combed 24s",
+   "hargaModal": "Rp40.950",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1535",
+   "name": "Kaos Atasan Anak Laki-Laki & Perempuan Series Constructions Usia 3-12 Tahun – Cotton Combed 24s, Nyaman & Stylish",
+   "hargaModal": "Rp42.750",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1488",
+   "name": "Kaos Bayi Lengan Pendek White Dino Usia 1–2 Tahun – Baju Bayi Premium SNI",
+   "hargaModal": "Rp42.750",
+   "rekomendasiJual": "Rp 55.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1743",
+   "name": "Kaos Polos Anak Cotton Combed 30s Premium Baju Anak Laki Perempuan Lembut Adem Nyaman Harian",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 39.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1744",
+   "name": "Kaos Polos Hitam Cotton Combed 30s Pria Wanita Premium Regular Fit Lembut Adem Nyaman Harian",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 49.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1745",
+   "name": "Kaos Polos Putih Cotton Combed 30s Pria Wanita Premium Regular Fit Lembut Adem Nyaman Harian",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 49.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1544",
+   "name": "Kaos Setelan Anak Series Explore Animal Laki-Laki / Oneset Baju Anak Perempuan 1–12 Tahun",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 74.400",
+   "location": "Bandung"
+  },
+  {
+   "id": "2308",
+   "name": "Kapsul Herbal Fortimen 30 Kapsul Bahan Alami Untuk Vitalitas Tubuh",
+   "hargaModal": "Rp42.300",
+   "rekomendasiJual": "Rp 109.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "2230",
+   "name": "Kapsul Herbal Gurah 60 Kapsul - Meredakan Batuk Berdahak BPOM",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2304",
+   "name": "Kapsul Herbal Vetosol 30pcs | Kapsul Zaitun Untuk Kesehatan Jantung & Tubuh",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "34",
+   "name": "KAPSUL IKAN KUTUK – Suplemen Alami Tinggi Gizi untuk Menjaga Kesehatan",
+   "hargaModal": "Rp45.000",
+   "rekomendasiJual": "Rp 150.000",
+   "location": "Ngawi"
+  },
+  {
+   "id": "2273",
+   "name": "Kapsul Manjakani Herbal 30 Kapsul | Ekstrak Manjakani Original Produk Herbal Tradisional",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1805",
+   "name": "Kapsul Minyak Ikan Gabus 500 mg Olimex 60 – Suplemen Albumin untuk Membantu Pemulihan Tubuh",
+   "hargaModal": "Rp126.000",
+   "rekomendasiJual": "Rp 165.000",
+   "location": "Bekasi"
+  },
+  {
+   "id": "2191",
+   "name": "Kapsul Pasak Bumi Stamina Pria Isi 50 Kapsul",
+   "hargaModal": "Rp27.000",
+   "rekomendasiJual": "Rp 60.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1261",
+   "name": "Kapsul Penambah Nafsu Makan – Gemuk Badan Alami",
+   "hargaModal": "Rp26.100",
+   "rekomendasiJual": "Rp 46.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2312",
+   "name": "Kapsul Qusthul Hindi 30 Kapsul Herbal | Ekstrak Qusthul Hindi Original",
+   "hargaModal": "Rp37.800",
+   "rekomendasiJual": "Rp 119.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "534",
+   "name": "KATAKILL 500ML - Pembasmi Serangga - Membunuh Semua Jenis Serangga - 500ml",
+   "hargaModal": "Rp40.500",
+   "rekomendasiJual": "Rp 60.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "1469",
+   "name": "Kayonna Home Dress Premium – Daster Katun Rayon Kekinian Adem & Lembut, Busui Friendly, Motif Elegan, Saku Tersembunyi, Lingkar Rok Lebar, All Size untuk Wanita & Ibu di Rumah",
+   "hargaModal": "Rp92.160",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Sleman"
+  },
+  {
+   "id": "1495",
+   "name": "Kennai & Happy Little Setelan Pendek Dress Peony Anak Perempuan Usia 1–4 Tahun – Cotton Combed 24s",
+   "hargaModal": "Rp58.950",
+   "rekomendasiJual": "Rp 70.500",
+   "location": "Bandung"
+  },
+  {
+   "id": "1501",
+   "name": "Kennai Kaos Anak Laki Laki 1-12 Tahun Kaos Anak Perempuan Series Trock And Roll",
+   "hargaModal": "Rp41.400",
+   "rekomendasiJual": "Rp 49.900",
+   "location": "Bandung"
+  },
+  {
+   "id": "1503",
+   "name": "Kennai Kaos Anak Lengan Pendek Hi Dino Usia 1–12 Tahun – Cotton Combed 24s Premium SNI",
+   "hargaModal": "Rp41.400",
+   "rekomendasiJual": "Rp 53.900",
+   "location": "Bandung"
+  },
+  {
+   "id": "1502",
+   "name": "Kennai Kaos Anak Series Shark In Sea Usia 1–12 Tahun – Baju Anak Laki-Laki & Perempuan Cotton Nyaman",
+   "hargaModal": "Rp42.300",
+   "rekomendasiJual": "Rp 55.700",
+   "location": "Bandung"
+  },
+  {
+   "id": "1479",
+   "name": "Kennai Kids Setelan Kaos & Celana Anak Premium – Cotton 155-185g, Usia 1-12 Tahun, Aman & Nyaman, SNI & Oeko-Tex",
+   "hargaModal": "Rp42.750",
+   "rekomendasiJual": "Rp 52.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1491",
+   "name": "Kennai Set Kaos Anak Lengan Pendek Blue Little Cat Usia 1–13 Tahun – Cotton Combed 24s Premium SNI",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 74.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1481",
+   "name": "Kennai Setelan Muslim Anak Kurta Laki-Laki Series Premium – Baju Kurta Oxford Usia 1–12 Tahun, Nyaman & Aman untuk Anak, Desain Elegan NV-1",
+   "hargaModal": "Rp85.500",
+   "rekomendasiJual": "Rp 118.500",
+   "location": "Bandung"
+  },
+  {
+   "id": "2176",
+   "name": "KHALIFAH OUD (bonus Parfum Kasturi 30ml + gelang kokka)",
+   "hargaModal": "Rp63.000",
+   "rekomendasiJual": "Rp 149.000",
+   "location": "Cirebon"
+  },
+  {
+   "id": "314",
+   "name": "Kipas Angin Portable N15 Mini USB LED Display Portable Fan 5-Kecepatan Putaran Dengan Aromaterapi Mini Fan Portable",
+   "hargaModal": "Rp34.740",
+   "rekomendasiJual": "Rp 44.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "315",
+   "name": "Kipas Angin Portable Nano Spray Fan F3 Kipas Angin Mini Genggam Usb Nano Spray Face Mist Portable 4 Speed",
+   "hargaModal": "Rp41.850",
+   "rekomendasiJual": "Rp 64.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "297",
+   "name": "Kipas Cooler HP USB Plug & Play | Cocok Semua HP, Gak Bikin Lemot Cooler X13",
+   "hargaModal": "Rp18.900",
+   "rekomendasiJual": "Rp 64.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "2225",
+   "name": "Kipas Dinding E27 + Saklar On/Off | Kipas Angin Mini Praktis Langsung Colok | Hemat Listrik untuk Rumah, Dapur & Kos",
+   "hargaModal": "Rp37.800",
+   "rekomendasiJual": "Rp 51.500",
+   "location": "Surabaya"
+  },
+  {
+   "id": "1134",
+   "name": "Kipas Tai Chi Polos Warna Merah | Kipas Latihan Pernapasan & Olahraga Tradisional",
+   "hargaModal": "Rp31.050",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Jakarta Pusat"
+  },
+  {
+   "id": "2200",
+   "name": "Kompon Body Compound Poles Penghilang Baret Goresan Bodi Mobil Motor-Dengan Kemasan",
+   "hargaModal": "Rp16.200",
+   "rekomendasiJual": "Rp 40.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "1281",
+   "name": "Kopi Rempah Al Ijabah Nikmat Berkhasiat Untuk 12x Seduh",
+   "hargaModal": "Rp37.800",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Jambi"
+  },
+  {
+   "id": "676",
+   "name": "KOYO 5 RAMUAN UNTUK PENGOBATAN NYERI AKIBAT CIDERA SENDI 8 PC",
+   "hargaModal": "Rp14.400",
+   "rekomendasiJual": "Rp 23.200",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "690",
+   "name": "KOYO 8 HOUR PEREDA NYERI",
+   "hargaModal": "Rp68.400",
+   "rekomendasiJual": "Rp 100.200",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "679",
+   "name": "KOYO AI CHAO – Pereda Nyeri Sendi & Otot Herbal",
+   "hargaModal": "Rp14.400",
+   "rekomendasiJual": "Rp 23.200",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "292",
+   "name": "Koyo Herbal SaluVera – Plaster Nyeri Sendi & Pegal Linu 10 Pad | Koyo Pinggang Tulang Belakang Pereda",
+   "hargaModal": "Rp9.810",
+   "rekomendasiJual": "Rp 17.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "684",
+   "name": "Koyo Jahe Pereda Nyeri 8 PCS – Koyo Herbal Hangat untuk Pegal, Nyeri Otot & Sendi",
+   "hargaModal": "Rp14.400",
+   "rekomendasiJual": "Rp 23.200",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "480",
+   "name": "Koyo Pelangsing Herbal – Fat Removal Patch (Isi 40 pcs)",
+   "hargaModal": "Rp17.640",
+   "rekomendasiJual": "Rp 37.400",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "687",
+   "name": "KOYO TIBET AJAIB – 8 PCS",
+   "hargaModal": "Rp14.400",
+   "rekomendasiJual": "Rp 23.200",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2302",
+   "name": "Kulit Manggis Kapsul Herbal 30 Kapsul | Ekstrak Kulit Manggis Original",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "2269",
+   "name": "Kumis Kucing Al Afia Kapsul Herbal 30 Kapsul Original | Ekstrak Kumis Kucing Herbal Alami",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 96.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1221",
+   "name": "Kurma Berkah – Premium Kurma Pilihan",
+   "hargaModal": "Rp37.800",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2142",
+   "name": "Lampu Kipas LED 2 in 1 E27 50W – Kipas Plafon Mini Multifungsi 360° dengan Remote Control 3 Mode Cahaya",
+   "hargaModal": "Rp88.200",
+   "rekomendasiJual": "Rp 135.000",
+   "location": "Surabaya"
+  },
+  {
+   "id": "2227",
+   "name": "Lampu Kipas Putih LED 2 in 1 Fitting E27 50W – Kipas Plafon Mini Multifungsi 360° dengan Remote Control 3 Mode Cahaya",
+   "hargaModal": "Rp81.000",
+   "rekomendasiJual": "Rp 135.000",
+   "location": "Surabaya"
+  },
+  {
+   "id": "2126",
+   "name": "Lampu Solar Jepit LED 3 Mode Tenaga Surya Sensor Gerak Outdoor Clip Lamp Taman Pagar Balkon",
+   "hargaModal": "Rp36.000",
+   "rekomendasiJual": "Rp 44.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "2127",
+   "name": "Lampu Solar Sorot 77 LED Tenaga Surya Outdoor Anti Air IP66 Sensor Gerak Remote",
+   "hargaModal": "Rp51.300",
+   "rekomendasiJual": "Rp 63.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "1708",
+   "name": "Laura Slingbag Tas Selempang Wanita | Banyak Saku | Bahan Semi Kulit Sintetis Premium",
+   "hargaModal": "Rp65.000",
+   "rekomendasiJual": "Rp 81.700",
+   "location": "Bandung"
+  },
+  {
+   "id": "2210",
+   "name": "Lem Pengganti Paku Tembok No More Nail Super kuat Perekat Dinding Ori",
+   "hargaModal": "Rp8.100",
+   "rekomendasiJual": "Rp 25.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "276",
+   "name": "Lem Perekat Serbaguna Pengganti Paku Dan Sekrup Cairan Penempel Partisi Lantai Stop Kontak Dinding Kaca Kayu Keramik Adhesive Glue No",
+   "hargaModal": "Rp4.500",
+   "rekomendasiJual": "Rp 17.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "1335",
+   "name": "Lem Transparan Anti Bocor 300gr – Waterproof Sealant dengan Kuas, Tahan Air & Isolasi Celah",
+   "hargaModal": "Rp25.650",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1258",
+   "name": "Lemme Intimate V Lotion by Jevarine 10g – Lotion Perawatan Area Kewanitaan Cerah, Halus & Wangi",
+   "hargaModal": "Rp29.250",
+   "rekomendasiJual": "Rp 40.600",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "528",
+   "name": "Lincospec 10 ml - Obat Sakit Ayam - Lincospec 200 10 ml - Obat Sakit Ayam 10 ml",
+   "hargaModal": "Rp25.200",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "1463",
+   "name": "Long Clutch Croco Tas Wanita Elegan Anti Air Fashionable – Handbag Praktis untuk Acara Formal & Santai",
+   "hargaModal": "Rp86.400",
+   "rekomendasiJual": "Rp 250.000",
+   "location": "Bogor"
+  },
+  {
+   "id": "1436",
+   "name": "Long Clutch Wanita Motif Anyam Zephyrine Tas Selempang Elegan Premium",
+   "hargaModal": "Rp144.000",
+   "rekomendasiJual": "Rp 245.000",
+   "location": "Bogor"
+  },
+  {
+   "id": "1418",
+   "name": "Lova Slingbag | Tas Selempang Mini Dan Tas Tenteng Wanita Lova Sling Bag – Bahan Nilon Cocoly Premium Longchamp Waterproof Simple Mini Anti Air",
+   "hargaModal": "Rp60.000",
+   "rekomendasiJual": "Rp 73.810",
+   "location": "Bandung"
+  },
+  {
+   "id": "311",
+   "name": "Lumbo Cold Compress Gel SALEP LUMBAR SPINE COOLING GEL PEREDA SAKIT PINGGANG LUMBAR PEREDA NYERI TULANG SENDI 20 gr",
+   "hargaModal": "Rp6.300",
+   "rekomendasiJual": "Rp 26.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "1269",
+   "name": "Lumbric Pro – Suplemen Herbal untuk Mendukung Kesehatan Pencernaan dan Daya Tahan Tubuh",
+   "hargaModal": "Rp119.203",
+   "rekomendasiJual": "Rp 156.876",
+   "location": "Madiun"
+  },
+  {
+   "id": "1120",
+   "name": "Madu Asli Multiflora 350gr dan 600gr",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "1158",
+   "name": "Madu Bawang Lanang - Madu Herbal Serbaindo",
+   "hargaModal": "Rp36.450",
+   "rekomendasiJual": "Rp 92.500",
+   "location": "Salatiga"
+  },
+  {
+   "id": "1153",
+   "name": "Madu Hitam Pahit - Madu Herbal Serbaindo",
+   "hargaModal": "Rp44.100",
+   "rekomendasiJual": "Rp 126.500",
+   "location": "Salatiga"
+  },
+  {
+   "id": "1155",
+   "name": "Madu Hutan Akasia - Madu Herbal Serbaindo",
+   "hargaModal": "Rp63.000",
+   "rekomendasiJual": "Rp 138.000",
+   "location": "Salatiga"
+  },
+  {
+   "id": "1157",
+   "name": "Madu Hutan Bawang Hitam - Madu Herbal Serbaindo",
+   "hargaModal": "Rp26.100",
+   "rekomendasiJual": "Rp 34.500",
+   "location": "Salatiga"
+  },
+  {
+   "id": "1128",
+   "name": "Madu Hutan Multiflora - Madu Herbal Serbaindo",
+   "hargaModal": "Rp90.000",
+   "rekomendasiJual": "Rp 115.000",
+   "location": "Salatiga"
+  },
+  {
+   "id": "1149",
+   "name": "Madu Kelengkeng - Madu Herbal Serbaindo",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 57.500",
+   "location": "Salatiga"
+  },
+  {
+   "id": "1151",
+   "name": "Madu Klanceng Hitam - Madu Herbal Serbaindo",
+   "hargaModal": "Rp62.100",
+   "rekomendasiJual": "Rp 111.500",
+   "location": "Salatiga"
+  },
+  {
+   "id": "1152",
+   "name": "Madu Klanceng Putih - Madu Herbal Serbaindo",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 103.500",
+   "location": "Salatiga"
+  },
+  {
+   "id": "1154",
+   "name": "Madu Lemon - Madu Herbal Serbaindo",
+   "hargaModal": "Rp45.000",
+   "rekomendasiJual": "Rp 57.500",
+   "location": "Salatiga"
+  },
+  {
+   "id": "1247",
+   "name": "MADU MENTAH - RUQIYA HONEY",
+   "hargaModal": "Rp13.500",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Di Yogyakarta"
+  },
+  {
+   "id": "1229",
+   "name": "Madu Nektar Akasia 1kg Bonus Minyak Terapi",
+   "hargaModal": "Rp66.600",
+   "rekomendasiJual": "Rp 105.000",
+   "location": "Jambi"
+  },
+  {
+   "id": "349",
+   "name": "Madu Ocean 100ml – Madu Randu Asli Boyolali | Energi Alami & Imun Booster Harian",
+   "hargaModal": "Rp24.300",
+   "rekomendasiJual": "Rp 30.000",
+   "location": "Ampel Boyolali"
+  },
+  {
+   "id": "350",
+   "name": "Madu Ocean 250ml – Madu Murni Khas Boyolali | Jaga Stamina & Daya Tahan Tubuh",
+   "hargaModal": "Rp45.000",
+   "rekomendasiJual": "Rp 60.000",
+   "location": "Ampel Boyolali"
+  },
+  {
+   "id": "351",
+   "name": "Madu Ocean 500ml – Madu Randu Asli Boyolali | Stamina, Vitalitas & Imun Tubuh Kuat",
+   "hargaModal": "Rp90.000",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Ampel Boyolali"
+  },
+  {
+   "id": "1360",
+   "name": "Madu Pro Lemon Herbal Probiotik Membantu Mengatasi Radang Amandel dan Memperkuat Sistem Imunitas Tubuh Sudah BPOM | B10 THS",
+   "hargaModal": "Rp66.705",
+   "rekomendasiJual": "Rp 79.010",
+   "location": "Madiun"
+  },
+  {
+   "id": "1150",
+   "name": "Madu Randu - Madu Herbal Serbaindo",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 57.500",
+   "location": "Salatiga"
+  },
+  {
+   "id": "1156",
+   "name": "Madu Sarcing Plus - Madu Herbal Serbaindo",
+   "hargaModal": "Rp23.400",
+   "rekomendasiJual": "Rp 30.000",
+   "location": "Salatiga"
+  },
+  {
+   "id": "1265",
+   "name": "Majakani – Suplemen Kewanitaan Herbal Probiotik",
+   "hargaModal": "Rp140.821",
+   "rekomendasiJual": "Rp 199.244",
+   "location": "Madiun"
+  },
+  {
+   "id": "2277",
+   "name": "Mangisqu Kapsul Herbal Ekstrak Kulit Manggis 30 Kapsul Original | Produk Herbal Tradisional",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "2299",
+   "name": "Manjakani Al Afiat Kapsul Herbal 30 Kapsul Ekstrak Manjakani Original",
+   "hargaModal": "Rp37.800",
+   "rekomendasiJual": "Rp 119.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1655",
+   "name": "Mary Jane Flat Shoes Calista – Flatshoes Wanita Elegan, Nyaman & Anti Slip untuk Kerja, Kuliah & Daily Use",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 80.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1420",
+   "name": "MAVE VEST - Atasan Vest Knit Rompi Kancing Sleeveless Wanita Basic",
+   "hargaModal": "Rp36.000",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Sragen"
+  },
+  {
+   "id": "539",
+   "name": "Max Centin 100 Gram - Max Centin Pemerah Telur - Pemerah Telur Xantaxenthin - Xantaxenthin 100 gr",
+   "hargaModal": "Rp30.600",
+   "rekomendasiJual": "Rp 37.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "2192",
+   "name": "Meili Nutricream Krim Untuk Menghilangkan Bekas Luka Bekas Jerawat Flek Hitam Bekas Cacar",
+   "hargaModal": "Rp27.000",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "2317",
+   "name": "Mini CCTV Wifi 1080P A9 Super Jernih - Kamera Kecil Pengintai Wifi Portabel USB 1080HD",
+   "hargaModal": "Rp36.000",
+   "rekomendasiJual": "Rp 60.000",
+   "location": "Selatan Banten"
+  },
+  {
+   "id": "2276",
+   "name": "Minyak Garlic Herbal 30 Kapsul",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1777",
+   "name": "Minyak Kemiri Bakar 100ml 1 Pcs – Perawatan Rambut Alami, Hitam, Tebal, dan Anti Rontok",
+   "hargaModal": "Rp27.900",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Klaten"
+  },
+  {
+   "id": "2270",
+   "name": "Minyak Kemiri Herbal 30ml Original | Perawatan Rambut & Kulit Kepala Dengan Minyak Kemiri",
+   "hargaModal": "Rp41.850",
+   "rekomendasiJual": "Rp 112.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1378",
+   "name": "Moist Bust Fit Cream Cazura - Krim Pembesar Payudara dan Pengencang Kulit Payudara Alami",
+   "hargaModal": "Rp29.700",
+   "rekomendasiJual": "Rp 96.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1750",
+   "name": "Morigo Herbal Propolis 10ml Suplemen Tetes Herbal Moringa Habbatussauda Minyak Zaitun Original",
+   "hargaModal": "Rp108.000",
+   "rekomendasiJual": "Rp 185.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "2178",
+   "name": "NAIL REVIVE",
+   "hargaModal": "Rp14.850",
+   "rekomendasiJual": "Rp 23.000",
+   "location": "Cirebon"
+  },
+  {
+   "id": "2228",
+   "name": "Natural Oil - Minyak Herbal Natural Pria BPOM",
+   "hargaModal": "Rp33.750",
+   "rekomendasiJual": "Rp 85.000",
+   "location": "Bekasi"
+  },
+  {
+   "id": "1997",
+   "name": "Nawasena Herbal Penggemuk Sapi & Kambing 1 Liter – Penambah Nafsu Makan & Pelengkap Nutrisi Ternak",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Sukoharjo"
+  },
+  {
+   "id": "1268",
+   "name": "Neolac Acticare – Suplemen Collagen Tripeptide + Probiotic Untuk Kesehatan Tulang & Sendi",
+   "hargaModal": "Rp89.681",
+   "rekomendasiJual": "Rp 113.364",
+   "location": "Madiun"
+  },
+  {
+   "id": "1263",
+   "name": "Neolac Suplemen Probiotik Anak Dewasa Lansia Melancarkan Pencernaan",
+   "hargaModal": "Rp73.763",
+   "rekomendasiJual": "Rp 90.462",
+   "location": "Madiun"
+  },
+  {
+   "id": "2246",
+   "name": "Nesilly Tablet Pembersih Kloset Aromaterapi / Toilet Cleaning Block Antibakteri Penghilang Bau",
+   "hargaModal": "Rp20.700",
+   "rekomendasiJual": "Rp 49.800",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "541",
+   "name": "New Fludoxan 120ml - Obat Flu Ternak - Obat Batuk Ternak - Fludoxan 120ml",
+   "hargaModal": "Rp25.200",
+   "rekomendasiJual": "Rp 32.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "2279",
+   "name": "Noni Elite Kapsul Herbal Ekstrak Mengkudu 30 Kapsul Original | Produk Herbal Tradisional",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1448",
+   "name": "Nutrisi Sayuran 500ml – Pupuk Cair Nutrisi Lengkap Untuk Sayuran Daun Lebih Hijau & Segar",
+   "hargaModal": "Rp25.650",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1083",
+   "name": "Nutrivit Cuka Apel With Mother 250ml",
+   "hargaModal": "Rp20.700",
+   "rekomendasiJual": "Rp 26.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "2282",
+   "name": "Obamig Kapsul Herbal Ekstrak Mengkudu, Daun Dewa & Pegagan 30 Kapsul",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1644",
+   "name": "OBAT GUREM 3 PCS - Pembasmi Gurem Unggas Ampuh | Anti Kutu & Gurem Ayam",
+   "hargaModal": "Rp12.600",
+   "rekomendasiJual": "Rp 18.000",
+   "location": "Sukoharjo"
+  },
+  {
+   "id": "1283",
+   "name": "Omar Smart Brain Vitamin Otak Anak dan Dewasa Meningkatkan Daya Ingat Anak",
+   "hargaModal": "Rp188.099",
+   "rekomendasiJual": "Rp 299.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "12",
+   "name": "Orthomil Susu Kambing Herbal 200g – Minuman Serbuk untuk Menjaga Kesehatan Tulang & Sendi",
+   "hargaModal": "Rp40.500",
+   "rekomendasiJual": "Rp 90.000",
+   "location": "Ngawi"
+  },
+  {
+   "id": "1701",
+   "name": "Oscar Shoulderbag Tas Bahu Wanita | Tas Selempang Medium Size | Muat Buku, Quran & Barang Harian | Bahan PU Sintetis Premium",
+   "hargaModal": "Rp75.400",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1273",
+   "name": "OTH Salama Herbal Probiotik – Membantu Meredakan Sakit Kepala, Membantu Glaukoma, Meringankan Sinusitis & Menjaga Kesehatan Mata",
+   "hargaModal": "Rp55.147",
+   "rekomendasiJual": "Rp 69.560",
+   "location": "Madiun"
+  },
+  {
+   "id": "305",
+   "name": "P13 Cooler HP Wireless Recharge | Pendingin Kuat, Ringan & Bebas Kabel",
+   "hargaModal": "Rp39.150",
+   "rekomendasiJual": "Rp 89.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "293",
+   "name": "P9 Headphone Wireless Premium – Suara Jernih, Desain Elegan, Warna Stylish!",
+   "hargaModal": "Rp38.700",
+   "rekomendasiJual": "Rp 137.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "344",
+   "name": "PAKET BUNDLE GET 5 - Lampu LED Rumah BE STECH 30 Watt",
+   "hargaModal": "Rp49.500",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Malang"
+  },
+  {
+   "id": "1404",
+   "name": "Paket Bundling Cream Lao Li Shi Wajah Glowing & Firming 2in1 Retinol Collagen Dragon Blood Untuk Mencerahkan, Melembapkan Dan Mengencangkan Kulit",
+   "hargaModal": "Rp45.000",
+   "rekomendasiJual": "Rp 147.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1289",
+   "name": "PAKET HEMAT 2IN1 Glow Home | Anti Sumbat WC & Pembersih Toilet | Atasi Saluran Air & Wastafel Mampet Cepat",
+   "hargaModal": "Rp50.850",
+   "rekomendasiJual": "Rp 73.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1780",
+   "name": "Panci Listrik 450W Multifungsi – Portable Electric Cooker | Anti Lengket | Free Centong",
+   "hargaModal": "Rp74.520",
+   "rekomendasiJual": "Rp 89.500",
+   "location": "Surabaya"
+  },
+  {
+   "id": "1778",
+   "name": "Panggangan Listrik Multifungsi | Electric Grill Non Stick 26cm | Portable BBQ Bulat",
+   "hargaModal": "Rp99.450",
+   "rekomendasiJual": "Rp 128.500",
+   "location": "Surabaya"
+  },
+  {
+   "id": "1779",
+   "name": "Panggangan Listrik Portable BBQ Pot 30 cm | Electric Grill Non Stick | Free Capitan | Panjang",
+   "hargaModal": "Rp99.450",
+   "rekomendasiJual": "Rp 128.500",
+   "location": "Surabaya"
+  },
+  {
+   "id": "2265",
+   "name": "Paranet 75% UV Block Premium Meteran",
+   "hargaModal": "Rp9.000",
+   "rekomendasiJual": "Rp 14.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1051",
+   "name": "Parfum Arabiyat Dubai Oud Al Layl Original 100ml | Parfum Arab EDP Tahan Lama Mewah Pria Wanita",
+   "hargaModal": "Rp142.200",
+   "rekomendasiJual": "Rp 190.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "422",
+   "name": "Parfum Pria Bxlgar1 Aqkva 100ML",
+   "hargaModal": "Rp53.550",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Wiyung Surabaya"
+  },
+  {
+   "id": "430",
+   "name": "Parfum Pria PR Invictus 100ml – Aroma Maskulin, Fresh & Sporty, Tahan Lama 3–6 Jam",
+   "hargaModal": "Rp63.900",
+   "rekomendasiJual": "Rp 150.000",
+   "location": "Wiyung Surabaya"
+  },
+  {
+   "id": "1438",
+   "name": "Parfum Timur Tengah Artistry by MPF – Eau De Parfum 100ml",
+   "hargaModal": "Rp405.000",
+   "rekomendasiJual": "Rp 650.000",
+   "location": "Balikpapan"
+  },
+  {
+   "id": "1442",
+   "name": "Parfum Timur Tengah Lamsat Harir by Arabiyat – Eau De Parfum 100ml",
+   "hargaModal": "Rp210.600",
+   "rekomendasiJual": "Rp 350.000",
+   "location": "Balikpapan"
+  },
+  {
+   "id": "429",
+   "name": "Parfum Unisex Red B4CCA 70ml – Aroma Sweet Woody Elegan & Menawan, Tahan Lama 3–6 Jam",
+   "hargaModal": "Rp71.010",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Wiyung Surabaya"
+  },
+  {
+   "id": "421",
+   "name": "Parfum Wanita Cahnxl 5 100ML",
+   "hargaModal": "Rp60.930",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Wiyung Surabaya"
+  },
+  {
+   "id": "424",
+   "name": "Parfum Wanita Gucci Pink Floral 100ml – Wangi Bunga Mewah & Feminin, Tahan Lama 3–6 Jam",
+   "hargaModal": "Rp65.250",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Wiyung Surabaya"
+  },
+  {
+   "id": "423",
+   "name": "Parfum Wanita Jennifer Lopez Still 100ml – Aroma Wood, Segar & Tahan Lama",
+   "hargaModal": "Rp49.950",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Wiyung Surabaya"
+  },
+  {
+   "id": "432",
+   "name": "Parfum Wanita OP1UM RED 90ml – Aroma Oriental Sweet Elegan & Memikat, Tahan Lama 3–6 Jam",
+   "hargaModal": "Rp62.820",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Wiyung Surabaya"
+  },
+  {
+   "id": "426",
+   "name": "Parfum wanita Unisex Gucci Guilty Gold 100ml – Aroma Floral Fruity Elegan & Fresh, Tahan Lama 4–7 Jam",
+   "hargaModal": "Rp67.500",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Wiyung Surabaya"
+  },
+  {
+   "id": "1050",
+   "name": "Parfum Wanita Warmkiss Midnight Rose",
+   "hargaModal": "Rp66.150",
+   "rekomendasiJual": "Rp 100.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "428",
+   "name": "Parfum Wanita ZARA Oriental 90ml – Aroma Floral Vanilla yang Hangat & Elegan, Tahan Lama 3–6 Jam",
+   "hargaModal": "Rp55.530",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Wiyung Surabaya"
+  },
+  {
+   "id": "414",
+   "name": "Parfum Y5L Wanita Premium Gold Ribbon 100ml – Aroma Elegan, Tahan Lama & Mewah",
+   "hargaModal": "Rp70.200",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Wiyung Surabaya"
+  },
+  {
+   "id": "2144",
+   "name": "Parutan & Pengiris Sayur Multifungsi 8 in 1 – Mandoline Slicer Stainless Steel Food Grade",
+   "hargaModal": "Rp28.800",
+   "rekomendasiJual": "Rp 42.500",
+   "location": "Surabaya"
+  },
+  {
+   "id": "972",
+   "name": "Pelembab Anti Jamur Silica Gell",
+   "hargaModal": "Rp18.000",
+   "rekomendasiJual": "Rp 24.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "44",
+   "name": "PELUMAS GEMUK 100gr R-46",
+   "hargaModal": "Rp13.770",
+   "rekomendasiJual": "Rp 29.000",
+   "location": "Malang"
+  },
+  {
+   "id": "45",
+   "name": "PELUMAS GEMUK 200gr R-46",
+   "hargaModal": "Rp19.710",
+   "rekomendasiJual": "Rp 42.000",
+   "location": "Malang"
+  },
+  {
+   "id": "951",
+   "name": "Pembasmi Kutu Tungau",
+   "hargaModal": "Rp22.050",
+   "rekomendasiJual": "Rp 25.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "23",
+   "name": "Pembersih Jamur Kaca Mobil 250ml – Glass Mold Cleaner Ampuh Hilangkan Jamur & Kerak Membandel",
+   "hargaModal": "Rp18.810",
+   "rekomendasiJual": "Rp 34.000",
+   "location": "Malang Jatim"
+  },
+  {
+   "id": "46",
+   "name": "PEMBERSIH JAMUR KACA R-46",
+   "hargaModal": "Rp19.710",
+   "rekomendasiJual": "Rp 34.000",
+   "location": "Malang"
+  },
+  {
+   "id": "1816",
+   "name": "Pembersih Kerak – Cairan Pembersih Kerak Kamar Mandi, Keramik, Kloset & Wastafel Ampuh Angkat Noda Membandel",
+   "hargaModal": "Rp13.500",
+   "rekomendasiJual": "Rp 59.000",
+   "location": "Semarang"
+  },
+  {
+   "id": "958",
+   "name": "Pembersih Meja",
+   "hargaModal": "Rp12.600",
+   "rekomendasiJual": "Rp 20.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "47",
+   "name": "PEMBERSIH MESIN PALING JAHAT R-46",
+   "hargaModal": "Rp22.680",
+   "rekomendasiJual": "Rp 33.900",
+   "location": "Malang"
+  },
+  {
+   "id": "961",
+   "name": "Pembersih Sepatu",
+   "hargaModal": "Rp19.350",
+   "rekomendasiJual": "Rp 25.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "960",
+   "name": "Pembersih Sofa",
+   "hargaModal": "Rp22.500",
+   "rekomendasiJual": "Rp 25.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "962",
+   "name": "Pembersih Tas",
+   "hargaModal": "Rp17.100",
+   "rekomendasiJual": "Rp 25.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "956",
+   "name": "Pembersih Wajan",
+   "hargaModal": "Rp18.900",
+   "rekomendasiJual": "Rp 25.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "977",
+   "name": "Pencerah Warna Pakaian Sodium Percarbonate",
+   "hargaModal": "Rp18.900",
+   "rekomendasiJual": "Rp 28.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "954",
+   "name": "Penghilang Bau Pipis Bayi",
+   "hargaModal": "Rp22.500",
+   "rekomendasiJual": "Rp 25.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "902",
+   "name": "Penghilang Noda Daki di Pakaian",
+   "hargaModal": "Rp15.300",
+   "rekomendasiJual": "Rp 20.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "890",
+   "name": "Penghilang Noda Darah di Pakaian",
+   "hargaModal": "Rp15.300",
+   "rekomendasiJual": "Rp 20.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "901",
+   "name": "Penghilang Noda Getah di Pakaian",
+   "hargaModal": "Rp15.300",
+   "rekomendasiJual": "Rp 20.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "891",
+   "name": "Penghilang Noda Jamur di Pakaian",
+   "hargaModal": "Rp15.300",
+   "rekomendasiJual": "Rp 20.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "892",
+   "name": "Penghilang Noda Karat di Pakaian",
+   "hargaModal": "Rp15.300",
+   "rekomendasiJual": "Rp 20.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "925",
+   "name": "Penghilang Noda Lipstik 250ml di Pakaian",
+   "hargaModal": "Rp19.800",
+   "rekomendasiJual": "Rp 30.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "893",
+   "name": "Penghilang Noda Luntur di Pakaian",
+   "hargaModal": "Rp15.300",
+   "rekomendasiJual": "Rp 20.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "926",
+   "name": "Penghilang Noda Soas Kecap 250ml di Pakaian",
+   "hargaModal": "Rp19.800",
+   "rekomendasiJual": "Rp 30.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "895",
+   "name": "Penghilang Noda Tinta di Pakaian 100ml",
+   "hargaModal": "Rp23.400",
+   "rekomendasiJual": "Rp 20.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "1556",
+   "name": "Pengusir Kucing Spray 250ml Dr. HaeChung– Aman & Efektif untuk Rumah",
+   "hargaModal": "Rp22.950",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1555",
+   "name": "Pengusir Semut & Kecoa Spray 250ml Dr. HaeChung – Formula Ampuh Lindungi Rumah & Keluarga",
+   "hargaModal": "Rp22.950",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "978",
+   "name": "Pengusir Serangga Naphtalene Ball 180gr",
+   "hargaModal": "Rp22.500",
+   "rekomendasiJual": "Rp 28.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "1447",
+   "name": "Perisai Cabai 500ml – Imun Booster Tanaman Cabai Anti Keriting & Daun Kuning",
+   "hargaModal": "Rp23.850",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1645",
+   "name": "Pinicillin 100ml Spray Perawatan Luka Kulit Hewan Ternak untuk Koreng Kudis Gatal Jamur Sapi Kambing Domba",
+   "hargaModal": "Rp16.200",
+   "rekomendasiJual": "Rp 25.000",
+   "location": "Sukoharjo"
+  },
+  {
+   "id": "2057",
+   "name": "Piyama Daster Motif Casual / Bahan Katun Adem / Baju Tidur Dress Oversize",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Jakarta Pusat"
+  },
+  {
+   "id": "1729",
+   "name": "Pocket Kombi Slingbag Tas Selempang Wanita | Sling Bag Simple Elegan Minimalis Muat HP | Bahan Sintetis Premium",
+   "hargaModal": "Rp60.000",
+   "rekomendasiJual": "Rp 73.800",
+   "location": "Bandung"
+  },
+  {
+   "id": "1370",
+   "name": "Pocket Slingbag - Tas Selempang Slingbag Wanita POCKETSling Bag Simple Desain Minimalis Bahan Motif Kombinasi",
+   "hargaModal": "Rp55.499",
+   "rekomendasiJual": "Rp 73.810",
+   "location": "Bandung"
+  },
+  {
+   "id": "540",
+   "name": "Premix Super 11 1 Kg – Suplemen Curcuma Herbal untuk Kambing, Sapi, Domba – Peningkat Pertumbuhan & Kesehatan Ternak",
+   "hargaModal": "Rp25.200",
+   "rekomendasiJual": "Rp 33.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "1259",
+   "name": "Prime Sabun Pencerah Korea 50gr Sabun Wajah dan Tubuh",
+   "hargaModal": "Rp14.850",
+   "rekomendasiJual": "Rp 33.600",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1271",
+   "name": "Pro Natur-X Shampoo Probiotik Anti Ketombe Dandruff Gatal dan Cegah Rontok",
+   "hargaModal": "Rp55.147",
+   "rekomendasiJual": "Rp 69.560",
+   "location": "Madiun"
+  },
+  {
+   "id": "1266",
+   "name": "Proca Sachet – Suplemen Herbal Probiotik Untuk Kesehatan Pencernaan",
+   "hargaModal": "Rp73.764",
+   "rekomendasiJual": "Rp 90.462",
+   "location": "Madiun"
+  },
+  {
+   "id": "1264",
+   "name": "Procaboost Kapsul Spirulina Probiotik Untuk Maag Gerd dan Meningkatkan Imunitas Tubuh Daya Tahan",
+   "hargaModal": "Rp101.999",
+   "rekomendasiJual": "Rp 136.265",
+   "location": "Madiun"
+  },
+  {
+   "id": "2298",
+   "name": "Proles Kapsul Herbal 30 Kapsul Ekstrak Daun Jati Belanda Bangle Kemuning",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1148",
+   "name": "Propolis Imunfit - Madu Herbal Serbaindo",
+   "hargaModal": "Rp85.950",
+   "rekomendasiJual": "Rp 172.500",
+   "location": "Salatiga"
+  },
+  {
+   "id": "2267",
+   "name": "PROVIDA Kapsul Herbal Daun Sirsak Propolis VCO 60 Kapsul Original | Suplemen Herbal Alami",
+   "hargaModal": "Rp42.300",
+   "rekomendasiJual": "Rp 96.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1389",
+   "name": "Pupdeo - Bubuk Ajaib Penghilang Bau Pup&Pesing Litterbox Kucing, Anabul",
+   "hargaModal": "Rp57.600",
+   "rekomendasiJual": "Rp 83.000",
+   "location": "Cilacap"
+  },
+  {
+   "id": "1456",
+   "name": "Pupdeo 1kg - Penghilang Bau Kotoran Litterbox Anabul",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 82.000",
+   "location": "Cilacap"
+  },
+  {
+   "id": "1455",
+   "name": "Pupdeo 500gr - Penghilang Bau Kotoran Litterbox Anabul",
+   "hargaModal": "Rp42.300",
+   "rekomendasiJual": "Rp 60.000",
+   "location": "Cilacap"
+  },
+  {
+   "id": "1390",
+   "name": "PUPDEO Litter Box Deodorant – Bubuk Penghilang Bau Kucing & Anabul Anti Pesing Tahan 7 Hari (160gr)",
+   "hargaModal": "Rp16.200",
+   "rekomendasiJual": "Rp 21.000",
+   "location": "Cilacap"
+  },
+  {
+   "id": "2174",
+   "name": "Pupuk Booster Tanaman Buah 250 Gram – Perangsang Bunga & Buah Lebat",
+   "hargaModal": "Rp15.750",
+   "rekomendasiJual": "Rp 49.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1359",
+   "name": "Pupuk Calsira Anti Rontok 500 Gram – Booster Kalsium untuk Buah & Bunga Tidak Mudah Gugur",
+   "hargaModal": "Rp27.450",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2166",
+   "name": "Pupuk Ipoh 1 kg Padat Penyubur Tanaman Tanah Buah Segala Jenis Tanaman",
+   "hargaModal": "Rp193.500",
+   "rekomendasiJual": "Rp 249.000",
+   "location": "Lampung Barat"
+  },
+  {
+   "id": "1358",
+   "name": "Pupuk Nutrisi Bunga 250 Gram – Booster Pembungaan & Warna Bunga Lebih Cerah",
+   "hargaModal": "Rp18.450",
+   "rekomendasiJual": "Rp 38.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "533",
+   "name": "Pupuk Organik DASSHU Z1000 LEBIH EFEKTIF - DASSHU Z1000 - Pupuk Jepang 500grm - Pupuk Organik 500GR",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 43.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "1357",
+   "name": "Pupuk Pelebat Tanaman Buah 250 Gram – Perangsang Bunga & Buah Lebat",
+   "hargaModal": "Rp15.750",
+   "rekomendasiJual": "Rp 49.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2309",
+   "name": "PURWOGRENG Kapsul Herbal 30 Kapsul Ekstrak Purwoceng Original Produk Herbal",
+   "hargaModal": "Rp38.700",
+   "rekomendasiJual": "Rp 109.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "2131",
+   "name": "Puspa Arum Dusty Pink JJ 25 Kemeja Batik Pria Lengan Panjang Modern Lapis Furing Batik Jakajaya JJ 25",
+   "hargaModal": "Rp144.900",
+   "rekomendasiJual": "Rp 225.000",
+   "location": "Sragen"
+  },
+  {
+   "id": "2303",
+   "name": "Qusthul Hindi Al Afiat Herbal 50 gram | Qusthul Hindi Original Produk Herbal",
+   "hargaModal": "Rp39.600",
+   "rekomendasiJual": "Rp 114.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "2132",
+   "name": "Raden Wicaksana JJ26 Abu Hitam – Kemeja Batik Pria Lengan Panjang Modern Lapis Furing Premium Jakajaya",
+   "hargaModal": "Rp144.900",
+   "rekomendasiJual": "Rp 225.000",
+   "location": "Sragen"
+  },
+  {
+   "id": "1640",
+   "name": "Radoc 500 Ec Cairan Pengusir Tikus Burung dan Hama Sawah untuk Tanaman Padi Area Pertanian",
+   "hargaModal": "Rp18.000",
+   "rekomendasiJual": "Rp 28.000",
+   "location": "Sukoharjo"
+  },
+  {
+   "id": "1451",
+   "name": "Ramtus Racun Tikus Ampuh Pembasmi Tikus & Mencit Sampai Tuntas Koloni",
+   "hargaModal": "Rp20.250",
+   "rekomendasiJual": "Rp 28.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "1388",
+   "name": "Ransel Cony | Tas Ransel Backpack Wanita Cony Waterproof Antiair Bahan Nilon Cocoly Premium Backpack Wanita Untuk Formal Atau Informal",
+   "hargaModal": "Rp75.500",
+   "rekomendasiJual": "Rp 105.500",
+   "location": "Bandung"
+  },
+  {
+   "id": "1392",
+   "name": "Ransel Dorothy | Tas Ransel Backpack Wanita Bordir Bahan Nilon Waterproof Antiair Dorothy Motif Bordir Banyak Saku Banyak Warna Tas Ransel Remaja Model Korea",
+   "hargaModal": "Rp76.400",
+   "rekomendasiJual": "Rp 105.500",
+   "location": "Bandung"
+  },
+  {
+   "id": "1399",
+   "name": "Ransel Elkan | Tas Ransel Wanita ELKAN Tas Backpack Wanita Waterproof Antiair Bahan Nilon Cocoly Backpack Untuk Formal Atau Informal Sekolah Maupun Acara Santai",
+   "hargaModal": "Rp75.500",
+   "rekomendasiJual": "Rp 105.500",
+   "location": "Bandung"
+  },
+  {
+   "id": "1369",
+   "name": "Ransel Gisella - Tas Ransel Backpack Wanita Gisella Muat Laptop Bahan Nilon Premium Waterproof Antiair Warna Hitam Abu Cream",
+   "hargaModal": "Rp75.500",
+   "rekomendasiJual": "Rp 105.556",
+   "location": "Bandung"
+  },
+  {
+   "id": "1400",
+   "name": "Ransel Jody | Tas Ransel Jody Tas Punggung Backpack Wanita Waterproof Antiair Bahan Nilon Cocoly Backpack Model Bordir Banyak Saku Motif Bordir Untuk Formal Atau Informal Sekolah Maupun Acara Santai",
+   "hargaModal": "Rp75.500",
+   "rekomendasiJual": "Rp 105.556",
+   "location": "Bandung"
+  },
+  {
+   "id": "500",
+   "name": "Ransel MAUDY - Tas Ransel Backpack Wanita Waterproof Bahan Nilon Simple Premium Untuk Formal Atau Informal",
+   "hargaModal": "Rp73.800",
+   "rekomendasiJual": "Rp 92.800",
+   "location": "Bandung"
+  },
+  {
+   "id": "1368",
+   "name": "Ransel Nadine - Tas Ransel Backpack Wanita Nadine Simple Elegant Bahan Nilon Premium Waterproof Antiair Warna Hitam Coklat Mocca Pink Salem",
+   "hargaModal": "Rp70.949",
+   "rekomendasiJual": "Rp 97.619",
+   "location": "Bandung"
+  },
+  {
+   "id": "2152",
+   "name": "Ransel RMINOO - Tas Ransel Backpack Wanita RMinoo Waterproof Bahan Nilon Cocoly Backpack Untuk Formal Atau Informal Sekolah Maupun Acara Santai",
+   "hargaModal": "Rp82.696",
+   "rekomendasiJual": "Rp 106.000",
+   "location": "Kota Bandung"
+  },
+  {
+   "id": "619",
+   "name": "Ransel SANSA - Tas Ransel Backpack Wanita SANSA Muat Laptop Waterproof Antiair Bahan Nilon Premium Aplikasi Bordir Double Tali",
+   "hargaModal": "Rp85.050",
+   "rekomendasiJual": "Rp 113.500",
+   "location": "Bandung"
+  },
+  {
+   "id": "1435",
+   "name": "Ransel Shafira - Tas Ransel Backpack Wanita Motif Bordir Bahan Nilon Premium Waterproof Antiair Double Tali Untuk Formal Atau Informal Sekolah Maupun Acara Santai",
+   "hargaModal": "Rp82.700",
+   "rekomendasiJual": "Rp 105.500",
+   "location": "Bandung"
+  },
+  {
+   "id": "1133",
+   "name": "Roller Pijat Wajah & Badan Batu Giok | Alat Terapi Refleksi Manual Pria Wanita – Kode 03",
+   "hargaModal": "Rp21.600",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Jakarta Pusat"
+  },
+  {
+   "id": "49",
+   "name": "RUBBING COMPOUND",
+   "hargaModal": "Rp13.500",
+   "rekomendasiJual": "Rp 34.000",
+   "location": "Malang"
+  },
+  {
+   "id": "18",
+   "name": "Rubbing Compound 100gr BA– Pengkilap & Penghapus Baret Halus Cat Mobil | FREE SPONS",
+   "hargaModal": "Rp14.400",
+   "rekomendasiJual": "Rp 34.000",
+   "location": "Sooko Mojokerto"
+  },
+  {
+   "id": "2294",
+   "name": "Rumput Mutiara Kapsul Herbal 30 Kapsul | Ekstrak Rumput Mutiara Original",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1885",
+   "name": "Sabun Cuci Tumbler – Pembersih Noda Kopi, Teh, Susu, Kerak & Bau pada Botol Minum",
+   "hargaModal": "Rp18.900",
+   "rekomendasiJual": "Rp 26.000",
+   "location": "Semarang"
+  },
+  {
+   "id": "1276",
+   "name": "Sabun Natural Probiotic Beauty Soap -Solusi Alami Untuk Menjaga Kesehatan Kulit",
+   "hargaModal": "Rp51.901",
+   "rekomendasiJual": "Rp 66.996",
+   "location": "Madiun"
+  },
+  {
+   "id": "1305",
+   "name": "Salep Ambeien / Salep Wasir - Hemorrhoid Ointment 20g",
+   "hargaModal": "Rp27.000",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1336",
+   "name": "Salep Anti Bakteri Anti Gatal Miao Jia Zu Fang 20g – Krim Herbal Atasi Gatal, Iritasi & Masalah Kulit",
+   "hargaModal": "Rp23.400",
+   "rekomendasiJual": "Rp 32.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1393",
+   "name": "Salep Anti Scabies dan Jamur Kucing Anjing Kelinci 15g Obat Kulit Anabul Gatal Kudis",
+   "hargaModal": "Rp22.500",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Cilacap"
+  },
+  {
+   "id": "1316",
+   "name": "Salep Djie Obat Sifilis Alami – Bantu Sembuhkan Infeksi Kulit & Kelamin",
+   "hargaModal": "Rp100.800",
+   "rekomendasiJual": "Rp 150.000",
+   "location": "Cilacap"
+  },
+  {
+   "id": "511",
+   "name": "Salep Wasir 20gr - Zhengtailin Sino - Rusia Hemorrhoid Cream",
+   "hargaModal": "Rp20.520",
+   "rekomendasiJual": "Rp 35.200",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2268",
+   "name": "Sambiloto Kapsul Herbal 60 Kapsul Original | Ekstrak Sambiloto Herbal Alami",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 96.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1659",
+   "name": "Sandal Flat Clara Wanita Synthetic PU Leather, Simple, Elegan & Nyaman untuk Daily Wear & Hangout",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1657",
+   "name": "Sandal Flat Wanita Aluna – Sandal Slop Kanvas Premium Elegan dengan Aksesori Berkilau untuk Daily Use",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1656",
+   "name": "Sandal Flat Wanita Aurel – Sandal Pesta Elegan Kulit Sintetis Premium Anti Slip untuk Kondangan & Acara Formal",
+   "hargaModal": "Rp78.300",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1658",
+   "name": "Sandal Flat Wanita Bella – Sandal Teplek PU Leather Elegan dengan Aksesori Mewah untuk Daily Use",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1660",
+   "name": "Sandal Flat Wanita Dela – Sandal Teplek Casual Elegan, Bahan Synthetic PU Leather, Ringan & Nyaman untuk Jalan Santai, Hangout, Daily Wear, Warna Beige & Hitam, Ukuran 37-40",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1661",
+   "name": "Sandal Flat Wanita Elora – Sandal Teplek PU Leather Elegan Non Slip untuk Jalan, Hangout & Daily Use",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1662",
+   "name": "Sandal Flat Wanita Freya – Sandal Teplek PU Leather Elegan Anti Slip untuk Daily Use",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 43.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1734",
+   "name": "Sandal Gunung Pria JOEMEN S 04 Original | Sandal Outdoor Anti Air Casual Sport Cowok Dewasa | Size 39-43",
+   "hargaModal": "Rp57.600",
+   "rekomendasiJual": "Rp 79.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "2099",
+   "name": "Sandal Gunung Pria JOEMEN S 08 New Original | Sandal Outdoor Anti Air Casual Sport Cowok Dewasa | Size 39-43",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1757",
+   "name": "Sandal Gunung Pria Joemen S26 Original Sandal Hiking Casual Anti Slip Ringan Empuk untuk Harian",
+   "hargaModal": "Rp76.500",
+   "rekomendasiJual": "Rp 100.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "2165",
+   "name": "Sandal Heels Wanita 3 cm Slip On Strap Buckle",
+   "hargaModal": "Rp48.150",
+   "rekomendasiJual": "Rp 79.000",
+   "location": "Bogor"
+  },
+  {
+   "id": "1762",
+   "name": "Sandal Jepit Pria Original Kulit Sintetis Anti Slip Casual Kekinian Ringan Empuk Harian Joemen S97",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 90.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1576",
+   "name": "Sandal Joemen S 29 NEW – Sandal Kulit Sintetis Original, Nyaman & Trendy untuk Pria Dewasa",
+   "hargaModal": "Rp62.100",
+   "rekomendasiJual": "Rp 90.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1613",
+   "name": "Sandal Karet Lentur Anti Air Pria & Wanita Joemen S 79 Kekinian Sandal Slop Slipper Casual Ringan Empuk Nyaman Anti Slip Ready Size 39-44",
+   "hargaModal": "Rp47.700",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1238",
+   "name": "Sandal Kulit Asli Dante Bahan Kulit Sendal Pria Kualitas Premium Kode F14",
+   "hargaModal": "Rp119.700",
+   "rekomendasiJual": "Rp 145.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "1587",
+   "name": "Sandal Kulit Joemen S 10 New Original 100% Sandal Pria Slop Cowok Kekinian Casual Terbaru 2026",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1584",
+   "name": "Sandal Kulit Joemen S-21 – Ringan, Anti Slip, Empuk & Nyaman untuk Pria – Model Terbaru Elegan 2026",
+   "hargaModal": "Rp62.100",
+   "rekomendasiJual": "Rp 85.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1597",
+   "name": "Sandal Kulit Pria Anti Slip Japit Joemen S 34 – Santai, Ringan, Empuk, Nyaman Dipakai",
+   "hargaModal": "Rp62.100",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "742",
+   "name": "Sandal Kulit Pria Orlando F19",
+   "hargaModal": "Rp119.698",
+   "rekomendasiJual": "Rp 145.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "765",
+   "name": "Sandal Kulit Pria Orlando F4",
+   "hargaModal": "Rp119.700",
+   "rekomendasiJual": "Rp 145.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "1575",
+   "name": "Sandal Kulit Pria S 25 Original 100% Joemen Sandal Kekinian Terbaru Casual Sendal Cowok Dewasa",
+   "hargaModal": "Rp52.200",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1286",
+   "name": "Sandal Kulit Sapi Asli Nyaman dan Trendy - F2",
+   "hargaModal": "Rp119.700",
+   "rekomendasiJual": "Rp 145.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "2167",
+   "name": "Sandal Pesta Kondangan Formal Bridesmaid 5cm Brokat - Heels 3cm",
+   "hargaModal": "Rp52.200",
+   "rekomendasiJual": "Rp 86.500",
+   "location": "Bogor"
+  },
+  {
+   "id": "2164",
+   "name": "Sandal Pesta Kondangan Formal Bridesmaid 5cm Brokat - Heels 5cm",
+   "hargaModal": "Rp43.650",
+   "rekomendasiJual": "Rp 89.000",
+   "location": "Bogor"
+  },
+  {
+   "id": "1566",
+   "name": "Sandal Pria & Wanita Original Premium, Joemen S 01 New Slipper Casual Kekinian, Ringan, Empuk & Nyaman, Cocok Jalan Santai & Outdoor",
+   "hargaModal": "Rp56.700",
+   "rekomendasiJual": "Rp 90.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1574",
+   "name": "Sandal Pria Anti Jebol Joemen S-05 – Slop Kekinian Cowok Laki-Laki Premium 2026",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1582",
+   "name": "Sandal Pria Empuk & Tahan Lama, Anti Slip Joemen S 18 , Ringan Dipakai Seharian, Casual & Outdoor, Original 100% Brand Lokal Selop Slide",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 90.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1588",
+   "name": "Sandal Pria Gunung Joemen S 12 Terbaru LIMITED EDITION Original Kekinian Anti Jebol Ringan Empuk Trendy",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1578",
+   "name": "Sandal Pria Joemen S 07 – Kulit Sintetis Original 100%, Jepit Cowok Elegan & Nyaman untuk Rumah, Kondangan, dan Slide Harian",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 85.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1579",
+   "name": "Sandal Pria Joemen S 09 Original 100% – Anti Slip, Empuk, Ringan, Tebal, Casual Santai Outdoor, Fashion Kekinian 2026",
+   "hargaModal": "Rp67.500",
+   "rekomendasiJual": "Rp 95.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1591",
+   "name": "Sandal Pria Joemen S 24 Original 100% Cowok Laki-Laki Japan Casual Style Ringan Empuk Anti Slip Trendy",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1615",
+   "name": "Sandal Pria Joemen S 81 Original 100% – Anti Air, Anti Jebol, Anti Slip, Brand Lokal Premium",
+   "hargaModal": "Rp63.000",
+   "rekomendasiJual": "Rp 95.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1583",
+   "name": "Sandal Pria Kulit Joemen S 17 ORIGINAL 100% Sandal Cowok Laki-Laki Selop Kasual Slide Kekinian 2026",
+   "hargaModal": "Rp60.300",
+   "rekomendasiJual": "Rp 80.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1589",
+   "name": "Sandal Pria Kulit Joemen S 19 Original 100% Slop Selop Slide Casual Cowok Bergaransi Anti Slip Ringan Empuk Trendy",
+   "hargaModal": "Rp60.300",
+   "rekomendasiJual": "Rp 85.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1590",
+   "name": "Sandal Pria Kulit Joemen S 20 Original 100% Jepit Kekinian Casual Dewasa Anti Slip Ringan Empuk Trendy 2026",
+   "hargaModal": "Rp60.300",
+   "rekomendasiJual": "Rp 85.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1287",
+   "name": "Sandal Pria Kulit Sapi Asli Model F12",
+   "hargaModal": "Rp119.700",
+   "rekomendasiJual": "Rp 145.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "1285",
+   "name": "Sandal Pria Kulit Sapi Asli Model F22",
+   "hargaModal": "Rp119.700",
+   "rekomendasiJual": "Rp 145.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "1288",
+   "name": "Sandal Pria Kulit Sapi Asli Model F6",
+   "hargaModal": "Rp119.700",
+   "rekomendasiJual": "Rp 145.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "1585",
+   "name": "Sandal Pria Kulit Tebal Anti Slip | Ringan Empuk Nyaman | Cocok Harian & Jalan Santai Jepit S 27 Joemen",
+   "hargaModal": "Rp60.300",
+   "rekomendasiJual": "Rp 85.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1616",
+   "name": "Sandal Pria Original Joemen S 83 Sendal Slop Dewasa Selop Cowok Karet Casual distro Terbaru Gunung",
+   "hargaModal": "Rp65.700",
+   "rekomendasiJual": "Rp 90.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1761",
+   "name": "Sandal Pria Original Kulit Sintetis Anti Slip Lentur Casual Keren Ringan Empuk Harian Joemen S76",
+   "hargaModal": "Rp49.500",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "2100",
+   "name": "Sandal Pria Original S 11 NEW Bergaransi Sendal Selop Cowok Distro Gunung Slop Outdoor Empuk Nyaman Seharian Anti Selip Karet JOEMEN",
+   "hargaModal": "Rp55.800",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1596",
+   "name": "Sandal Pria Pyhlon Joemen S 33 Kekinian Super Ringan Empuk Tebal Casual Selop Laki-Laki EVA Anti Slip",
+   "hargaModal": "Rp63.000",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1580",
+   "name": "Sandal Pria Selop Tebal Joemen S-14 Original 100% – Anti Slip, Empuk, Ringan, Casual Santai Harian & Outdoor",
+   "hargaModal": "Rp63.000",
+   "rekomendasiJual": "Rp 90.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1598",
+   "name": "Sandal Pria Slide JOEMEN S 36 NEW 2026 Original 100% Brand Lokal Slip On Casual Selop Anti Licin Ringan",
+   "hargaModal": "Rp62.100",
+   "rekomendasiJual": "Rp 90.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1609",
+   "name": "Sandal Pria Slide Joemen S 43 Original 100% Brand Lokal Slip On Anti Licin Ringan Selop Trendy Kekinian",
+   "hargaModal": "Rp63.000",
+   "rekomendasiJual": "Rp 80.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1614",
+   "name": "Sandal Pria Slide Joemen S 80 Original 100% Brand Lokal Anti Slip Sandal Selop Casual Kekinian Ringan Empuk Nyaman Untuk Kerja Kuliah & Santai",
+   "hargaModal": "Rp63.000",
+   "rekomendasiJual": "Rp 90.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1617",
+   "name": "Sandal Pria Slide Joemen S 87 Original 100% Brand Lokal Anti Slip Sandal Selop Casual Trendy Ringan Empuk Nyaman Untuk Kerja Kuliah & Hangout",
+   "hargaModal": "Rp72.000",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1618",
+   "name": "Sandal Pria Slide Joemen S 88 Original 100% Brand Lokal Slip on Sendal Anti Licin Ringan Cowok Selop",
+   "hargaModal": "Rp73.800",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1586",
+   "name": "Sandal Pria Tebal Anti Slip Nyaman Empuk | Model Terbaru 2026 | Casual Santai Outdoor Joemen S-30",
+   "hargaModal": "Rp67.500",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1567",
+   "name": "Sandal Pria Wanita Original 100% Sendal Cowok Cewek Slide Laki Laki Distro Selop Slop S-02 NEW",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 90.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1608",
+   "name": "Sandal Selop Kulit Pria Joemen S 52 Original 100% Anti Putus Anti Air Ringan Empuk Casual Trendy",
+   "hargaModal": "Rp52.200",
+   "rekomendasiJual": "Rp 78.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "2168",
+   "name": "Sandal Selop Pesta Kondangan Pengantin Brokat - Heels 5cm",
+   "hargaModal": "Rp44.550",
+   "rekomendasiJual": "Rp 85.500",
+   "location": "Bogor"
+  },
+  {
+   "id": "1577",
+   "name": "Sandal Selop Pria ANTI AIR ANTI JEBOL S 06 Original Brand Lokal Anti Slip Sendal Laki Laki Dewasa",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1607",
+   "name": "Sandal Selop Pria Joemen S 39 Original 100% Anti Putus Anti Slip Ringan Empuk Casual Trendy",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1756",
+   "name": "Sandal Selop Pria Joemen S15 Original Sendal Slide Casual Anti Slip Ringan Empuk untuk Harian",
+   "hargaModal": "Rp67.500",
+   "rekomendasiJual": "Rp 95.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1610",
+   "name": "Sandal Selop Pria Kulit S 57 New Original Brand Lokal Anti Slip Empuk Nyaman Trendy Cowok",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 90.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1612",
+   "name": "Sandal Selop Pria Kulit S 61 New Original 100% Brand Lokal Casual Santai Empuk Nyaman Anti Slip Trendy Terbaru 2024",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 90.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1599",
+   "name": "Sandal Slide Pria JOEMEN S 38 Terbaru 2026 Anti Slip Flat Slipper Casual Dewasa Original 100% Brand Lokal",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 92.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1758",
+   "name": "Sandal Slip On Pria Wanita Dewasa Kekinian Sendal Selop EVA Tebal Empuk JOEMEN S 28 NEW",
+   "hargaModal": "Rp67.500",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1766",
+   "name": "Sandal Slop Formal Casual Pria Wanita Suede Gesper Anti Slip Ringan Empuk Joemen S77",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1395",
+   "name": "Sari Lemon 500ml Murni Lemon California",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "1398",
+   "name": "Sari Lemon Original 250ml - Diet Detoks Original California",
+   "hargaModal": "Rp26.100",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "378",
+   "name": "Sarung Dewasa Motif Batik Hitam Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "377",
+   "name": "Sarung Dewasa Motif Batik Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "392",
+   "name": "Sarung Dewasa Motif Batik Kekinian Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "386",
+   "name": "Sarung Dewasa Motif Batik Palaikat Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "388",
+   "name": "Sarung Dewasa Motif Batik Pekalongan Hijau Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "383",
+   "name": "Sarung Dewasa Motif Batik Pekalongan Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "393",
+   "name": "Sarung Dewasa Motif Batik Pekalongan Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "391",
+   "name": "Sarung Dewasa Motif Batik Saleman Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "387",
+   "name": "Sarung Dewasa Motif Batik Sekar Jagad Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "404",
+   "name": "Sarung Dewasa Motif Merak Abu Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "403",
+   "name": "Sarung Dewasa Motif Pekalongan Hitam Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "380",
+   "name": "Sarung Dewasa Motif Sarwon Abu-Abu Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "376",
+   "name": "Sarung Dewasa Motif Sarwon Hijau Botol Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "375",
+   "name": "Sarung Dewasa Motif Sarwon Hitam Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "381",
+   "name": "Sarung Dewasa Motif Sarwon Krem Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "379",
+   "name": "Sarung Dewasa Motif Sarwon Navy Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "374",
+   "name": "Sarung Dewasa Motif Sarwon Putih Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "382",
+   "name": "Sarung Dewasa Motif Wayang Kain Polymicro Tembus",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 70.000",
+   "location": "Kab Pekalongan"
+  },
+  {
+   "id": "1000",
+   "name": "SARUNG INSTAN ANAK MOTIF SARWON L-XL (COKSU)",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "996",
+   "name": "SARUNG INSTAN ANAK MOTIF SARWON L-XL (HITAM)",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1002",
+   "name": "SARUNG INSTAN ANAK MOTIF SARWON L-XL (JOTOL)",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1004",
+   "name": "SARUNG INSTAN ANAK MOTIF SARWON L-XL (PUTIH)",
+   "hargaModal": "Rp33.300",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "999",
+   "name": "SARUNG INSTAN ANAK MOTIF SARWON S-M (COKSU)",
+   "hargaModal": "Rp29.700",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "995",
+   "name": "SARUNG INSTAN ANAK MOTIF SARWON S-M (HITAM)",
+   "hargaModal": "Rp29.700",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1001",
+   "name": "SARUNG INSTAN ANAK MOTIF SARWON S-M (JOTOL)",
+   "hargaModal": "Rp29.700",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1003",
+   "name": "SARUNG INSTAN ANAK MOTIF SARWON S-M (PUTIH)",
+   "hargaModal": "Rp29.700",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "405",
+   "name": "Sarung Instan Dewasa Motif Aceh Kain Polymicro",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "406",
+   "name": "Sarung Instan Dewasa Motif Palaikat Kain Polymicro",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "407",
+   "name": "Sarung Instan Dewasa Motif Palaikat Kain Polymicro",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "408",
+   "name": "Sarung Instan Dewasa Motif Palaikat Kain Polymicro",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "409",
+   "name": "Sarung Instan Dewasa Motif Palaikat Kain Polymicro",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "412",
+   "name": "Sarung Instan Dewasa Motif Sarwon Kain Polymicro",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "410",
+   "name": "Sarung Instan Dewasa Motif Sarwon Kain Polymicro",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "413",
+   "name": "Sarung Instan Dewasa Motif Sarwon Kain Polymicro",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "411",
+   "name": "Sarung Instan Dewasa Motif Sarwon Kain Polymicro",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 75.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1249",
+   "name": "Sarung Premium Collection – Bonus Free Sajadah Premium",
+   "hargaModal": "Rp47.250",
+   "rekomendasiJual": "Rp 89.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "2186",
+   "name": "SCENTNICE BLACK SERIES",
+   "hargaModal": "Rp72.000",
+   "rekomendasiJual": "Rp 95.000",
+   "location": "Cirebon"
+  },
+  {
+   "id": "2179",
+   "name": "SCENTNICE HAIR TONIC",
+   "hargaModal": "Rp13.500",
+   "rekomendasiJual": "Rp 19.900",
+   "location": "Cirebon"
+  },
+  {
+   "id": "2185",
+   "name": "Scentnice Signature Series",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 60.000",
+   "location": "Cirebon"
+  },
+  {
+   "id": "2291",
+   "name": "Sekar Slim Kapsul Herbal 30 Kapsul Ekstrak Daun Jati Belanda Daun Kemuning",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1666",
+   "name": "Selena Slingbag Wanita Original 2026 – Tas Selempang Minimalis Modis, Bahan Sintesis Premium, Aksesoris Anti Karat, Ring Adjustable",
+   "hargaModal": "Rp60.900",
+   "rekomendasiJual": "Rp 73.900",
+   "location": "Bandung"
+  },
+  {
+   "id": "50",
+   "name": "SEMIR BAN 1L R-46",
+   "hargaModal": "Rp19.710",
+   "rekomendasiJual": "Rp 24.900",
+   "location": "Malang"
+  },
+  {
+   "id": "21",
+   "name": "Semir Ban Mobil & Motor BA 1000ml | Kilap Basah, Anti Retak & Tahan Air",
+   "hargaModal": "Rp18.810",
+   "rekomendasiJual": "Rp 24.900",
+   "location": "Malang Jatim"
+  },
+  {
+   "id": "51",
+   "name": "SEMIR BAN PREMIUM 1L R-46",
+   "hargaModal": "Rp23.670",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Malang"
+  },
+  {
+   "id": "1246",
+   "name": "Sepatu Boot Slip On Pendek Pria Kulit Sapi Stylist dan Trendi - GR04",
+   "hargaModal": "Rp206.100",
+   "rekomendasiJual": "Rp 350.000",
+   "location": "Kab Jombang"
+  },
+  {
+   "id": "1601",
+   "name": "Sepatu Boots Pria Tinggi Joemen J 47 Original 100% Kerja Proyek Outdoor Anti Slip Empuk Anti Jebol",
+   "hargaModal": "Rp108.000",
+   "rekomendasiJual": "Rp 160.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "739",
+   "name": "Sepatu Docmart Kulit Sapi",
+   "hargaModal": "Rp196.200",
+   "rekomendasiJual": "Rp 250.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "1626",
+   "name": "Sepatu Futsal Pria JOEMEN J 69 – Sneakers Olahraga Indoor & Outdoor, Ringan, Empuk, Anti Slip, Original 100%",
+   "hargaModal": "Rp85.500",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1623",
+   "name": "Sepatu Hiking Gunung Pria Joemen J 66 Original 100% Sneakers Outdoor Anti Air Casual & Trekking Shoes",
+   "hargaModal": "Rp85.500",
+   "rekomendasiJual": "Rp 149.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1630",
+   "name": "Sepatu Kerja Pria Joemen J 75 – Slip On Kulit Sintetis Premium, Anti Slip, Empuk & Nyaman, Casual & Formal, Ready Size 39–43",
+   "hargaModal": "Rp94.500",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "740",
+   "name": "Sepatu Kulit Formal Pria – Pantofel Hitam Elegan, Casual Cocok Kantor & Kondangan Kode AM7",
+   "hargaModal": "Rp196.200",
+   "rekomendasiJual": "Rp 240.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "743",
+   "name": "Sepatu Kulit Pantofel RE 02",
+   "hargaModal": "Rp182.700",
+   "rekomendasiJual": "Rp 215.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "1763",
+   "name": "Sepatu Kulit Pria Original Casual Kerja Kantor Proyek Anti Slip Ringan Empuk Joemen J41",
+   "hargaModal": "Rp108.000",
+   "rekomendasiJual": "Rp 160.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "741",
+   "name": "Sepatu Kulit Pria Orlando CLS 6 – Sneakers Casual Formal Kulit Sapi Full Upper untuk Kerja, Sekolah & Harian",
+   "hargaModal": "Rp200.700",
+   "rekomendasiJual": "Rp 245.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "738",
+   "name": "Sepatu Pantofel Pria Formal Kulit Asli Hand Made Model GUSTAVO Tali",
+   "hargaModal": "Rp182.700",
+   "rekomendasiJual": "Rp 225.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "1620",
+   "name": "Sepatu Pria & Wanita Joemen J 62 Sneakers Running Olahraga Casual Empuk Super Ringan Anti Slip Original 100% Brand Lokal",
+   "hargaModal": "Rp81.000",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1624",
+   "name": "Sepatu Pria & Wanita Joemen J 67 NEW – Sneakers Casual, Formal & Hangout Original 100%, Ringan & Anti Slip",
+   "hargaModal": "Rp108.000",
+   "rekomendasiJual": "Rp 149.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1631",
+   "name": "Sepatu Pria Boots Joemen J 84 – Original Kulit Sintetis Premium, Casual & Formal",
+   "hargaModal": "Rp99.000",
+   "rekomendasiJual": "Rp 160.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1603",
+   "name": "Sepatu Pria Casual Kulit Sintetis Cokelat JOEMEN J 35 – Kerja, Kuliah & Semi Formal",
+   "hargaModal": "Rp81.000",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1629",
+   "name": "Sepatu Pria dan Wanita Joemen J 74 Original 100% – Sepatu Running, Olahraga, Casual, Fashion Kekinian, Nyaman Dipakai Seharian, Ringan & Anti Slip",
+   "hargaModal": "Rp94.500",
+   "rekomendasiJual": "Rp 149.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1602",
+   "name": "Sepatu Pria Kerja Slip On Joemen J 21 – Kulit Sintetis Mengkilap, Nyaman, Anti Slip, Premium & Trendy",
+   "hargaModal": "Rp94.500",
+   "rekomendasiJual": "Rp 150.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1619",
+   "name": "Sepatu Pria Kerja Slip On Joemen J 28 Original 100% Brand Lokal Kulit Sintetis Anti Slip Empuk Super Nyaman Bisa COD",
+   "hargaModal": "Rp94.500",
+   "rekomendasiJual": "Rp 150.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1605",
+   "name": "Sepatu Pria Kulit Slip On Joemen J 54 Original 100% Sepatu Kerja Kantor Casual Anti Slip Nyaman",
+   "hargaModal": "Rp108.000",
+   "rekomendasiJual": "Rp 150.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1625",
+   "name": "Sepatu Pria Olahraga JOEMEN J 68 NEW – Sneakers Futsal Sepakbola Running, Indoor & Outdoor, Anti Slip, Empuk, Original 100%",
+   "hargaModal": "Rp85.500",
+   "rekomendasiJual": "Rp 130.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1606",
+   "name": "Sepatu Pria Running Joemen J 58 Original 100% Sneakers Olahraga Ringan Anti Slip Nyaman Casual",
+   "hargaModal": "Rp90.000",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1595",
+   "name": "Sepatu Pria Slip On Joemen J 40 – Sepatu Kerja Kulit Pria Empuk, Nyaman, Anti Slip, Ready Size 39-43",
+   "hargaModal": "Rp101.700",
+   "rekomendasiJual": "Rp 150.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1628",
+   "name": "Sepatu Pria Sneakers Joemen J 72 Sepatu Sneakers Casual Pria Wanita Terbaru Kekinian",
+   "hargaModal": "Rp112.500",
+   "rekomendasiJual": "Rp 145.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1634",
+   "name": "Sepatu Safety Pria Joemen J 94 – Ujung Besi Asli, Kulit Sintetis Premium, Anti Slip, Sepatu Kerja Lapangan & Proyek Brand Lokal",
+   "hargaModal": "Rp112.500",
+   "rekomendasiJual": "Rp 180.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1622",
+   "name": "Sepatu Slip On Pria Wanita Joemen J 64 Original 100% Casual & Formal Hangout Ringan Empuk Anti Slip",
+   "hargaModal": "Rp103.500",
+   "rekomendasiJual": "Rp 150.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1764",
+   "name": "Sepatu Sneakers Full Hitam Unisex Original Nylon Mesh Anti Slip untuk Sekolah Kerja dan Harian Joemen J87",
+   "hargaModal": "Rp108.000",
+   "rekomendasiJual": "Rp 140.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1765",
+   "name": "Sepatu Sneakers Olahraga Pria Original Nylon Mesh Ringan Empuk Anti Slip Casual Harian Joemen J97",
+   "hargaModal": "Rp103.500",
+   "rekomendasiJual": "Rp 140.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1236",
+   "name": "Sepatu Sneakers Pria - Kulit Asli Original Tali Klasik Premium CLS5",
+   "hargaModal": "Rp205.200",
+   "rekomendasiJual": "Rp 235.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "1627",
+   "name": "Sepatu Sneakers Pria & Wanita Joemen J 71 Original 100% – Casual, Trendy, Fashion Hangout, OOTD, Ringan, Empuk, Nyaman, Anti Slip",
+   "hargaModal": "Rp130.500",
+   "rekomendasiJual": "Rp 165.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1635",
+   "name": "Sepatu Sneakers Pria & Wanita Joemen J 95 Unisex Original 100% – Casual, Fashion Terbaru, Ringan, Empuk, Anti Slip, Brand Lokal",
+   "hargaModal": "Rp103.500",
+   "rekomendasiJual": "Rp 130.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1636",
+   "name": "Sepatu Sneakers Pria & Wanita Joemen J 97 Original 100% – Brand Lokal, Sporty, Ringan, Empuk, Anti Slip, Casual & Hangout, Fashionable Terbaru",
+   "hargaModal": "Rp108.000",
+   "rekomendasiJual": "Rp 140.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1600",
+   "name": "Sepatu Sneakers Pria Joemen J 46 New Original 100% Sepatu Sekolah & Sport Lokal Pria Terbaru Trendy Anti Slip",
+   "hargaModal": "Rp112.500",
+   "rekomendasiJual": "Rp 156.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1604",
+   "name": "Sepatu Sneakers Pria Joemen J 49 Original 100% Casual Sporty Ringan Empuk Anti Slip – Sepatu Olahraga Kekinian",
+   "hargaModal": "Rp90.000",
+   "rekomendasiJual": "Rp 149.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1621",
+   "name": "Sepatu Sneakers Pria Joemen J 63 Original 100% Casual Sport Fashion Kerja Sekolah Kantor Empuk Anti Slip",
+   "hargaModal": "Rp94.500",
+   "rekomendasiJual": "Rp 125.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1633",
+   "name": "Sepatu Sneakers Pria Joemen J 92 – Casual Olahraga Santai, Ringan & Empuk, Original 100% Brand Lokal",
+   "hargaModal": "Rp108.000",
+   "rekomendasiJual": "Rp 140.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1638",
+   "name": "Sepatu Sneakers Pria Joemen J 99 Original 100% – Sepatu Sport, Casual & Trendy, Ringan Empuk Anti Slip, Brand Lokal",
+   "hargaModal": "Rp103.500",
+   "rekomendasiJual": "Rp 140.000",
+   "location": "Mojokerto"
+  },
+  {
+   "id": "1475",
+   "name": "Set Anak Big Cat Series – Pakaian Anak Laki-Laki & Perempuan Usia 1–9 Tahun, Cotton Premium, Nyaman & Aman, Dengan Sertifikasi SNI & Oeko-Tex Kennai Set Anak Big Cat Series adalah set pakaian anak",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 74.400",
+   "location": "Bandung"
+  },
+  {
+   "id": "1519",
+   "name": "Set Anak Birdy Series Usia 1-12 Tahun – Kaos & Celana Anak Laki-Laki & Perempuan, Cotton Combed 24s",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 74.400",
+   "location": "Bandung"
+  },
+  {
+   "id": "1485",
+   "name": "Set Anak Boy Series Usia 1–9 Tahun – Cotton Combed 24s Premium SNI",
+   "hargaModal": "Rp58.500",
+   "rekomendasiJual": "Rp 74.400",
+   "location": "Bandung"
+  },
+  {
+   "id": "1511",
+   "name": "Set Kaos Anak Lengan Pendek Cutie Cat Series 3 – Kaos Anak Laki-laki & Perempuan Usia 3-12 Tahun Cotton Combed 24s",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 74.400",
+   "location": "Bandung"
+  },
+  {
+   "id": "1483",
+   "name": "Set Kaos Anak Lengan Pendek WHITE CAT ZEBRA 1-13 Tahun Cotton Combed 24s",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 74.400",
+   "location": "Bandung"
+  },
+  {
+   "id": "1136",
+   "name": "Set Perhiasan Anak Motif Hello Kitty/Kelinci/Unicorn | Kalung Gelang Anting Cincin Titanium Steel",
+   "hargaModal": "Rp27.000",
+   "rekomendasiJual": "Rp 34.000",
+   "location": "Jakarta Pusat"
+  },
+  {
+   "id": "1480",
+   "name": "SET Piyama Anak Long Basic – Setelan Tidur Laki-Laki & Perempuan Unisex Bahan Cotton Premium 155-185 GSM, All Size Usia 1–12 Tahun NV-1",
+   "hargaModal": "Rp68.400",
+   "rekomendasiJual": "Rp 82.755",
+   "location": "Bandung"
+  },
+  {
+   "id": "491",
+   "name": "Set SARKO – Sarung & Baju Koko Motif Batik Kobata (Dewasa) Biru Navy",
+   "hargaModal": "Rp67.500",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "492",
+   "name": "Set SARKO – Sarung & Baju Koko Motif Batik Kobata (Dewasa) Coksu",
+   "hargaModal": "Rp67.500",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "495",
+   "name": "Set SARKO – Sarung & Baju Koko Motif Batik Kobata (Dewasa) Hitam",
+   "hargaModal": "Rp67.500",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "494",
+   "name": "Set SARKO – Sarung & Baju Koko Motif Batik Kobata (Dewasa) Putih",
+   "hargaModal": "Rp67.500",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "493",
+   "name": "Set SARKO – Sarung & Baju Koko Motif Batik Kobata (Dewasa) Putih-Hitam",
+   "hargaModal": "Rp67.500",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Pekalongan"
+  },
+  {
+   "id": "1492",
+   "name": "Setelan Anak Face Cute Animal Usia 1–2 Tahun – Baju Anak Laki-Laki & Perempuan Premium SNI",
+   "hargaModal": "Rp60.300",
+   "rekomendasiJual": "Rp 74.400",
+   "location": "Bandung"
+  },
+  {
+   "id": "1537",
+   "name": "Setelan Anak Pendek Laki-Laki & Perempuan | Oneset Motif Hewan Africa Cute Usia 1-12 Tahun – Nyaman, Stylish, Serbaguna",
+   "hargaModal": "Rp55.800",
+   "rekomendasiJual": "Rp 89.100",
+   "location": "Bandung"
+  },
+  {
+   "id": "1533",
+   "name": "Setelan Ellie Onset Anak Perempuan Series Unicorn Usia 1-12 Tahun – Motif Unicorn & Bunga Pastel, Lembut & Nyaman",
+   "hargaModal": "Rp63.000",
+   "rekomendasiJual": "Rp 80.900",
+   "location": "Bandung"
+  },
+  {
+   "id": "1536",
+   "name": "Setelan Jumba Onset Anak Perempuan & Laki Laki Series Africa Cute Usia 1-12 Tahun",
+   "hargaModal": "Rp62.100",
+   "rekomendasiJual": "Rp 89.100",
+   "location": "Bandung"
+  },
+  {
+   "id": "1542",
+   "name": "Setelan Jumba Onset Anak Perempuan & Laki Laki Series Cute Head Animal Usia 1-12 Tahun",
+   "hargaModal": "Rp62.100",
+   "rekomendasiJual": "Rp 89.100",
+   "location": "Bandung"
+  },
+  {
+   "id": "1534",
+   "name": "Setelan Jumba Onset Anak Perempuan & Laki Laki Series Shark In Sea Usia 1-12 Tahun",
+   "hargaModal": "Rp63.000",
+   "rekomendasiJual": "Rp 89.100",
+   "location": "Bandung"
+  },
+  {
+   "id": "1477",
+   "name": "Setelan Kaos Polos 2 Anak Usia 1–12 Tahun – Cotton Combed 24s Premium, Nyaman & Aman Untuk Anak Laki-Laki & Perempuan",
+   "hargaModal": "Rp52.200",
+   "rekomendasiJual": "Rp 65.500",
+   "location": "Bandung"
+  },
+  {
+   "id": "1510",
+   "name": "Setelan Long Sleeve Raglan Anak Dino Series – Kaos Anak Laki-laki & Perempuan 1-9 Tahun Cotton Combed 24s",
+   "hargaModal": "Rp66.600",
+   "rekomendasiJual": "Rp 98.900",
+   "location": "Bandung"
+  },
+  {
+   "id": "1496",
+   "name": "Setelan Long Sleeve Raglan Animal Kawai Series Usia 1–12 Tahun – Cotton Premium Lembut & Nyaman",
+   "hargaModal": "Rp70.200",
+   "rekomendasiJual": "Rp 98.900",
+   "location": "Bandung"
+  },
+  {
+   "id": "52",
+   "name": "SHAMPO MOBIL R-46",
+   "hargaModal": "Rp14.670",
+   "rekomendasiJual": "Rp 25.000",
+   "location": "Malang"
+  },
+  {
+   "id": "24",
+   "name": "Shampoo UltraFoam Mobil & Motor BA 1000ml - Busa Melimpah, Tidak Merusak Cat, Aman & Wangi",
+   "hargaModal": "Rp13.500",
+   "rekomendasiJual": "Rp 25.000",
+   "location": "Malang"
+  },
+  {
+   "id": "1376",
+   "name": "Shirin Waistbag | Tas Pinggang Dan Selempang Half Monn Waistbag Dan Slingbag Unisex Simple Casual Bahan Crinckle",
+   "hargaModal": "Rp55.500",
+   "rekomendasiJual": "Rp 73.810",
+   "location": "Bandung"
+  },
+  {
+   "id": "1107",
+   "name": "Shoe Clean Shoe Parfume 60ml – pengharum sepatu anti bau dan tahan lama",
+   "hargaModal": "Rp14.850",
+   "rekomendasiJual": "Rp 18.000",
+   "location": "Gedangan Sidoarjo"
+  },
+  {
+   "id": "29",
+   "name": "Shoes Cleaner 100ml – Pembersih Sepatu Aman untuk Kulit, Suede, Kanvas, Mesh, dan Bahan Sintetis",
+   "hargaModal": "Rp24.300",
+   "rekomendasiJual": "Rp 42.000",
+   "location": "Malang Jatim"
+  },
+  {
+   "id": "53",
+   "name": "SHOES CLEANER R-46",
+   "hargaModal": "Rp26.100",
+   "rekomendasiJual": "Rp 42.000",
+   "location": "Malang"
+  },
+  {
+   "id": "757",
+   "name": "SIDOARJO Detergen Khusus",
+   "hargaModal": "Rp14.400",
+   "rekomendasiJual": "Rp 20.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "2306",
+   "name": "Sirsaqu Sirsak Herbal Capsule 30 Kapsul | Ekstrak Daun Sirsak Antioksidan Alami",
+   "hargaModal": "Rp37.800",
+   "rekomendasiJual": "Rp 109.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1131",
+   "name": "Sisir Pijat Meridian Kayu Cendana | Sisir Rambut & Guasha Wajah Leher",
+   "hargaModal": "Rp21.600",
+   "rekomendasiJual": "Rp 40.000",
+   "location": "Jakarta Pusat"
+  },
+  {
+   "id": "1437",
+   "name": "Sling Zephyrine Tas Selempang Unisex Simpel Elegan",
+   "hargaModal": "Rp54.000",
+   "rekomendasiJual": "Rp 125.000",
+   "location": "Bogor"
+  },
+  {
+   "id": "2314",
+   "name": "Snap On Smile – Mouthwash Antibacterial Rasa Green Apple - Obat Kumur Anti Bacterial Segar Bersih dan Percaya Diri BPOM",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Selatan Banten"
+  },
+  {
+   "id": "2313",
+   "name": "Snap On Smile Gigi Palsu Veneer Instan | Pelindung Gigi Lepas Pasang Model Atas dan Bawah Snap On Smile",
+   "hargaModal": "Rp10.800",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Selatan Banten"
+  },
+  {
+   "id": "2315",
+   "name": "Snap On Smile Toothpaste Pasta Gigi Dengan Formula Alami & Menyegarkan Nafas 100 Gram - Perlindungan Ganda Terhadap Gigi",
+   "hargaModal": "Rp42.300",
+   "rekomendasiJual": "Rp 86.000",
+   "location": "Selatan Banten"
+  },
+  {
+   "id": "1237",
+   "name": "Sneakers Boots Sepatu Pria Kulit Asli Sapi CLS7",
+   "hargaModal": "Rp211.500",
+   "rekomendasiJual": "Rp 255.000",
+   "location": "Kab Jombang"
+  },
+  {
+   "id": "1242",
+   "name": "Sneakers Klasik CLS9 Kulit Sapi Pria Dewasa Trendy dan Stylish",
+   "hargaModal": "Rp205.200",
+   "rekomendasiJual": "Rp 235.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "1054",
+   "name": "So Easy Pembersih Mesin Cuci 2PCS – Ampuh Hilangkan Kotoran, Kerak & Bau Tak Sedap, Sisa Deterjen Bersih Maksimal",
+   "hargaModal": "Rp16.650",
+   "rekomendasiJual": "Rp 24.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "970",
+   "name": "Sodium Bicarbonate Pemutih Pakaian Kusam",
+   "hargaModal": "Rp14.400",
+   "rekomendasiJual": "Rp 20.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "969",
+   "name": "Sodium Chloride Penghilang Noda Luntur",
+   "hargaModal": "Rp13.500",
+   "rekomendasiJual": "Rp 20.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "1726",
+   "name": "Solar Boros? Ini Solusinya! - GP Fuel Cleaner Additive 250ml | Injector Safety Fluid | Additive Solar Mobil Diesel Common Rail & Euro",
+   "hargaModal": "Rp103.500",
+   "rekomendasiJual": "Rp 130.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "2229",
+   "name": "Solvera Warm Soothing Cream - Krim Gel Hangat Atasi Nyeri Otot",
+   "hargaModal": "Rp31.500",
+   "rekomendasiJual": "Rp 89.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1397",
+   "name": "Soy Bean Milk Powder 1Kg Susu Kacang Kedelai Bubuk Murni Tinggi Protein Nabati",
+   "hargaModal": "Rp89.100",
+   "rekomendasiJual": "Rp 100.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "1396",
+   "name": "Soy Bean Milk Powder 200gr Susu Kacang Kedelai Bubuk Murni Tinggi Protein Nabati",
+   "hargaModal": "Rp28.800",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Sidoarjo"
+  },
+  {
+   "id": "308",
+   "name": "Spare Part Cadangan Gameboy Player Retro Mini 400 in 1 SUP Kabel Av / Batre BL 5C / Stick Gameboy hk",
+   "hargaModal": "Rp19.350",
+   "rekomendasiJual": "Rp 54.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "334",
+   "name": "Speaker Allure Super Bass Mini Portable Hi-fi Speaker Bluetooth Allure Wireless Speaker Simple Gift 360 degree Sound Changing Color",
+   "hargaModal": "Rp49.500",
+   "rekomendasiJual": "Rp 94.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "467",
+   "name": "Sprei Aesthetic Kekinian – Bahan Halus, Adem UK 120x200x20cm",
+   "hargaModal": "Rp64.800",
+   "rekomendasiJual": "Rp 100.000",
+   "location": "Jawa Tengah"
+  },
+  {
+   "id": "468",
+   "name": "Sprei Aesthetic Kekinian – Bahan Halus, Adem UK 160x200x20cm",
+   "hargaModal": "Rp81.000",
+   "rekomendasiJual": "Rp 110.000",
+   "location": "Jawa Tengah"
+  },
+  {
+   "id": "469",
+   "name": "Sprei Aesthetic Kekinian – Bahan Halus, Adem UK 180x200x20cm",
+   "hargaModal": "Rp83.700",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Jawa Tengah"
+  },
+  {
+   "id": "470",
+   "name": "Sprei Batik Jadul Pekalongan – Bahan Halus, Adem UK 120x200x20cm",
+   "hargaModal": "Rp64.800",
+   "rekomendasiJual": "Rp 100.000",
+   "location": "Jawa Tengah"
+  },
+  {
+   "id": "471",
+   "name": "Sprei Batik Jadul Pekalongan – Bahan Halus, Adem UK 160x200x20cm",
+   "hargaModal": "Rp76.140",
+   "rekomendasiJual": "Rp 110.000",
+   "location": "Jawa Tengah"
+  },
+  {
+   "id": "472",
+   "name": "Sprei Batik Jadul Pekalongan – Bahan Halus, Adem UK 180x200x20cm",
+   "hargaModal": "Rp89.100",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Jawa Tengah"
+  },
+  {
+   "id": "1302",
+   "name": "Sprei Jadul Jumput – Bahan Halus, Adem UK 140x200x20cm",
+   "hargaModal": "Rp67.500",
+   "rekomendasiJual": "Rp 105.000",
+   "location": "Jawa Tengah"
+  },
+  {
+   "id": "1300",
+   "name": "Sprei Jadul Jumput – Bahan Halus, Adem UK 140x200x30cm",
+   "hargaModal": "Rp86.400",
+   "rekomendasiJual": "Rp 115.000",
+   "location": "Jawa Tengah"
+  },
+  {
+   "id": "1298",
+   "name": "Sprei Jadul Jumput – Bahan Halus, Adem UK 160x200x30cm",
+   "hargaModal": "Rp87.300",
+   "rekomendasiJual": "Rp 120.000",
+   "location": "Jawa Tengah"
+  },
+  {
+   "id": "1299",
+   "name": "Sprei Jadul Jumput – Bahan Halus, Adem UK 180x200x30cm",
+   "hargaModal": "Rp89.100",
+   "rekomendasiJual": "Rp 130.000",
+   "location": "Jawa Tengah"
+  },
+  {
+   "id": "1303",
+   "name": "Sprei Jadul Jumput – Bahan Halus, Adem UK 200x200x20cm",
+   "hargaModal": "Rp85.500",
+   "rekomendasiJual": "Rp 130.000",
+   "location": "Jawa Tengah"
+  },
+  {
+   "id": "1301",
+   "name": "Sprei Jadul Jumput – Bahan Halus, Adem UK 200x200x30cm",
+   "hargaModal": "Rp92.700",
+   "rekomendasiJual": "Rp 140.000",
+   "location": "Jawa Tengah"
+  },
+  {
+   "id": "1297",
+   "name": "Sprei Jadul Jumput– Bahan Halus, Adem UK 120x200x30cm",
+   "hargaModal": "Rp71.100",
+   "rekomendasiJual": "Rp 110.000",
+   "location": "X Cm"
+  },
+  {
+   "id": "496",
+   "name": "Sprei Karakter Kartun Anak Laki-Laki – Bahan Halus, Adem UK 120x200x20cm",
+   "hargaModal": "Rp64.800",
+   "rekomendasiJual": "Rp 100.000",
+   "location": "Jawa Tengah"
+  },
+  {
+   "id": "497",
+   "name": "Sprei Karakter Kartun Anak Laki-Laki – Bahan Halus, Adem UK 160x200x20cm",
+   "hargaModal": "Rp81.000",
+   "rekomendasiJual": "Rp 110.000",
+   "location": "Jawa Tengah"
+  },
+  {
+   "id": "1274",
+   "name": "Starkid Madu Herbal Probiotik Multivitamin Anak dan Meningkatkan Berat Badan Sudah BPOM",
+   "hargaModal": "Rp114.704",
+   "rekomendasiJual": "Rp 156.876",
+   "location": "Madiun"
+  },
+  {
+   "id": "2224",
+   "name": "Stiker Kaca Anti Air Embun ScreenGuard Spion Mobil Fog RainProof Film",
+   "hargaModal": "Rp5.400",
+   "rekomendasiJual": "Rp 20.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "280",
+   "name": "Stiker Pendingin HP Heatsink Aluminium | Plat Radiator Peredam Panas LEGENDARY",
+   "hargaModal": "Rp21.600",
+   "rekomendasiJual": "Rp 76.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "281",
+   "name": "Stiker Pendingin HP Heatsink Aluminium | Plat Radiator Peredam Panas MEMO",
+   "hargaModal": "Rp26.550",
+   "rekomendasiJual": "Rp 71.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "197",
+   "name": "STRIKE-X ESSEN 30 ML Berbagai Varian – Perisa Umpan untuk Galatama, Harian, dan Lomba",
+   "hargaModal": "Rp14.400",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "198",
+   "name": "STRIKE-X ESSEN 60ML Berbagai Varian – Perisa Umpan untuk Galatama, Harian, dan Lomba",
+   "hargaModal": "Rp26.550",
+   "rekomendasiJual": "Rp 65.000",
+   "location": "Jombang"
+  },
+  {
+   "id": "2194",
+   "name": "Sunscreen Serum SPF 30 PA++++ Melindungi Dari Sinar UV dan Mencerahkan",
+   "hargaModal": "Rp48.600",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Tangerang"
+  },
+  {
+   "id": "555",
+   "name": "Super Blood 10 ml - Super Blood Untuk Ayam - Energy Booster Ayam",
+   "hargaModal": "Rp25.200",
+   "rekomendasiJual": "Rp 27.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "2133",
+   "name": "Super Blood 20 ml - Super Blood Untuk Ayam - Energy Booster Ayam",
+   "hargaModal": "Rp28.800",
+   "rekomendasiJual": "Rp 37.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "1642",
+   "name": "Super Dokoh 500ml Suplemen Cair Ternak Jumbo untuk Nafsu Makan Sapi Kambing Domba Kerbau dan Ternak",
+   "hargaModal": "Rp18.450",
+   "rekomendasiJual": "Rp 30.000",
+   "location": "Sukoharjo"
+  },
+  {
+   "id": "545",
+   "name": "Super Oxy Fit 20 ml - Untuk Ayam Sakit Apapun - Untuk Ayam Aduan",
+   "hargaModal": "Rp36.000",
+   "rekomendasiJual": "Rp 45.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "2318",
+   "name": "Susu Kambing Etawa Bubuk Plus Herbal 200g Etanourish Prime",
+   "hargaModal": "Rp39.600",
+   "rekomendasiJual": "Rp 60.000",
+   "location": "Jawa Barat"
+  },
+  {
+   "id": "2129",
+   "name": "T9 Dragon Alat Cukur Rambut Elektrik Hair Clipper Rechargeable Mesin Trimmer Profesional USB",
+   "hargaModal": "Rp21.510",
+   "rekomendasiJual": "Rp 28.000",
+   "location": "Jakarta Utara"
+  },
+  {
+   "id": "2301",
+   "name": "Talasendi Kapsul Herbal 30 Kapsul | Ekstrak Talas & Daun Teh Original",
+   "hargaModal": "Rp37.800",
+   "rekomendasiJual": "Rp 109.900",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "1749",
+   "name": "Tee Shadow Monarch Hitam/Putih Kaos Anime Pria Wanita Cotton Combed 30s Regular Fit",
+   "hargaModal": "Rp75.600",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Bandung"
+  },
+  {
+   "id": "1572",
+   "name": "Teh Herbal Kumis Kucing Premium Original Organik – Teh Celup Alami Untuk Kesehatan Ginjal, Saluran Kemih, Anti Radang & Peluruh Batu Ginjal – 10 Kantong",
+   "hargaModal": "Rp19.800",
+   "rekomendasiJual": "Rp 35.000",
+   "location": "Jember"
+  },
+  {
+   "id": "1840",
+   "name": "Teh Herbal Menurunkan Asam Urat Kolesterol Nyeri Sendi",
+   "hargaModal": "Rp28.800",
+   "rekomendasiJual": "Rp 49.000",
+   "location": "Brebes"
+  },
+  {
+   "id": "2284",
+   "name": "Temulawak Al Afiat Herbal Capsule 30 Kapsul | Ekstrak Temulawak untuk Pencernaan Lemak |",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "529",
+   "name": "TERRAMYCIN PLUS 10 ml - Obat Ayam Pasca Bertarung - Obat Ayam Yang Terkena Jalu - Obat CRD Ngorok Ayam - Obat Ayam Berak Kapur",
+   "hargaModal": "Rp24.300",
+   "rekomendasiJual": "Rp 30.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "1573",
+   "name": "Thormax Rise Men Oil 15ml – Minyak Pijat Herbal Performa Pria, Meningkatkan Daya Tahan, Keharmonisan Pasangan, Tekstur Ringan & Cepat Meresap, Aromaterapi Lembut, Praktis Dibawa, Perawatan Pria Dewasa",
+   "hargaModal": "Rp162.000",
+   "rekomendasiJual": "Rp 200.000",
+   "location": "Bekasi"
+  },
+  {
+   "id": "546",
+   "name": "TIARA Shoulderbag - Tas Bahu Totte Shoulderbag Wanita Simple Kasual Bahan Nilon Anti air Waterproof",
+   "hargaModal": "Rp66.960",
+   "rekomendasiJual": "Rp 83.400",
+   "location": "Bandung"
+  },
+  {
+   "id": "2259",
+   "name": "Tiga Jari Oil – Minyak Oles Herbal Pria 30 ml BPOM",
+   "hargaModal": "Rp34.650",
+   "rekomendasiJual": "Rp 95.000",
+   "location": "Jawa Barat"
+  },
+  {
+   "id": "33",
+   "name": "TOPEDY – Herbal Alami untuk Pegal, Linu, dan Nyeri Persendian",
+   "hargaModal": "Rp45.720",
+   "rekomendasiJual": "Rp 74.000",
+   "location": "Ngawi"
+  },
+  {
+   "id": "2222",
+   "name": "Travel Size Banana Heel Cream Krim Kaki Pecah Kering Kasar Ampuh BPOM Foot Cream",
+   "hargaModal": "Rp25.200",
+   "rekomendasiJual": "Rp 29.900",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "721",
+   "name": "TUGINGO – Herbal Membantu Meluruhkan Batu Urin & Menjaga Kesehatan Ginjal (30 Kapsul)",
+   "hargaModal": "Rp134.100",
+   "rekomendasiJual": "Rp 229.000",
+   "location": "Ngawi"
+  },
+  {
+   "id": "2275",
+   "name": "Turmaric Kapsul Herbal Ekstrak Kunyit 30 Kapsul Original | Produk Herbal Tradisional",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "985",
+   "name": "Underarm whitening Cream",
+   "hargaModal": "Rp74.700",
+   "rekomendasiJual": "Rp 95.000",
+   "location": "Jawa Timur"
+  },
+  {
+   "id": "2280",
+   "name": "VCO Al - Kanzu Virgin Coconut Oil 30 Kapsul",
+   "hargaModal": "Rp36.900",
+   "rekomendasiJual": "Rp 98.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "2281",
+   "name": "VCO MINT Virgin Coconut Oil & Daun Mint 30 Kapsul",
+   "hargaModal": "Rp40.500",
+   "rekomendasiJual": "Rp 99.000",
+   "location": "Sleman Yogyakarta"
+  },
+  {
+   "id": "556",
+   "name": "Vita Plus 30 ml - Vitamin Nafsu Makan Kucing Anjing - Multivitamin Hewan Peliharaan",
+   "hargaModal": "Rp20.700",
+   "rekomendasiJual": "Rp 27.000",
+   "location": "Tangerang Selatan"
+  },
+  {
+   "id": "2258",
+   "name": "Wamena Oil - Minyak Herbal Pria BPOM",
+   "hargaModal": "Rp27.900",
+   "rekomendasiJual": "Rp 85.000",
+   "location": "Jawa Barat"
+  },
+  {
+   "id": "55",
+   "name": "WAX LEATHER R46",
+   "hargaModal": "Rp16.200",
+   "rekomendasiJual": "Rp 30.000",
+   "location": "Malang"
+  },
+  {
+   "id": "1648",
+   "name": "Wuzzt Booster Durian 500ml Pupuk Nutrisi Tanaman Durian untuk Akar Batang Daun Bunga dan Buah",
+   "hargaModal": "Rp32.400",
+   "rekomendasiJual": "Rp 50.000",
+   "location": "Sukoharjo"
+  },
+  {
+   "id": "1649",
+   "name": "X-Worm Obat Cacing Cair Kucing dan Anjing untuk Perawatan Cacingan Hewan Peliharaan",
+   "hargaModal": "Rp16.200",
+   "rekomendasiJual": "Rp 25.000",
+   "location": "Sukoharjo"
+  },
+  {
+   "id": "2310",
+   "name": "ZENVITA Minuman Botanical 100gr 10 Sachet Herbal Goji Berry Kurma Merah Mulberry BPOM",
+   "hargaModal": "Rp35.100",
+   "rekomendasiJual": "Rp 89.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1329",
+   "name": "Zhongsanqing Pembersih Pel Lantai Aroma – Cairan Pembersih Lantai Wangi, Bersih Maksimal Tidak Licin",
+   "hargaModal": "Rp23.850",
+   "rekomendasiJual": "Rp 30.000",
+   "location": "Jakarta Barat"
+  },
+  {
+   "id": "1046",
+   "name": "Zhongshanqing Multi Cleaner 400ml – Pembersih Alami Anti Bau & Segar Tahan Lama",
+   "hargaModal": "Rp26.550",
+   "rekomendasiJual": "Rp 47.000",
+   "location": "Jakarta Barat"
+  }
+ ]
+}

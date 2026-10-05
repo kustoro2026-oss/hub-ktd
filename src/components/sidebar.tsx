@@ -21,6 +21,7 @@ import {
   Package,
   ChevronDown,
   Boxes,
+  Link2,
 } from "lucide-react";
 
 export type NavItem = {
@@ -78,6 +79,16 @@ export const NAV: NavSection[] = [
         items: [
           { href: "", label: "Pesanan", Icon: Package, segera: true },
           { href: "", label: "Produk", Icon: Boxes, segera: true },
+        ],
+      },
+      {
+        title: "Aneka",
+        items: [
+          {
+            href: "/marketplace/aneka/pemetaan",
+            label: "Pemetaan Produk",
+            Icon: Link2,
+          },
         ],
       },
     ],
