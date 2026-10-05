@@ -25,6 +25,8 @@ import {
   type AnekaCartItem,
 } from "@/lib/aneka-checkout";
 import {
+  appendTiktokOrderExecLog,
+  clearTiktokOrderExecLog,
   getAnekaProductMap,
   getTiktokOrderExec,
   saveTiktokOrderExec,
@@ -175,6 +177,8 @@ export async function prepareAnekaExec(
     detail: "",
     executed_at: "",
   });
+  // Persiapan ulang = antrean baru — jejak log percobaan lama dihapus.
+  await clearTiktokOrderExecLog(order.order_id);
 
   const baris = check.items
     .map((it) => `- ${it.qty}x ${it.product_name} (${fmtRp(it.subtotal)})`)
@@ -192,6 +196,7 @@ export async function prepareAnekaExec(
 export async function cancelAnekaExec(orderId: string): Promise<void> {
   const row = await getTiktokOrderExec(orderId);
   if (!row || row.status !== "menunggu") return;
+  await appendTiktokOrderExecLog(orderId, "Dibatalkan — tombol Batalkan");
   await saveTiktokOrderExec({
     order_id: orderId,
     status: "batal",
@@ -241,23 +246,61 @@ export async function executeAnekaOrder(
   };
 
   // 1. Login + buat pembayaran (payment_id baru setiap percobaan).
+  //    Tiap langkah dicatat ke kolom log baris ini — ditulis langsung per
+  //    langkah supaya bila proses serverless terputus (mis. batas waktu),
+  //    jejak sampai langkah terakhir tetap tersimpan untuk diagnosa.
+  await clearTiktokOrderExecLog(orderId);
+  await saveTiktokOrderExec({
+    order_id: orderId,
+    status: "berjalan",
+    payload: row.payload,
+    detail: "",
+  });
+  const logStep = async (langkah: string, pesan: string) => {
+    const t = new Date().toISOString().slice(0, 19).replace("T", " ");
+    await appendTiktokOrderExecLog(orderId, `${t} | ${langkah} | ${pesan}`);
+  };
+
+  await logStep("mulai", "rantai checkout Aneka dijalankan");
   const login = await anekaLogin();
-  if (!login.ok) return gagal(login.detail);
+  if (!login.ok) {
+    await logStep("login", `GAGAL — ${login.detail}`);
+    return gagal(login.detail);
+  }
+  await logStep("login", "berhasil masuk");
   const pay = await anekaCreatePayment(login.session);
-  if (!pay.ok) return gagal(pay.detail);
+  if (!pay.ok) {
+    await logStep("payment/create", `GAGAL — ${pay.detail}`);
+    return gagal(pay.detail);
+  }
+  await logStep("payment/create", `berhasil — payment_id ${pay.paymentId}`);
 
   // 1b. Tentukan varian produk ber-varian yang belum dipetakan manual
   //     (data varian diambil dari halaman produk Aneka; nama varian pesanan
   //     sku_name jadi petunjuk pencocokan, fallback ke nama produk).
   for (const it of payload.items) {
     if (it.aneka_variant_id) continue;
+    const langkah = `varian:${it.aneka_product_id}`;
+    await logStep(
+      langkah,
+      `mencari varian untuk "${it.sku_name || it.product_name}"`,
+    );
     const v = await anekaResolveVariant(
       login.session,
       it.aneka_product_id,
       it.sku_name || it.product_name,
     );
-    if (!v.ok) return gagal(v.detail);
+    if (!v.ok) {
+      await logStep(langkah, `GAGAL — ${v.detail}`);
+      return gagal(v.detail);
+    }
     if (v.variantId) it.aneka_variant_id = v.variantId;
+    await logStep(
+      langkah,
+      v.variantId
+        ? `dipakai variant_id ${v.variantId}${v.label ? ` (${v.label})` : ""}`
+        : "produk tanpa varian",
+    );
   }
 
   // 2. Masukkan produk: satu slot resi untuk pesanan ini (satu paket
@@ -269,11 +312,25 @@ export async function executeAnekaOrder(
     resiCount: i === 0 ? 1 : 0,
   }));
   const save = await anekaVariantSave(login.session, pay.paymentId, items);
-  if (!save.ok) return gagal(save.detail);
+  if (!save.ok) {
+    await logStep("variant/save", `GAGAL — ${save.detail}`);
+    return gagal(save.detail);
+  }
+  await logStep(
+    "variant/save",
+    `berhasil — ${items.length} item masuk keranjang (slot resi 1)`,
+  );
 
   // 3. Token halaman checkout → bayar saldo + upload label resmi.
   const tok = await anekaCheckoutToken(login.session, pay.paymentId);
-  if (!tok.ok) return gagal(tok.detail);
+  if (!tok.ok) {
+    await logStep("checkout", `GAGAL — ${tok.detail}`);
+    return gagal(tok.detail);
+  }
+  await logStep(
+    "checkout",
+    `token didapat — ${tok.itemResiIds.length} baris item_resi`,
+  );
   const process = await anekaProcessPayment(
     login.session,
     pay.paymentId,
@@ -284,12 +341,25 @@ export async function executeAnekaOrder(
       pdf: Buffer.from(payload.label_pdf_base64, "base64"),
     },
   );
-  if (!process.ok) return gagal(process.detail);
+  if (!process.ok) {
+    await logStep("pembayaran/process", `GAGAL — ${process.detail}`);
+    return gagal(process.detail);
+  }
+  await logStep(
+    "pembayaran/process",
+    `berhasil — bayar saldo wallet + upload label ${payload.tracking_number}`,
+  );
 
   // 4. Kode pesanan Aneka dari riwayat (ORDER-{payment_id}-...); bukan
   //    penentu sukses — pembayaran sudah lolos — hanya untuk laporan.
   const found = await anekaFindOrderByPayment(login.session, pay.paymentId);
   const anekaId = found.ok && found.orderCode ? found.orderCode : "";
+  await logStep(
+    "verifikasi",
+    anekaId
+      ? `kode pesanan ${anekaId} ditemukan di riwayat`
+      : "kode pesanan belum terbaca — cek riwayat manual",
+  );
 
   const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
   await saveTiktokOrderExec({
@@ -301,6 +371,10 @@ export async function executeAnekaOrder(
     detail: "",
     executed_at: nowUtc,
   });
+  await logStep(
+    "selesai",
+    `status selesai — ${anekaId || "tanpa kode pesanan"}`,
+  );
 
   await sendExecNotice(
     anekaId

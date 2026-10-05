@@ -15,12 +15,15 @@ export type ExecRow = {
   tracking_number: string;
   aneka_order_id: string;
   detail: string;
+  /** Jejak langkah eksekusi checkout Aneka (satu baris per langkah). */
+  log: string;
   created_at: string;
   executed_at: string;
 };
 
 const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
   menunggu: { text: "Menunggu persetujuan", cls: "bg-amber-100 text-amber-800" },
+  berjalan: { text: "Sedang dieksekusi", cls: "bg-sky-100 text-sky-800" },
   selesai: { text: "Selesai", cls: "bg-emerald-100 text-emerald-800" },
   batal: { text: "Dibatalkan", cls: "bg-slate-200 text-slate-600" },
   gagal: { text: "Gagal — bisa dicoba lagi", cls: "bg-rose-100 text-rose-800" },
@@ -65,7 +68,11 @@ function ExecActions({ row }: { row: ExecRow }) {
         disabled={busy !== ""}
         className="rounded-lg bg-emerald-700 px-4 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-800 disabled:opacity-60"
       >
-        {busy === "setuju" ? "Mengeksekusi..." : "Setuju"}
+        {busy === "setuju"
+          ? "Mengeksekusi..."
+          : row.status === "menunggu"
+            ? "Setuju"
+            : "Coba lagi"}
       </button>
       <button
         type="button"
@@ -169,7 +176,23 @@ export default function AnekaExecClient({
               </p>
             ) : null}
 
-            {row.status === "menunggu" || row.status === "gagal" ? (
+            {row.log ? (
+              <details
+                className="mt-3 rounded-lg border border-slate-200 bg-slate-50"
+                open={row.status === "gagal" || row.status === "berjalan"}
+              >
+                <summary className="cursor-pointer select-none px-3 py-1.5 text-xs font-medium text-slate-600">
+                  Jejak langkah eksekusi
+                </summary>
+                <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words px-3 pb-3 text-[11px] leading-snug text-slate-700">
+                  {row.log.trim()}
+                </pre>
+              </details>
+            ) : null}
+
+            {row.status === "menunggu" ||
+            row.status === "gagal" ||
+            row.status === "berjalan" ? (
               <div className="mt-3">
                 <ExecActions row={row} />
               </div>

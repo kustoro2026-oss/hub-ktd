@@ -66,6 +66,7 @@ export default async function EksekusiTikTokPage({
       tracking_number: payload?.tracking_number ?? "",
       aneka_order_id: r.aneka_order_id,
       detail: r.detail,
+      log: r.log,
       created_at: waktuWib(r.created_at),
       executed_at: waktuWib(r.executed_at),
     };

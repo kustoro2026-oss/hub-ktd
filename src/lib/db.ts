@@ -282,6 +282,7 @@ function migrateSqlite(db: DatabaseSync) {
       aneka_payment_id TEXT NOT NULL DEFAULT '',
       aneka_order_id TEXT NOT NULL DEFAULT '',
       detail TEXT NOT NULL DEFAULT '',
+      log TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       executed_at TEXT NOT NULL DEFAULT ''
     );
@@ -294,6 +295,16 @@ function migrateSqlite(db: DatabaseSync) {
   if (!tcols.some((c) => c.name === "cipher")) {
     db.exec(
       "ALTER TABLE tiktok_shop_tokens ADD COLUMN cipher TEXT NOT NULL DEFAULT ''",
+    );
+  }
+
+  // Migrasi DB lama: kolom log jejak langkah eksekusi checkout Aneka.
+  const ecols = db
+    .prepare("PRAGMA table_info(tiktok_order_exec)")
+    .all() as unknown as { name: string }[];
+  if (!ecols.some((c) => c.name === "log")) {
+    db.exec(
+      "ALTER TABLE tiktok_order_exec ADD COLUMN log TEXT NOT NULL DEFAULT ''",
     );
   }
 
@@ -473,6 +484,7 @@ async function migratePg(pool: Pool) {
       aneka_payment_id TEXT NOT NULL DEFAULT '',
       aneka_order_id TEXT NOT NULL DEFAULT '',
       detail TEXT NOT NULL DEFAULT '',
+      log TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       executed_at TEXT NOT NULL DEFAULT ''
     );
@@ -481,6 +493,11 @@ async function migratePg(pool: Pool) {
   // Migrasi DB lama: kolom shop_cipher untuk panggilan API pesanan.
   await pool.query(
     "ALTER TABLE tiktok_shop_tokens ADD COLUMN IF NOT EXISTS cipher TEXT NOT NULL DEFAULT ''",
+  );
+
+  // Migrasi DB lama: kolom log jejak langkah eksekusi checkout Aneka.
+  await pool.query(
+    "ALTER TABLE tiktok_order_exec ADD COLUMN IF NOT EXISTS log TEXT NOT NULL DEFAULT ''",
   );
 
   // Migrasi DB lama: kolom arah pesan (masuk/keluar) dan status terbaca.
@@ -1256,6 +1273,10 @@ export type TiktokOrderExec = {
   aneka_payment_id: string;
   aneka_order_id: string;
   detail: string;
+  /** Jejak langkah eksekusi checkout Aneka (satu baris per langkah,
+   *  format "WAKTU | langkah | keterangan") — ditulis per langkah supaya
+   *  diagnosa tetap tersedia bila proses terputus di tengah jalan. */
+  log: string;
   created_at: string;
   executed_at: string;
 };
@@ -1277,6 +1298,27 @@ export async function listTiktokOrderExecs(): Promise<TiktokOrderExec[]> {
   return queryAll<TiktokOrderExec>(
     `SELECT * FROM tiktok_order_exec
      ORDER BY CASE status WHEN 'menunggu' THEN 0 ELSE 1 END, created_at DESC`,
+  );
+}
+
+/** Tambah satu baris ke jejak log eksekusi (langkah checkout Aneka).
+ *  Ditulis langsung per langkah supaya jejak selamat bila proses serverless
+ *  terputus sebelum selesai. */
+export async function appendTiktokOrderExecLog(
+  orderId: string,
+  line: string,
+): Promise<void> {
+  await queryRun(
+    "UPDATE tiktok_order_exec SET log = log || ? WHERE order_id = ?",
+    ["\n" + line, orderId],
+  );
+}
+
+/** Kosongkan jejak log (awal percobaan baru / persiapan ulang). */
+export async function clearTiktokOrderExecLog(orderId: string): Promise<void> {
+  await queryRun(
+    "UPDATE tiktok_order_exec SET log = '' WHERE order_id = ?",
+    [orderId],
   );
 }
 
