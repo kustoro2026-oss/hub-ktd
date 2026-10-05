@@ -7,16 +7,21 @@
 //   POST /variant/save (FormData per produk) → GET /checkout-barang/{id}
 //   (token _token + id baris item_resi[]) → POST /pembayaran/process
 //   (multipart: resi_number[i], resi_file[i], item_resi[jual_id]=1,
-//   payment_category=wallet, wallet_source=wallet) → verifikasi kode
-//   ORDER-{payment_id}-... di /riwayat-pemesanan.
+//   payment_category=wallet, wallet_source=wallet) → verifikasi lewat
+//   halaman detail riwayat pembayaran /payment-history/finish
+//   (kunci payment_id; 200 = pesanan jadi).
 //
 // Catatan perilaku situs (hasil probe 2026-10):
 //   - /payment/create SELALU membuat payment baru (bukan reuse).
 //   - /variant/save MENIMPA qty produk yang sama (aman diulang); menolak
 //     produk ber-varian tanpa variant_id[pid]; jumlah_resi[pid]=0 valid.
 //   - Gagal validasi /pembayaran/process = 302 kembali ke checkout-barang.
-//   - Riwayat menampilkan kode ORDER-{payment_id}-{timestamp} sebagai teks
-//     polos (tanpa tautan detail).
+//   - Riwayat resmi kini /payment-history (berpaginasi; tautan detail
+//     /payment-history/finish?payment_id={id}&status=success — 404 untuk
+//     id tak dikenal, 500 untuk payment mangkrak). Kode pesanan bisa dua
+//     format: ORDER-{payment_id}-{ts} (lama) atau ORDER-XXXX alfanumerik
+//     (baru, dari tombol + CHECKOUT). Halaman lama /riwayat-pemesanan
+//     masih ada tetapi menampilkan tanggal transaksi yang keliru.
 //
 // Situs sering error saat beban tinggi (Cloudflare 522) — setiap fetch
 // dibungkus coba-ulang dengan jeda. Sesi (cookie + token CSRF) hidup hanya
@@ -585,7 +590,16 @@ export async function anekaProcessPayment(
   }
 }
 
-/** Cari kode pesanan di riwayat berdasarkan payment_id (ORDER-{id}-{ts}). */
+/**
+ * Verifikasi pesanan Aneka berdasarkan payment_id lewat halaman detail
+ * riwayat pembayaran baru (/payment-history/finish). Semantik halaman
+ * (diverifikasi 2026-10-05): 200 → payment benar-benar menghasilkan
+ * pesanan; 404 → payment_id tak dikenal; 500 → payment mangkrak/tidak
+ * pernah dibayar. Kode pesanan kini bisa dua format: ORDER-{id}-{ts}
+ * (lama) atau ORDER-XXXX alfanumerik (baru) — diambil dari halaman bila
+ * tampil. Fallback: bila halaman detail tidak membuahkan hasil, pola
+ * lama ORDER-{payment_id}-{ts} dicari di /riwayat-pemesanan.
+ */
 export async function anekaFindOrderByPayment(
   s: AnekaSession,
   paymentId: string,
@@ -593,12 +607,22 @@ export async function anekaFindOrderByPayment(
   try {
     const res = await fetchRetry(
       s.cookie,
-      `${BASE}/riwayat-pemesanan`,
+      `${BASE}/payment-history/finish?payment_id=${paymentId}&status=success`,
       { redirect: "manual" },
     );
     const html = await res.text();
-    const m = new RegExp(`ORDER-${paymentId}-\\d{6,}`).exec(html);
-    return { ok: true, orderCode: m?.[0] ?? "" };
+    if (res.status === 200) {
+      const m = /ORDER-(?:\d{4,}-\d{6,}|[A-Z0-9]{6,})/.exec(html);
+      return { ok: true, orderCode: m?.[0] ?? "" };
+    }
+    const old = await fetchRetry(
+      s.cookie,
+      `${BASE}/riwayat-pemesanan`,
+      { redirect: "manual" },
+    );
+    const oldHtml = await old.text();
+    const m2 = new RegExp(`ORDER-${paymentId}-\\d{6,}`).exec(oldHtml);
+    return { ok: true, orderCode: m2?.[0] ?? "" };
   } catch (e) {
     return {
       ok: false,

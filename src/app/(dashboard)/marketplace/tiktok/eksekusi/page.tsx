@@ -68,6 +68,7 @@ export default async function EksekusiTikTokPage({
         subtotal: fmtRp(it.subtotal),
       })),
       tracking_number: payload?.tracking_number ?? "",
+      aneka_payment_id: r.aneka_payment_id,
       aneka_order_id: r.aneka_order_id,
       detail: r.detail,
       log: r.log,

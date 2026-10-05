@@ -15,6 +15,7 @@ export type ExecRow = {
   total_estimate: string;
   items: { qty: number; name: string; subtotal: string }[];
   tracking_number: string;
+  aneka_payment_id: string;
   aneka_order_id: string;
   detail: string;
   /** Jejak langkah eksekusi checkout Aneka (satu baris per langkah). */
@@ -171,17 +172,24 @@ export default function AnekaExecClient({
                 : ""}
             </p>
 
-            {row.aneka_order_id ? (
+            {row.aneka_payment_id || row.aneka_order_id ? (
               <p className="mt-2 text-sm text-emerald-800">
-                ID pesanan Aneka:{" "}
-                <a
-                  href="https://anekadropship.id/payment-history"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-semibold underline"
-                >
-                  {row.aneka_order_id}
-                </a>
+                ID pembayaran Aneka:{" "}
+                {row.aneka_payment_id ? (
+                  <a
+                    href={`https://anekadropship.id/payment-history/finish?payment_id=${row.aneka_payment_id}&status=success`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold underline"
+                  >
+                    {row.aneka_payment_id}
+                  </a>
+                ) : (
+                  <span className="font-semibold">—</span>
+                )}
+                {row.aneka_order_id
+                  ? ` (kode pesanan ${row.aneka_order_id})`
+                  : ""}
                 {row.executed_at ? ` — ${row.executed_at}` : ""}
               </p>
             ) : null}

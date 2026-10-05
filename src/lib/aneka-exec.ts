@@ -342,11 +342,11 @@ export async function executeAnekaOrder(
           `${nowUtc} | pemulihan | pembayaran sebelumnya terverifikasi — ${found.orderCode}`,
         );
         await sendExecNotice(
-          `Eksekusi Aneka BERHASIL untuk pesanan ${orderId} (dipulihkan dari percobaan terputus).\nID pesanan Aneka: ${found.orderCode}`,
+          `Eksekusi Aneka BERHASIL untuk pesanan ${orderId} (dipulihkan dari percobaan terputus).\nID pembayaran Aneka: ${payId} (kode pesanan: ${found.orderCode})\nDetail: https://anekadropship.id/payment-history/finish?payment_id=${payId}&status=success`,
         );
         return {
           ok: true,
-          detail: `Dipulihkan — ID pesanan Aneka: ${found.orderCode}`,
+          detail: `Dipulihkan — ID pembayaran Aneka: ${payId} (${found.orderCode})`,
         };
       }
       return {
@@ -517,15 +517,16 @@ export async function executeAnekaOrder(
     `berhasil — bayar saldo wallet + upload label ${payload.tracking_number}`,
   );
 
-  // 4. Kode pesanan Aneka dari riwayat (ORDER-{payment_id}-...); bukan
-  //    penentu sukses — pembayaran sudah lolos — hanya untuk laporan.
+  // 4. Konfirmasi lewat halaman detail riwayat pembayaran Aneka (kunci
+  //    payment_id); bukan penentu sukses — pembayaran sudah lolos — hanya
+  //    untuk laporan dan tautan detail.
   const found = await anekaFindOrderByPayment(login.session, pay.paymentId);
   const anekaId = found.ok && found.orderCode ? found.orderCode : "";
   await logStep(
     "verifikasi",
     anekaId
-      ? `kode pesanan ${anekaId} ditemukan di riwayat`
-      : "kode pesanan belum terbaca — cek riwayat manual",
+      ? `payment ${pay.paymentId} terverifikasi di riwayat — ${anekaId}`
+      : `payment ${pay.paymentId} tidak terbaca kodenya — cek riwayat manual`,
   );
 
   const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
@@ -540,16 +541,14 @@ export async function executeAnekaOrder(
   });
   await logStep(
     "selesai",
-    `status selesai — ${anekaId || "tanpa kode pesanan"}`,
+    `status selesai — payment ${pay.paymentId}${anekaId ? ` (${anekaId})` : ""}`,
   );
 
   await sendExecNotice(
-    anekaId
-      ? `Eksekusi Aneka BERHASIL untuk pesanan ${orderId}.\nID pesanan Aneka: ${anekaId}`
-      : `Eksekusi Aneka BERHASIL untuk pesanan ${orderId} (payment ${pay.paymentId}), tetapi kode pesanan belum terbaca otomatis — cek riwayat: https://anekadropship.id/payment-history`,
+    `Eksekusi Aneka BERHASIL untuk pesanan ${orderId}.\nID pembayaran Aneka: ${pay.paymentId}${anekaId ? ` (kode pesanan: ${anekaId})` : ""}\nDetail: https://anekadropship.id/payment-history/finish?payment_id=${pay.paymentId}&status=success`,
   );
   return {
     ok: true,
-    detail: `Selesai — ID pesanan Aneka: ${anekaId || "(cek riwayat)"}`,
+    detail: `Selesai — ID pembayaran Aneka: ${pay.paymentId}${anekaId ? ` (${anekaId})` : ""}`,
   };
 }
