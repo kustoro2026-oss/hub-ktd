@@ -59,14 +59,28 @@ import {
   sendText,
 } from "@/lib/wa";
 
-/** Batas percobaan kirim ulang untuk pesanan yang resinya gagal terkirim. */
-const MAX_SEND_ATTEMPTS = 3;
+/** Batas percobaan kirim ulang untuk pesanan yang resinya gagal terkirim.
+ *  Dengan jeda RETRY_COOLDOWN_MS antar percobaan, batas ini mencakup
+ *  sekitar 6 jam pemulihan (label belum tersedia, situs sibuk, dll.). */
+const MAX_SEND_ATTEMPTS = 12;
+
+/** Jeda minimal antar percobaan ulang pesanan yang gagal. Penting karena
+ *  pengecekan bisa berjalan tiap menit (tab admin terbuka) — tanpa jeda,
+ *  kegagalan sementara menghabiskan seluruh kuota percobaan dalam beberapa
+ *  menit lalu pesanan diam selamanya. */
+const RETRY_COOLDOWN_MS = 30 * 60 * 1000;
 
 /** Lama pesanan baru ditahan sebelum resi dikirim (env
  *  TIKTOK_RESI_DELAY_MINUTES, default 15 menit) — memberi kesempatan
  *  pembeli membatalkan supaya resi tidak terkirim percuma. */
 const NEW_ORDER_WAIT_MS =
   (Number(process.env.TIKTOK_RESI_DELAY_MINUTES) || 15) * 60 * 1000;
+
+/** UTC "YYYY-MM-DD HH:MM:SS" → epoch ms. */
+function parseUtcMs(s: string): number {
+  const t = Date.parse(s.replace(" ", "T") + "Z");
+  return Number.isFinite(t) ? t : 0;
+}
 
 /** Satu jenis dokumen yang diminta saat "Cetak Resi" — urutan sesuai dialog
  *  "Cetak halaman" aplikasi TikTok Shop. `reason` diisi saat dokumen
@@ -423,7 +437,11 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
   const seen = new Map(
     (await listSeenTiktokOrders()).map((s) => [
       s.order_id,
-      { notify: s.notify, attempts: Number(s.attempts ?? 0) },
+      {
+        notify: s.notify,
+        attempts: Number(s.attempts ?? 0),
+        last_attempt_at: s.last_attempt_at,
+      },
     ]),
   );
 
@@ -456,6 +474,16 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
       if (cancelled) {
         // Batalkan juga antrean eksekusi Aneka bila sempat disiapkan.
         await cancelAnekaExec(o.order_id);
+        // Percobaan ulang notifikasi pembatalan juga diberi jeda — tanpa
+        // jeda, WA down beberapa menit menghabiskan kuota percobaan.
+        if (
+          prev &&
+          prev.notify.startsWith("gagal") &&
+          prev.last_attempt_at &&
+          Date.now() - parseUtcMs(prev.last_attempt_at) < RETRY_COOLDOWN_MS
+        ) {
+          continue;
+        }
         const silent =
           baseline ||
           prev?.notify === "skip" ||
@@ -513,6 +541,22 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
           `menunggu:${Date.now()}`,
         );
         newOrders++;
+        // Kabari admin bahwa pesanan terdeteksi — informasi saja, tidak
+        // memengaruhi alur (masa tunggu tetap berjalan).
+        const itemsTxt =
+          o.items.length > 0
+            ? ` — ${o.items[0].product_name}${o.items[0].sku_name ? ` (${o.items[0].sku_name})` : ""}${
+                o.items.length > 1 ? ` (+${o.items.length - 1} produk lain)` : ""
+              }`
+            : "";
+        const notice = await sendOwnerNotice(
+          `Pesanan TikTok Shop baru: ${o.order_id}${itemsTxt}. Akan diproses otomatis ±15 menit (memberi kesempatan pembeli membatalkan).`,
+        );
+        if (!notice.startsWith("ok")) {
+          errors.push(
+            `${shop.shop_name}: ${o.order_id}: notif pesanan baru gagal: ${notice}`,
+          );
+        }
         continue;
       }
 
@@ -528,6 +572,17 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
       // Sudah gagal berkali-kali — berhenti mencoba (resi tetap bisa
       // dibuka manual dari halaman Pesanan).
       if (prev.attempts >= MAX_SEND_ATTEMPTS) continue;
+
+      // Percobaan ulang diberi jeda — bila pengecekan berjalan tiap menit
+      // (tab admin terbuka), tanpa jeda ini kegagalan sementara langsung
+      // menghabiskan kuota percobaan dalam hitungan menit.
+      if (
+        prev.notify.startsWith("gagal") &&
+        prev.last_attempt_at &&
+        Date.now() - parseUtcMs(prev.last_attempt_at) < RETRY_COOLDOWN_MS
+      ) {
+        continue;
+      }
 
       // Masa tunggu selesai, atau percobaan ulang untuk kiriman yang gagal.
       newOrders++;
@@ -583,6 +638,9 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
             pdf: official.pdf,
             tracking_number: official.tracking_number,
           },
+          // Percobaan ulang setelah kegagalan: antrean "menunggu" mungkin
+          // sudah tersimpan tetapi notif WA-nya gagal — kirim ulang.
+          { resendNotice: prev.notify.startsWith("gagal") },
         );
         if (prep.ok) {
           await markTiktokOrderSeen(

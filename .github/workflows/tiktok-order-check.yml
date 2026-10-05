@@ -1,0 +1,23 @@
+# Pengecekan pesanan TikTok otomatis tiap 5 menit (24 jam) — pemicu cadangan
+# saat tidak ada tab admin Hub yang terbuka (tick dalam aplikasi hanya jalan
+# selama halaman Hub dibuka; cron Vercel hanya sekali sehari).
+#
+# Endpoint idempoten — tabel tiktok_order_seen mencegah kirim ganda.
+# Rahasia CRON_SECRET disimpan di repo: Settings → Secrets and variables →
+# Actions → New repository secret (nilai sama dengan env CRON_SECRET Vercel).
+name: TikTok order check
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Panggil endpoint cek pesanan TikTok
+        run: |
+          curl -s -o /dev/null -w "%{http_code}\n" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            https://admin.kustoro2026.com/api/tiktok/resi/check

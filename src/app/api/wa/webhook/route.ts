@@ -25,6 +25,7 @@ import {
 } from "@/lib/replies";
 import { notifyOrderOwner, sendText } from "@/lib/wa";
 import { runDueScheduledBroadcasts } from "@/lib/broadcast-send";
+import { checkNewTiktokOrders } from "@/lib/tiktok-resi";
 import { after } from "next/server";
 
 type WaStatusEvent = {
@@ -40,6 +41,11 @@ type WaValue = {
 };
 
 type WaEntry = { changes?: { field?: string; value?: WaValue }[] };
+
+/** Waktu pengecekan pesanan TikTok terakhir lewat tick webhook (epoch ms) —
+ *  pembatas supaya webhook yang deras (event status kiriman broadcast)
+ *  tidak memanggil API TikTok pada setiap event. */
+let lastOrderCheckAt = 0;
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -170,12 +176,21 @@ export async function POST(request: Request) {
   }
 
   // Tick penjadwal: setiap payload webhook juga memeriksa kampanye terjadwal
-  // yang waktunya sudah tiba. Dijalankan lewat after() supaya respon webhook
-  // tetap cepat (Meta mensyaratkan balasan kilat) tanpa membatalkan tick.
+  // yang waktunya sudah tiba, dan mengecek pesanan TikTok baru (paling cepat
+  // sekali per menit per instans). Dijalankan lewat after() supaya respon
+  // webhook tetap cepat (Meta mensyaratkan balasan kilat) tanpa membatalkan
+  // tick — jadi pesanan tetap terdeteksi walau tidak ada tab admin terbuka.
   after(() => {
     runDueScheduledBroadcasts().catch((e) =>
       console.error("[wa-webhook] tick jadwal gagal:", e),
     );
+    const now = Date.now();
+    if (now - lastOrderCheckAt >= 60_000) {
+      lastOrderCheckAt = now;
+      checkNewTiktokOrders().catch((e) =>
+        console.error("[wa-webhook] tick pesanan gagal:", e),
+      );
+    }
   });
 
   return new Response("OK", { status: 200 });

@@ -260,7 +260,8 @@ function migrateSqlite(db: DatabaseSync) {
       shop_id TEXT NOT NULL DEFAULT '',
       first_seen_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       notify TEXT NOT NULL DEFAULT '',
-      attempts INTEGER NOT NULL DEFAULT 0
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_attempt_at TEXT NOT NULL DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS aneka_product_map (
@@ -305,6 +306,18 @@ function migrateSqlite(db: DatabaseSync) {
   if (!ecols.some((c) => c.name === "log")) {
     db.exec(
       "ALTER TABLE tiktok_order_exec ADD COLUMN log TEXT NOT NULL DEFAULT ''",
+    );
+  }
+
+  // Migrasi DB lama: kolom waktu percobaan ulang terakhir (pengatur jeda
+  // retry supaya kegagalan sementara tidak menghabiskan kuota dalam
+  // hitungan menit ketika pengecekan berjalan tiap menit).
+  const scols = db
+    .prepare("PRAGMA table_info(tiktok_order_seen)")
+    .all() as unknown as { name: string }[];
+  if (!scols.some((c) => c.name === "last_attempt_at")) {
+    db.exec(
+      "ALTER TABLE tiktok_order_seen ADD COLUMN last_attempt_at TEXT NOT NULL DEFAULT ''",
     );
   }
 
@@ -462,7 +475,8 @@ async function migratePg(pool: Pool) {
       shop_id TEXT NOT NULL DEFAULT '',
       first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       notify TEXT NOT NULL DEFAULT '',
-      attempts INTEGER NOT NULL DEFAULT 0
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_attempt_at TEXT NOT NULL DEFAULT ''
     );
 
     CREATE TABLE IF NOT EXISTS aneka_product_map (
@@ -498,6 +512,12 @@ async function migratePg(pool: Pool) {
   // Migrasi DB lama: kolom log jejak langkah eksekusi checkout Aneka.
   await pool.query(
     "ALTER TABLE tiktok_order_exec ADD COLUMN IF NOT EXISTS log TEXT NOT NULL DEFAULT ''",
+  );
+
+  // Migrasi DB lama: kolom waktu percobaan ulang terakhir (pengatur jeda
+  // retry pengiriman resi/notifikasi pesanan).
+  await pool.query(
+    "ALTER TABLE tiktok_order_seen ADD COLUMN IF NOT EXISTS last_attempt_at TEXT NOT NULL DEFAULT ''",
   );
 
   // Migrasi DB lama: kolom arah pesan (masuk/keluar) dan status terbaca.
@@ -1067,6 +1087,9 @@ export type TiktokOrderSeen = {
   first_seen_at: string;
   notify: string;
   attempts: number;
+  /** Waktu percobaan ulang terakhir (UTC "YYYY-MM-DD HH:MM:SS") — dipakai
+   *  sebagai pengatur jeda antar percobaan ulang. */
+  last_attempt_at: string;
 };
 
 /** Jumlah pesanan yang sudah pernah diproses. 0 berarti tabel kosong dan
@@ -1102,22 +1125,24 @@ export async function markTiktokOrderSeen(
 }
 
 /** Tambah hitungan percobaan kirim resi yang gagal — pesanan yang belum
- *  pernah tercatat otomatis dibuatkan barisnya dengan attempts = 1. */
+ *  pernah tercatat otomatis dibuatkan barisnya dengan attempts = 1.
+ *  last_attempt_at dicatat supaya percobaan ulang bisa diberi jeda. */
 export async function recordTiktokOrderFailure(
   orderId: string,
   shopId: string,
   notify: string,
 ): Promise<void> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
   const updated = await queryOne<{ order_id: string }>(
-    "UPDATE tiktok_order_seen SET attempts = attempts + 1, notify = ? WHERE order_id = ? RETURNING order_id",
-    [notify, orderId],
+    "UPDATE tiktok_order_seen SET attempts = attempts + 1, notify = ?, last_attempt_at = ? WHERE order_id = ? RETURNING order_id",
+    [notify, nowUtc, orderId],
   );
   if (!updated) {
     const sql =
       dbMode() === "pg"
-        ? "INSERT INTO tiktok_order_seen (order_id, shop_id, notify, attempts) VALUES (?, ?, ?, 1) ON CONFLICT (order_id) DO NOTHING"
-        : "INSERT OR IGNORE INTO tiktok_order_seen (order_id, shop_id, notify, attempts) VALUES (?, ?, ?, 1)";
-    await queryRun(sql, [orderId, shopId, notify]);
+        ? "INSERT INTO tiktok_order_seen (order_id, shop_id, notify, attempts, last_attempt_at) VALUES (?, ?, ?, 1, ?) ON CONFLICT (order_id) DO NOTHING"
+        : "INSERT OR IGNORE INTO tiktok_order_seen (order_id, shop_id, notify, attempts, last_attempt_at) VALUES (?, ?, ?, 1, ?)";
+    await queryRun(sql, [orderId, shopId, notify, nowUtc]);
   }
 }
 

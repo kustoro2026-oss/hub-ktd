@@ -144,14 +144,17 @@ export async function checkAnekaExecutable(
 
 /** PERSIAPAN: simpan label resmi + rincian produk sebagai antrean eksekusi
  *  "menunggu" dan kirim notif WA berisi tautan Setuju. Idempoten — bila
- *  barisnya sudah menunggu, tidak menyimpan/kirim ulang. */
+ *  barisnya sudah menunggu, tidak menyimpan/kirim ulang (kecuali
+ *  opts.resendNotice = true, dipakai ketika notif WA percobaan sebelumnya
+ *  gagal terkirim). */
 export async function prepareAnekaExec(
   shop: { shop_id: string; shop_name: string },
   order: TiktokOrderSummary,
   official: AnekaExecOfficial,
+  opts: { resendNotice?: boolean } = {},
 ): Promise<{ ok: boolean; detail: string }> {
   const existing = await getTiktokOrderExec(order.order_id);
-  if (existing?.status === "menunggu") {
+  if (existing?.status === "menunggu" && !opts.resendNotice) {
     return { ok: true, detail: "Sudah menunggu persetujuan" };
   }
 
