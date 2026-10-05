@@ -574,13 +574,28 @@ export async function anekaProcessPayment(
     ) {
       return { ok: true };
     }
-    // Respons tak dikenali → pastikan lewat riwayat (kode ORDER-{payment_id})
-    // sebelum menyatakan gagal, supaya coba-ulang tidak membayar dua kali.
+    // Respons tak dikenali → pastikan lewat riwayat sebelum menyatakan gagal,
+    // supaya coba-ulang tidak membayar dua kali. PERHATIAN (perubahan situs
+    // 2026-10-05): halaman finish kini menampilkan kode ORDER ALFANUMERIK
+    // bahkan untuk payment yang BELUM dibayar (bila masih ada item di
+    // keranjang), jadi "200 + ada kode" TIDAK lagi cukup sebagai bukti
+    // pesanan terbayar. Dua bukti yang bisa dipercaya: (a) kode numerik
+    // ORDER-{payment_id}-{ts} yang memuat payment_id ini, atau (b) payment
+    // sudah terdaftar di /payment-history (yang belum dibayar tidak
+    // pernah terdaftar).
     const found = await anekaFindOrderByPayment(s, paymentId);
-    if (found.ok && found.orderCode) return { ok: true };
+    if (
+      found.ok &&
+      found.orderCode.includes(paymentId) &&
+      /ORDER-\d{4,}-\d{6,}/.test(found.orderCode)
+    ) {
+      return { ok: true };
+    }
+    const listed = await anekaPaymentListed(s, paymentId);
+    if (listed) return { ok: true };
     return {
       ok: false,
-      detail: "Respons pembayaran tak dikenali dan pesanan belum tampak di riwayat — periksa manual sebelum mencoba lagi",
+      detail: `Respons pembayaran tak dikenali dan payment ${paymentId} belum terbukti terbayar di riwayat — periksa manual sebelum mencoba lagi`,
     };
   } catch (e) {
     return {
@@ -628,6 +643,28 @@ export async function anekaFindOrderByPayment(
       ok: false,
       detail: `Gagal membaca riwayat: ${e instanceof Error ? e.message : "kesalahan tidak dikenal"}`,
     };
+  }
+}
+
+/** Apakah payment_id sudah terdaftar di daftar riwayat pembayaran resmi
+ *  (/payment-history). Payment yang BELUM dibayar TIDAK pernah muncul di
+ *  daftar ini meskipun halaman finish-nya menampilkan kode ORDER
+ *  alfanumerik — jadi kehadiran di daftar adalah bukti pesanan benar-benar
+ *  terbayar (dipakai cabang respons pembayaran yang tak dikenali). */
+export async function anekaPaymentListed(
+  s: AnekaSession,
+  paymentId: string,
+): Promise<boolean> {
+  try {
+    const res = await fetchRetry(
+      s.cookie,
+      `${BASE}/payment-history?page=1`,
+      { redirect: "manual" },
+    );
+    const html = await res.text();
+    return html.includes(paymentId);
+  } catch {
+    return false;
   }
 }
 
