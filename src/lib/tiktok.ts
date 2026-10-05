@@ -262,11 +262,22 @@ export type TiktokOrderSummary = {
   }[];
 };
 
+/** Opsi filter pencarian pesanan (POST /order/202309/orders/search).
+ *  Bila createTimeGe/createTimeLt diisi → filter & urut berdasarkan waktu
+ *  PEMBUATAN pesanan (sort_field=create_time); bila tidak → jendela
+ *  pembaruan status daysBack hari terakhir (sort_field=update_time). */
+export type TiktokOrdersFilter = {
+  daysBack?: number;
+  createTimeGe?: number;
+  createTimeLt?: number;
+  pageSize?: number;
+};
+
 /** POST /order/202309/orders/search — daftar pesanan terbaru toko.
  *  page_size/sort_field/sort_order ada di QUERY; filter waktu di body. */
 export async function getTiktokOrders(
   shop: { cipher: string; access_token: string },
-  daysBack = 7,
+  filter: TiktokOrdersFilter = {},
 ): Promise<
   { ok: true; orders: TiktokOrderSummary[]; total_count: number } | { ok: false; detail: string }
 > {
@@ -286,16 +297,26 @@ export async function getTiktokOrders(
   }
   const path = "/order/202309/orders/search";
   const now = Math.floor(Date.now() / 1000);
-  const body = JSON.stringify({
-    update_time_ge: now - daysBack * 86400,
-    update_time_lt: now,
-  });
+  const daysBack = filter.daysBack ?? 7;
+  const pakaiCreateTime =
+    filter.createTimeGe !== undefined || filter.createTimeLt !== undefined;
+  const body = JSON.stringify(
+    pakaiCreateTime
+      ? {
+          create_time_ge: filter.createTimeGe ?? now - daysBack * 86400,
+          create_time_lt: filter.createTimeLt ?? now,
+        }
+      : {
+          update_time_ge: now - daysBack * 86400,
+          update_time_lt: now,
+        },
+  );
   const params: Record<string, string> = {
     app_key: appKey,
     shop_cipher: shop.cipher,
     timestamp: now.toString(),
-    page_size: "20",
-    sort_field: "update_time",
+    page_size: String(filter.pageSize ?? 20),
+    sort_field: pakaiCreateTime ? "create_time" : "update_time",
     sort_order: "DESC",
   };
   const sign = signRequest(appSecret, path, params, body);

@@ -89,7 +89,7 @@ export async function getSeenTiktokProducts(): Promise<
   if (!prep.ok) return { ok: false, detail: prep.detail };
   const r = await getTiktokOrders(
     { cipher: prep.cipher, access_token: prep.access_token },
-    30,
+    { daysBack: 30 },
   );
   if (!r.ok) return { ok: false, detail: r.detail };
 

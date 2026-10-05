@@ -1,6 +1,7 @@
 // Orkestrasi pesanan TikTok Shop: refresh token kedaluwarsa, isi ulang
-// shop_cipher yang kosong, lalu tarik 20 pesanan terbaru per toko.
-// Dipakai route API dan halaman Pesanan di dashboard.
+// shop_cipher yang kosong, lalu tarik pesanan terbaru per toko (rentang
+// tanggal & pageSize bisa diatur lewat filter). Dipakai route API dan
+// halaman Pesanan di dashboard.
 import {
   listTiktokShopTokens,
   saveTiktokShopToken,
@@ -10,6 +11,7 @@ import {
   getAuthorizedTiktokShops,
   getTiktokOrders,
   refreshTiktokToken,
+  type TiktokOrdersFilter,
   type TiktokOrderSummary,
 } from "@/lib/tiktok";
 
@@ -84,7 +86,11 @@ export async function prepareShop(
   return { ok: true, cipher, access_token: token };
 }
 
-export async function pullTiktokShopOrders(): Promise<TiktokShopOrders[]> {
+/** Tarik pesanan semua toko terotorisasi. `filter` diteruskan ke API
+ *  pencarian pesanan (rentang tanggal, pageSize, dll). */
+export async function pullTiktokShopOrders(
+  filter: TiktokOrdersFilter = {},
+): Promise<TiktokShopOrders[]> {
   const shops = await listTiktokShopTokens();
   const results: TiktokShopOrders[] = [];
 
@@ -100,10 +106,13 @@ export async function pullTiktokShopOrders(): Promise<TiktokShopOrders[]> {
       continue;
     }
 
-    const ord = await getTiktokOrders({
-      cipher: prep.cipher,
-      access_token: prep.access_token,
-    });
+    const ord = await getTiktokOrders(
+      {
+        cipher: prep.cipher,
+        access_token: prep.access_token,
+      },
+      filter,
+    );
     if (!ord.ok) {
       results.push({
         shop_id: shop.shop_id,

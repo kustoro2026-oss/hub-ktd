@@ -433,7 +433,7 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
       continue;
     }
     const cred = { cipher: prep.cipher, access_token: prep.access_token };
-    const ord = await getTiktokOrders(cred, 7);
+    const ord = await getTiktokOrders(cred, { daysBack: 7 });
     if (!ord.ok) {
       errors.push(`${shop.shop_name}: ${ord.detail}`);
       continue;
