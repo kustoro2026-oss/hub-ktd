@@ -1117,10 +1117,12 @@ export type AnekaProductMap = {
   updated_at: string;
 };
 
-/** Semua pemetaan produk tersimpan (kunci: tiktok_product_id). */
+/** Semua pemetaan produk tersimpan (kunci: tiktok_product_id).
+ *  Urutkan tanpa COLLATE NOCASE — itu sintaks khusus SQLite dan membuat
+ *  Postgres melempar "collation \"nocase\" does not exist" (halaman 500). */
 export async function listAnekaProductMaps(): Promise<AnekaProductMap[]> {
   return queryAll<AnekaProductMap>(
-    "SELECT * FROM aneka_product_map ORDER BY tiktok_product_name COLLATE NOCASE ASC",
+    "SELECT * FROM aneka_product_map ORDER BY LOWER(tiktok_product_name) ASC",
   );
 }
 
