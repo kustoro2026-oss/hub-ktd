@@ -1186,6 +1186,66 @@ export async function deleteAnekaProductMap(
   );
 }
 
+/** Impor massal pemetaan awal (seed) tanpa menimpa pemetaan yang sudah ada
+ *  (baik buatan manual maupun hasil impor sebelumnya). Mengembalikan jumlah
+ *  baris baru yang benar-benar dimasukkan. */
+export async function seedAnekaProductMaps(
+  rows: {
+    tiktok_product_id: string;
+    tiktok_product_name?: string;
+    tiktok_sku?: string;
+    aneka_product_id: string;
+    aneka_variant_id?: string;
+    aneka_product_name?: string;
+    enabled?: number;
+  }[],
+): Promise<{ inserted: number; skipped: number }> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  let inserted = 0;
+  for (const m of rows) {
+    if (dbMode() === "pg") {
+      const r = await (
+        await pgPool()
+      ).query(
+        toPg(
+          `INSERT INTO aneka_product_map (tiktok_product_id, tiktok_product_name, tiktok_sku, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (tiktok_product_id) DO NOTHING`,
+        ),
+        [
+          m.tiktok_product_id,
+          m.tiktok_product_name ?? "",
+          m.tiktok_sku ?? "",
+          m.aneka_product_id,
+          m.aneka_variant_id ?? "",
+          m.aneka_product_name ?? "",
+          m.enabled ?? 1,
+          nowUtc,
+        ],
+      );
+      inserted += r.rowCount ?? 0;
+    } else {
+      const r = (await sqliteDb())
+        .prepare(
+          `INSERT OR IGNORE INTO aneka_product_map (tiktok_product_id, tiktok_product_name, tiktok_sku, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          m.tiktok_product_id,
+          m.tiktok_product_name ?? "",
+          m.tiktok_sku ?? "",
+          m.aneka_product_id,
+          m.aneka_variant_id ?? "",
+          m.aneka_product_name ?? "",
+          m.enabled ?? 1,
+          nowUtc,
+        );
+      inserted += Number(r.changes) || 0;
+    }
+  }
+  return { inserted, skipped: rows.length - inserted };
+}
+
 // ---------- Eksekusi pesanan TikTok → Aneka (Fase 2, semi-otomatis) ----------
 
 export type TiktokOrderExec = {

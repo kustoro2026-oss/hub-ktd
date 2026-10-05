@@ -1,0 +1,879 @@
+{
+ "generatedAt": "2026-10-05T05:39:53.984Z",
+ "source": "tiktok-export/tiktok-live-100.json (100 listing aktif) x products-cache.json",
+ "rows": [
+  {
+   "tiktok_product_id": "1737754450652464688",
+   "tiktok_product_name": "Minyak Kemiri Bakar 100ml 1 Pcs – Perawatan Rambut Alami, Hitam, Tebal, dan Anti Rontok",
+   "tiktok_sku": "",
+   "aneka_product_id": "1777",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Minyak Kemiri Bakar 100ml 1 Pcs – Perawatan Rambut Alami, Hitam, Tebal, dan Anti Rontok",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754450652530224",
+   "tiktok_product_name": "G-OXFRESH Deodorant Roll On",
+   "tiktok_sku": "",
+   "aneka_product_id": "1222",
+   "aneka_variant_id": "",
+   "aneka_product_name": "G-OXFRESH Deodorant Roll On",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754450652399152",
+   "tiktok_product_name": "Beli 1 GRATIS 1 Minyak Kemiri Bakar 100ml – Perawatan Rambut Alami, Hitam, Tebal, dan Anti Rontok",
+   "tiktok_sku": "",
+   "aneka_product_id": "1667",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Beli 1 GRATIS 1 Minyak Kemiri Bakar 100ml – Perawatan Rambut Alami, Hitam, Tebal, dan Anti Rontok",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754381512508976",
+   "tiktok_product_name": "Teh Herbal Menurunkan Asam Urat Kolesterol Nyeri Sendi",
+   "tiktok_sku": "",
+   "aneka_product_id": "1840",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Teh Herbal Menurunkan Asam Urat Kolesterol Nyeri Sendi",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754381512640048",
+   "tiktok_product_name": "Morigo Herbal Propolis 10ml Suplemen Tetes Herbal Moringa Habbatussauda Minyak Zaitun Original",
+   "tiktok_sku": "",
+   "aneka_product_id": "1750",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Morigo Herbal Propolis 10ml Suplemen Tetes Herbal Moringa Habbatussauda Minyak Zaitun Original",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754381512705584",
+   "tiktok_product_name": "TUGINGO – Herbal Membantu Meluruhkan Batu Urin & Menjaga Kesehatan Ginjal (30 Kapsul)",
+   "tiktok_sku": "",
+   "aneka_product_id": "721",
+   "aneka_variant_id": "",
+   "aneka_product_name": "TUGINGO – Herbal Membantu Meluruhkan Batu Urin & Menjaga Kesehatan Ginjal (30 Kapsul)",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754411364943408",
+   "tiktok_product_name": "AL K | Penghilang Bau Amoniak Kandang 1 Liter Cairan Pengurang Bau untuk Kandang Ayam Sapi Kambing Bebek dan Ternak",
+   "tiktok_sku": "",
+   "aneka_product_id": "1639",
+   "aneka_variant_id": "",
+   "aneka_product_name": "AL K | Penghilang Bau Amoniak Kandang 1 Liter Cairan Pengurang Bau untuk Kandang Ayam Sapi Kambing Bebek dan Ternak",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754411364877872",
+   "tiktok_product_name": "OBAT GUREM 3 PCS - Pembasmi Gurem Unggas Ampuh | Anti Kutu & Gurem Ayam",
+   "tiktok_sku": "",
+   "aneka_product_id": "1644",
+   "aneka_variant_id": "",
+   "aneka_product_name": "OBAT GUREM 3 PCS - Pembasmi Gurem Unggas Ampuh | Anti Kutu & Gurem Ayam",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754411364615728",
+   "tiktok_product_name": "Nawasena Herbal Penggemuk Sapi & Kambing 1 Liter – Penambah Nafsu Makan & Pelengkap Nutrisi Ternak",
+   "tiktok_sku": "",
+   "aneka_product_id": "1997",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Nawasena Herbal Penggemuk Sapi & Kambing 1 Liter – Penambah Nafsu Makan & Pelengkap Nutrisi Ternak",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754411364812336",
+   "tiktok_product_name": "Fertani Suplemen Penggemuk Ikan Air Tawar 250gr Pakan Tambahan untuk Lele Gurame, Nila, Bawal, Mujair, dan Udang",
+   "tiktok_sku": "",
+   "aneka_product_id": "1754",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Fertani Suplemen Penggemuk Ikan Air Tawar 250gr Pakan Tambahan untuk Lele Gurame, Nila, Bawal, Mujair, dan Udang",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754411364681264",
+   "tiktok_product_name": "Herbaracik - Obat Ayam Herbal Flu Pilek Snot Cekreh Aratan Booster Unggas",
+   "tiktok_sku": "",
+   "aneka_product_id": "1637",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Herbaracik - Obat Ayam Herbal Flu Pilek Snot Cekreh Aratan Booster Unggas",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754411364746800",
+   "tiktok_product_name": "Fertani Suplemen Penggemuk Ternak Ruminansia 250 Gram – Vitamin Penggemuk Sapi, Kambing & Babi Penambah Nafsu Makan dan Pertumbuhan",
+   "tiktok_sku": "",
+   "aneka_product_id": "1809",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Fertani Suplemen Penggemuk Ternak Ruminansia 250 Gram – Vitamin Penggemuk Sapi, Kambing & Babi Penambah Nafsu Makan dan Pertumbuhan",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754216922908208",
+   "tiktok_product_name": "Asam Humat Premium 500gr – Pembenah Tanah Organik Nutrisi Tanaman & Penyubur Akar",
+   "tiktok_sku": "",
+   "aneka_product_id": "1446",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Asam Humat Premium 500gr – Pembenah Tanah Organik Nutrisi Tanaman & Penyubur Akar",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754216922646064",
+   "tiktok_product_name": "Benih Unggul Fertani Berbagai Varian – Benih Sayur dan Buah untuk Kebun, Pekarangan, Pot & Polybag",
+   "tiktok_sku": "",
+   "aneka_product_id": "1781",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Benih Unggul Fertani Berbagai Varian – Benih Sayur dan Buah untuk Kebun, Pekarangan, Pot & Polybag",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754216922514992",
+   "tiktok_product_name": "Wuzzt Booster Durian 500ml Pupuk Nutrisi Tanaman Durian untuk Akar Batang Daun Bunga dan Buah",
+   "tiktok_sku": "",
+   "aneka_product_id": "1648",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Wuzzt Booster Durian 500ml Pupuk Nutrisi Tanaman Durian untuk Akar Batang Daun Bunga dan Buah",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754216922973744",
+   "tiktok_product_name": "Pupuk Calsira Anti Rontok 500 Gram – Booster Kalsium untuk Buah & Bunga Tidak Mudah Gugur",
+   "tiktok_sku": "",
+   "aneka_product_id": "1359",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Pupuk Calsira Anti Rontok 500 Gram – Booster Kalsium untuk Buah & Bunga Tidak Mudah Gugur",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754216922580528",
+   "tiktok_product_name": "Pupuk Nutrisi Bunga 250 Gram – Booster Pembungaan & Warna Bunga Lebih Cerah",
+   "tiktok_sku": "",
+   "aneka_product_id": "1358",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Pupuk Nutrisi Bunga 250 Gram – Booster Pembungaan & Warna Bunga Lebih Cerah",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754216922842672",
+   "tiktok_product_name": "Perisai Cabai 500ml – Imun Booster Tanaman Cabai Anti Keriting & Daun Kuning",
+   "tiktok_sku": "",
+   "aneka_product_id": "1447",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Perisai Cabai 500ml – Imun Booster Tanaman Cabai Anti Keriting & Daun Kuning",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754216922383920",
+   "tiktok_product_name": "Fertani Pupuk Organik Cair 100ml Nutrisi Makro & Mikro Lengkap Tanaman Sayuran, Aman & Organik, Cocok Semprot Daun atau Siram untuk Hidroponik, Polybag, & Tanah, Hasil Panen Lebih Subur",
+   "tiktok_sku": "",
+   "aneka_product_id": "1698",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Fertani Pupuk Organik Cair 100ml Nutrisi Makro & Mikro Lengkap Tanaman Sayuran, Aman & Organik, Cocok Semprot Daun atau Siram untuk Hidroponik, Polybag, & Tanah, Hasil Panen Lebih Subur",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754216923039280",
+   "tiktok_product_name": "Booster Sawit Fertani 250 Gram – Pupuk Pelengkap Cair untuk Produktivitas Maksimal",
+   "tiktok_sku": "",
+   "aneka_product_id": "1552",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Booster Sawit Fertani 250 Gram – Pupuk Pelengkap Cair untuk Produktivitas Maksimal",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754216922777136",
+   "tiktok_product_name": "Fertani Pupuk Organik Cair Tanaman Buah 100ml – Nutrisi Makro & Mikro Lengkap untuk Memperkuat Akar, Menyehatkan Tanaman, dan Meningkatkan Hasil Panen Optimal",
+   "tiktok_sku": "",
+   "aneka_product_id": "1702",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Fertani Pupuk Organik Cair Tanaman Buah 100ml – Nutrisi Makro & Mikro Lengkap untuk Memperkuat Akar, Menyehatkan Tanaman, dan Meningkatkan Hasil Panen Optimal",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754216922449456",
+   "tiktok_product_name": "Nutrisi Sayuran 500ml – Pupuk Cair Nutrisi Lengkap Untuk Sayuran Daun Lebih Hijau & Segar",
+   "tiktok_sku": "",
+   "aneka_product_id": "1448",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Nutrisi Sayuran 500ml – Pupuk Cair Nutrisi Lengkap Untuk Sayuran Daun Lebih Hijau & Segar",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737754216922711600",
+   "tiktok_product_name": "Fertani Pestisida Nabati Cair 500ml – Pupuk Organik Alami, Solusi Perlindungan Tanaman dari Hama, Aman & Efektif, Kemasan Spray Praktis",
+   "tiktok_sku": "",
+   "aneka_product_id": "1670",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Fertani Pestisida Nabati Cair 500ml – Pupuk Organik Alami, Solusi Perlindungan Tanaman dari Hama, Aman & Efektif, Kemasan Spray Praktis",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737448401220896304",
+   "tiktok_product_name": "Setelan Jumba Onset Anak Perempuan & Laki Laki Series Cute Head Animal Usia 1-12 Tahun",
+   "tiktok_sku": "",
+   "aneka_product_id": "1542",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Setelan Jumba Onset Anak Perempuan & Laki Laki Series Cute Head Animal Usia 1-12 Tahun",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737448401220568624",
+   "tiktok_product_name": "Happy Little Dress Orchid Anak Perempuan 5–6 Tahun – Dress Cantik Bordir Bunga Pastel, Aksesoris Kupu-Kupu, Cotton Combed 24s, Lembut & Nyaman untuk Balita",
+   "tiktok_sku": "",
+   "aneka_product_id": "1482",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Happy Little Dress Orchid Anak Perempuan 5–6 Tahun – Dress Cantik Bordir Bunga Pastel, Aksesoris Kupu-Kupu, Cotton Combed 24s, Lembut & Nyaman untuk Balita",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737448401220503088",
+   "tiktok_product_name": "Setelan Jumba Onset Anak Perempuan & Laki Laki Series Africa Cute Usia 1-12 Tahun",
+   "tiktok_sku": "",
+   "aneka_product_id": "1536",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Setelan Jumba Onset Anak Perempuan & Laki Laki Series Africa Cute Usia 1-12 Tahun",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737448401221289520",
+   "tiktok_product_name": "Baju Setelan Longsleeve Onset Anak Perempuan & Laki Laki Series Cute Head Animal Usia 1-12 Tahun",
+   "tiktok_sku": "",
+   "aneka_product_id": "1539",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Baju Setelan Longsleeve Onset Anak Perempuan & Laki Laki Series Cute Head Animal Usia 1-12 Tahun",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737452423824639536",
+   "tiktok_product_name": "Beewax Wood Seasoning Polish Gel Lilin Lebah Alami Pengkilap Kayu",
+   "tiktok_sku": "",
+   "aneka_product_id": "2136",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Beewax Wood Seasoning Polish Gel Lilin Lebah Alami Pengkilap Kayu",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133361284656",
+   "tiktok_product_name": "So Easy Pembersih Mesin Cuci 2PCS – Ampuh Hilangkan Kotoran, Kerak & Bau Tak Sedap, Sisa Deterjen Bersih Maksimal",
+   "tiktok_sku": "",
+   "aneka_product_id": "1054",
+   "aneka_variant_id": "",
+   "aneka_product_name": "So Easy Pembersih Mesin Cuci 2PCS – Ampuh Hilangkan Kotoran, Kerak & Bau Tak Sedap, Sisa Deterjen Bersih Maksimal",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133362529840",
+   "tiktok_product_name": "Pembersih Meja",
+   "tiktok_sku": "",
+   "aneka_product_id": "958",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Pembersih Meja",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133361743408",
+   "tiktok_product_name": "Delta Plus 55 EC 100ml Cairan Pembasmi Kutu Caplak Tungau untuk Anjing Kucing Kandang dan Lingkungan Hewan",
+   "tiktok_sku": "",
+   "aneka_product_id": "543",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Delta Plus 55 EC 100ml Cairan Pembasmi Kutu Caplak Tungau untuk Anjing Kucing Kandang dan Lingkungan Hewan",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133362202160",
+   "tiktok_product_name": "Penghilang Noda Lipstik 250ml di Pakaian",
+   "tiktok_sku": "",
+   "aneka_product_id": "925",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Penghilang Noda Lipstik 250ml di Pakaian",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133362071088",
+   "tiktok_product_name": "Glow Home Pembersih Toilet Serbaguna – Foam Cleaner Anti Kerak, Jamur, Noda Air, 500ml",
+   "tiktok_sku": "",
+   "aneka_product_id": "1042",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Glow Home Pembersih Toilet Serbaguna – Foam Cleaner Anti Kerak, Jamur, Noda Air, 500ml",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133362398768",
+   "tiktok_product_name": "Pembersih Kerak – Cairan Pembersih Kerak Kamar Mandi, Keramik, Kloset & Wastafel Ampuh Angkat Noda Membandel",
+   "tiktok_sku": "",
+   "aneka_product_id": "1816",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Pembersih Kerak – Cairan Pembersih Kerak Kamar Mandi, Keramik, Kloset & Wastafel Ampuh Angkat Noda Membandel",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133361940016",
+   "tiktok_product_name": "Alfa Tox 100 ml - Obat Kutu Ternak - Pembasmi Larva Lalat Gurem Kutu Ampuh 100 ml",
+   "tiktok_sku": "",
+   "aneka_product_id": "544",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Alfa Tox 100 ml - Obat Kutu Ternak - Pembasmi Larva Lalat Gurem Kutu Ampuh 100 ml",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133361874480",
+   "tiktok_product_name": "TERRAMYCIN PLUS 10 ml - Obat Ayam Pasca Bertarung - Obat Ayam Yang Terkena Jalu - Obat CRD Ngorok Ayam - Obat Ayam Berak Kapur",
+   "tiktok_sku": "",
+   "aneka_product_id": "529",
+   "aneka_variant_id": "",
+   "aneka_product_name": "TERRAMYCIN PLUS 10 ml - Obat Ayam Pasca Bertarung - Obat Ayam Yang Terkena Jalu - Obat CRD Ngorok Ayam - Obat Ayam Berak Kapur",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133362136624",
+   "tiktok_product_name": "Penghilang Noda Soas Kecap 250ml di Pakaian",
+   "tiktok_sku": "",
+   "aneka_product_id": "926",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Penghilang Noda Soas Kecap 250ml di Pakaian",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133362464304",
+   "tiktok_product_name": "Glow Home | Anti Sumbat WC Saluran Air Wastafel Mampet",
+   "tiktok_sku": "",
+   "aneka_product_id": "1041",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Glow Home | Anti Sumbat WC Saluran Air Wastafel Mampet",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133361808944",
+   "tiktok_product_name": "KATAKILL 500ML - Pembasmi Serangga - Membunuh Semua Jenis Serangga - 500ml",
+   "tiktok_sku": "",
+   "aneka_product_id": "534",
+   "aneka_variant_id": "",
+   "aneka_product_name": "KATAKILL 500ML - Pembasmi Serangga - Membunuh Semua Jenis Serangga - 500ml",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133361415728",
+   "tiktok_product_name": "Super Blood 20 ml - Super Blood Untuk Ayam - Energy Booster Ayam",
+   "tiktok_sku": "",
+   "aneka_product_id": "2133",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Super Blood 20 ml - Super Blood Untuk Ayam - Energy Booster Ayam",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133361153584",
+   "tiktok_product_name": "Super Oxy Fit 20 ml - Untuk Ayam Sakit Apapun - Untuk Ayam Aduan",
+   "tiktok_sku": "",
+   "aneka_product_id": "545",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Super Oxy Fit 20 ml - Untuk Ayam Sakit Apapun - Untuk Ayam Aduan",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133361546800",
+   "tiktok_product_name": "Ecovet 200 gram - Antibiotik Herbal untuk Sapi - Ecovet 200 gram - B3G1 - LEBIH EFEKTIF",
+   "tiktok_sku": "",
+   "aneka_product_id": "531",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Ecovet 200 gram - Antibiotik Herbal untuk Sapi - Ecovet 200 gram - B3G1 - LEBIH EFEKTIF",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133361350192",
+   "tiktok_product_name": "Vita Plus 30 ml - Vitamin Nafsu Makan Kucing Anjing - Multivitamin Hewan Peliharaan",
+   "tiktok_sku": "",
+   "aneka_product_id": "556",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Vita Plus 30 ml - Vitamin Nafsu Makan Kucing Anjing - Multivitamin Hewan Peliharaan",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133361677872",
+   "tiktok_product_name": "Premix Super 11 1 Kg – Suplemen Curcuma Herbal untuk Kambing, Sapi, Domba – Peningkat Pertumbuhan & Kesehatan Ternak",
+   "tiktok_sku": "",
+   "aneka_product_id": "540",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Premix Super 11 1 Kg – Suplemen Curcuma Herbal untuk Kambing, Sapi, Domba – Peningkat Pertumbuhan & Kesehatan Ternak",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133361612336",
+   "tiktok_product_name": "Lincospec 10 ml - Obat Sakit Ayam - Lincospec 200 10 ml - Obat Sakit Ayam 10 ml",
+   "tiktok_sku": "",
+   "aneka_product_id": "528",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Lincospec 10 ml - Obat Sakit Ayam - Lincospec 200 10 ml - Obat Sakit Ayam 10 ml",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133362005552",
+   "tiktok_product_name": "Super Blood 10 ml - Super Blood Untuk Ayam - Energy Booster Ayam",
+   "tiktok_sku": "",
+   "aneka_product_id": "555",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Super Blood 10 ml - Super Blood Untuk Ayam - Energy Booster Ayam",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453190416533040",
+   "tiktok_product_name": "Bundling Get 3 Kaki Tabib - Perawatan Kulit Rendaman Kaki (15g)",
+   "tiktok_sku": "",
+   "aneka_product_id": "1452",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Bundling Get 3 Kaki Tabib - Perawatan Kulit Rendaman Kaki (15g)",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453190416598576",
+   "tiktok_product_name": "Banana Heel Cream 60g Krim Tumit Pecah-Pecah Dan Kering Dan Kasar Ampuh Pelembab Ekstrak Pisang",
+   "tiktok_sku": "",
+   "aneka_product_id": "2221",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Banana Heel Cream 60g Krim Tumit Pecah-Pecah Dan Kering Dan Kasar Ampuh Pelembab Ekstrak Pisang",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453506516518448",
+   "tiktok_product_name": "Ampuh Super 3 Pcs Pembasmi Lalat Ternak untuk Kandang Sapi Kambing Ayam Bebek dan Unggas",
+   "tiktok_sku": "",
+   "aneka_product_id": "1646",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Ampuh Super 3 Pcs Pembasmi Lalat Ternak untuk Kandang Sapi Kambing Ayam Bebek dan Unggas",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453506516387376",
+   "tiktok_product_name": "Super Dokoh 500ml Suplemen Cair Ternak Jumbo untuk Nafsu Makan Sapi Kambing Domba Kerbau dan Ternak",
+   "tiktok_sku": "",
+   "aneka_product_id": "1642",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Super Dokoh 500ml Suplemen Cair Ternak Jumbo untuk Nafsu Makan Sapi Kambing Domba Kerbau dan Ternak",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615164720688",
+   "tiktok_product_name": "Shoe Clean Shoe Parfume 60ml – pengharum sepatu anti bau dan tahan lama",
+   "tiktok_sku": "",
+   "aneka_product_id": "1107",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Shoe Clean Shoe Parfume 60ml – pengharum sepatu anti bau dan tahan lama",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453830366332464",
+   "tiktok_product_name": "FERTANI Umpan Pancing 120X Cacing Bloodworm 30gr",
+   "tiktok_sku": "",
+   "aneka_product_id": "2150",
+   "aneka_variant_id": "",
+   "aneka_product_name": "FERTANI Umpan Pancing 120X Cacing Bloodworm 30gr",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615165179440",
+   "tiktok_product_name": "Essen Pancing Power 30 ml Berbagai Varian – Perisa Umpan untuk Galatama, Harian, dan Lomba",
+   "tiktok_sku": "",
+   "aneka_product_id": "2112",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Essen Pancing Power 30 ml Berbagai Varian – Perisa Umpan untuk Galatama, Harian, dan Lomba",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615164982832",
+   "tiktok_product_name": "ESSEN LUMUT R-46 65ml",
+   "tiktok_sku": "",
+   "aneka_product_id": "63",
+   "aneka_variant_id": "",
+   "aneka_product_name": "ESSEN LUMUT R-46 65ml",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615165507120",
+   "tiktok_product_name": "Fertani Umpan Pancing 120X",
+   "tiktok_sku": "",
+   "aneka_product_id": "2145",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Fertani Umpan Pancing 120X",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453830366660144",
+   "tiktok_product_name": "Essen Kailtorque 30 ml Berbagai Varian – Perisa Umpan Galatama, Harian, dan Lomba",
+   "tiktok_sku": "",
+   "aneka_product_id": "2118",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Essen Kailtorque 30 ml Berbagai Varian – Perisa Umpan Galatama, Harian, dan Lomba",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453830366463536",
+   "tiktok_product_name": "ESSEN IKAN BAWAL BRO AZMI 65ml",
+   "tiktok_sku": "",
+   "aneka_product_id": "57",
+   "aneka_variant_id": "",
+   "aneka_product_name": "ESSEN IKAN BAWAL BRO AZMI 65ml",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133362333232",
+   "tiktok_product_name": "New Fludoxan 120ml - Obat Flu Ternak - Obat Batuk Ternak - Fludoxan 120ml",
+   "tiktok_sku": "",
+   "aneka_product_id": "541",
+   "aneka_variant_id": "",
+   "aneka_product_name": "New Fludoxan 120ml - Obat Flu Ternak - Obat Batuk Ternak - Fludoxan 120ml",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133361481264",
+   "tiktok_product_name": "Max Centin 100 Gram - Max Centin Pemerah Telur - Pemerah Telur Xantaxenthin - Xantaxenthin 100 gr",
+   "tiktok_sku": "",
+   "aneka_product_id": "539",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Max Centin 100 Gram - Max Centin Pemerah Telur - Pemerah Telur Xantaxenthin - Xantaxenthin 100 gr",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615164851760",
+   "tiktok_product_name": "- FERTANI Essen Ikan 120X Kapsul Formula Ikan Liar",
+   "tiktok_sku": "",
+   "aneka_product_id": "2148",
+   "aneka_variant_id": "",
+   "aneka_product_name": "- FERTANI Essen Ikan 120X Kapsul Formula Ikan Liar",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453506516452912",
+   "tiktok_product_name": "ALBENOL - Obat Cacing Ternak Ampuh | Cacing Hilang, Nafsu Makan Meningkat & Bobot Cepat Naik",
+   "tiktok_sku": "",
+   "aneka_product_id": "1641",
+   "aneka_variant_id": "",
+   "aneka_product_name": "ALBENOL - Obat Cacing Ternak Ampuh | Cacing Hilang, Nafsu Makan Meningkat & Bobot Cepat Naik",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453506516321840",
+   "tiktok_product_name": "Pinicillin 100ml Spray Perawatan Luka Kulit Hewan Ternak untuk Koreng Kudis Gatal Jamur Sapi Kambing Domba",
+   "tiktok_sku": "",
+   "aneka_product_id": "1645",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Pinicillin 100ml Spray Perawatan Luka Kulit Hewan Ternak untuk Koreng Kudis Gatal Jamur Sapi Kambing Domba",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615164786224",
+   "tiktok_product_name": "FERTANI Essen Ikan 120X Kapsul Formula Ikan Kolam",
+   "tiktok_sku": "",
+   "aneka_product_id": "2149",
+   "aneka_variant_id": "",
+   "aneka_product_name": "FERTANI Essen Ikan 120X Kapsul Formula Ikan Kolam",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615165310512",
+   "tiktok_product_name": "Kipas Tai Chi Polos Warna Merah | Kipas Latihan Pernapasan & Olahraga Tradisional",
+   "tiktok_sku": "",
+   "aneka_product_id": "1134",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Kipas Tai Chi Polos Warna Merah | Kipas Latihan Pernapasan & Olahraga Tradisional",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615165769264",
+   "tiktok_product_name": "SHOES CLEANER R-46",
+   "tiktok_sku": "",
+   "aneka_product_id": "53",
+   "aneka_variant_id": "",
+   "aneka_product_name": "SHOES CLEANER R-46",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615164917296",
+   "tiktok_product_name": "ESSEN JAHAT STRIKE R-46",
+   "tiktok_sku": "",
+   "aneka_product_id": "65",
+   "aneka_variant_id": "",
+   "aneka_product_name": "ESSEN JAHAT STRIKE R-46",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615165441584",
+   "tiktok_product_name": "Boom Essen 30 ml Berbagai Varian – Perisa Umpan Galatama dan Mancing Harian",
+   "tiktok_sku": "",
+   "aneka_product_id": "2120",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Boom Essen 30 ml Berbagai Varian – Perisa Umpan Galatama dan Mancing Harian",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615165244976",
+   "tiktok_product_name": "Pembersih Sepatu",
+   "tiktok_sku": "",
+   "aneka_product_id": "961",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Pembersih Sepatu",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453830366398000",
+   "tiktok_product_name": "ESSEN IKAN PATIN BRO AZMI 65ml",
+   "tiktok_sku": "",
+   "aneka_product_id": "58",
+   "aneka_variant_id": "",
+   "aneka_product_name": "ESSEN IKAN PATIN BRO AZMI 65ml",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453830366987824",
+   "tiktok_product_name": "Essen Tarik Hantam 30 ml Berbagai Varian – Perisa Umpan Galatama dan Mancing Harian",
+   "tiktok_sku": "",
+   "aneka_product_id": "2122",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Essen Tarik Hantam 30 ml Berbagai Varian – Perisa Umpan Galatama dan Mancing Harian",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615164524080",
+   "tiktok_product_name": "Essen Pancing Power 60 ml Berbagai Varian – Perisa Umpan untuk Galatama, Harian, dan Lomba",
+   "tiktok_sku": "",
+   "aneka_product_id": "2111",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Essen Pancing Power 60 ml Berbagai Varian – Perisa Umpan untuk Galatama, Harian, dan Lomba",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615164327472",
+   "tiktok_product_name": "Essen Kailtorque 60 ml Berbagai Varian – Perisa Umpan Galatama, Harian, dan Lomba",
+   "tiktok_sku": "",
+   "aneka_product_id": "2117",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Essen Kailtorque 60 ml Berbagai Varian – Perisa Umpan Galatama, Harian, dan Lomba",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615165113904",
+   "tiktok_product_name": "FERTANI Essen Ikan Cair 120X Formula Konsentrat - Penambah Aroma Umpan Pancing Air Tawar (Netto 100ml)",
+   "tiktok_sku": "",
+   "aneka_product_id": "2146",
+   "aneka_variant_id": "",
+   "aneka_product_name": "FERTANI Essen Ikan Cair 120X Formula Konsentrat - Penambah Aroma Umpan Pancing Air Tawar (Netto 100ml)",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615165703728",
+   "tiktok_product_name": "STRIKE-X ESSEN 60ML Berbagai Varian – Perisa Umpan untuk Galatama, Harian, dan Lomba",
+   "tiktok_sku": "",
+   "aneka_product_id": "198",
+   "aneka_variant_id": "",
+   "aneka_product_name": "STRIKE-X ESSEN 60ML Berbagai Varian – Perisa Umpan untuk Galatama, Harian, dan Lomba",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453830366725680",
+   "tiktok_product_name": "FERTANI Umpan Pancing 120X Udang Antartika Netto 30g",
+   "tiktok_sku": "",
+   "aneka_product_id": "2151",
+   "aneka_variant_id": "",
+   "aneka_product_name": "FERTANI Umpan Pancing 120X Udang Antartika Netto 30g",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615164655152",
+   "tiktok_product_name": "Essen Hantam 60 ml Berbagai Varian – Perisa Umpan Galatama, Harian, dan Lomba",
+   "tiktok_sku": "",
+   "aneka_product_id": "2113",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Essen Hantam 60 ml Berbagai Varian – Perisa Umpan Galatama, Harian, dan Lomba",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453830366529072",
+   "tiktok_product_name": "Essen Strike Racun 60 ml – Perisa Umpan Galatama, Harian, dan Lomba",
+   "tiktok_sku": "",
+   "aneka_product_id": "2123",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Essen Strike Racun 60 ml – Perisa Umpan Galatama, Harian, dan Lomba",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615164196400",
+   "tiktok_product_name": "ESSEN IKAN BAWAL R-46 65ml",
+   "tiktok_sku": "",
+   "aneka_product_id": "62",
+   "aneka_variant_id": "",
+   "aneka_product_name": "ESSEN IKAN BAWAL R-46 65ml",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615165572656",
+   "tiktok_product_name": "Essen Strike Racun 30 ml – Perisa Umpan Galatama, Harian, dan Lomba",
+   "tiktok_sku": "",
+   "aneka_product_id": "2124",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Essen Strike Racun 30 ml – Perisa Umpan Galatama, Harian, dan Lomba",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615164261936",
+   "tiktok_product_name": "Boom Essen 60 ml Berbagai Varian – Perisa Umpan Galatama dan Mancing Harian",
+   "tiktok_sku": "",
+   "aneka_product_id": "2119",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Boom Essen 60 ml Berbagai Varian – Perisa Umpan Galatama dan Mancing Harian",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453830366922288",
+   "tiktok_product_name": "ESSEN IKAN EMAS BRO AZMI 65ml",
+   "tiktok_sku": "",
+   "aneka_product_id": "59",
+   "aneka_variant_id": "",
+   "aneka_product_name": "ESSEN IKAN EMAS BRO AZMI 65ml",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453615165048368",
+   "tiktok_product_name": "ESSEN IKAN EMAS R-46 65ml",
+   "tiktok_sku": "",
+   "aneka_product_id": "64",
+   "aneka_variant_id": "",
+   "aneka_product_name": "ESSEN IKAN EMAS R-46 65ml",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453830366594608",
+   "tiktok_product_name": "Shoes Cleaner 100ml – Pembersih Sepatu Aman untuk Kulit, Suede, Kanvas, Mesh, dan Bahan Sintetis",
+   "tiktok_sku": "",
+   "aneka_product_id": "29",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Shoes Cleaner 100ml – Pembersih Sepatu Aman untuk Kulit, Suede, Kanvas, Mesh, dan Bahan Sintetis",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737454037802321456",
+   "tiktok_product_name": "Kurma Berkah – Premium Kurma Pilihan",
+   "tiktok_sku": "",
+   "aneka_product_id": "1221",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Kurma Berkah – Premium Kurma Pilihan",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737454037802255920",
+   "tiktok_product_name": "Black Chia Seed 100gr Kaya Antioksidan",
+   "tiktok_sku": "",
+   "aneka_product_id": "1118",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Black Chia Seed 100gr Kaya Antioksidan",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737454037802714672",
+   "tiktok_product_name": "Great Vanilla Bean Gourmet 2 pods",
+   "tiktok_sku": "",
+   "aneka_product_id": "370",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Great Vanilla Bean Gourmet 2 pods",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737454037802583600",
+   "tiktok_product_name": "Black Garlic Honey Madu Bawang Hitam 250ml",
+   "tiktok_sku": "",
+   "aneka_product_id": "1235",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Black Garlic Honey Madu Bawang Hitam 250ml",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737454037802386992",
+   "tiktok_product_name": "Soy Bean Milk Powder 200gr Susu Kacang Kedelai Bubuk Murni Tinggi Protein Nabati",
+   "tiktok_sku": "",
+   "aneka_product_id": "1396",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Soy Bean Milk Powder 200gr Susu Kacang Kedelai Bubuk Murni Tinggi Protein Nabati",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737454037802845744",
+   "tiktok_product_name": "Cuka Apel 500ml With Mother",
+   "tiktok_sku": "",
+   "aneka_product_id": "1394",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Cuka Apel 500ml With Mother",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737454037802452528",
+   "tiktok_product_name": "Soy Bean Milk Powder 1Kg Susu Kacang Kedelai Bubuk Murni Tinggi Protein Nabati",
+   "tiktok_sku": "",
+   "aneka_product_id": "1397",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Soy Bean Milk Powder 1Kg Susu Kacang Kedelai Bubuk Murni Tinggi Protein Nabati",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737454037802911280",
+   "tiktok_product_name": "Sari Lemon 500ml Murni Lemon California",
+   "tiktok_sku": "",
+   "aneka_product_id": "1395",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Sari Lemon 500ml Murni Lemon California",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737454037802649136",
+   "tiktok_product_name": "Black Chia Seed 200gr Premium",
+   "tiktok_sku": "",
+   "aneka_product_id": "1119",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Black Chia Seed 200gr Premium",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737454037802976816",
+   "tiktok_product_name": "Sari Lemon Original 250ml - Diet Detoks Original California",
+   "tiktok_sku": "",
+   "aneka_product_id": "1398",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Sari Lemon Original 250ml - Diet Detoks Original California",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737704837772183088",
+   "tiktok_product_name": "Glowhome Pembersih Stainless Steel dan Anti Lengket 180ml Cairan Penghilang Kerak Noda Hitam Alat Dapur",
+   "tiktok_sku": "",
+   "aneka_product_id": "1039",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Glowhome Pembersih Stainless Steel dan Anti Lengket 180ml Cairan Penghilang Kerak Noda Hitam Alat Dapur",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737704674627913264",
+   "tiktok_product_name": "Pupuk Booster Tanaman Buah 250 Gram – Perangsang Bunga & Buah Lebat",
+   "tiktok_sku": "",
+   "aneka_product_id": "2174",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Pupuk Booster Tanaman Buah 250 Gram – Perangsang Bunga & Buah Lebat",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453182586029616",
+   "tiktok_product_name": "SIDOARJO Detergen Khusus",
+   "tiktok_sku": "",
+   "aneka_product_id": "757",
+   "aneka_variant_id": "",
+   "aneka_product_name": "SIDOARJO Detergen Khusus",
+   "enabled": 1
+  },
+  {
+   "tiktok_product_id": "1737453133361219120",
+   "tiktok_product_name": "Desinfektan Kandang 1 Liter - Destan Plus 1 L - Desinfektan BKC 10% Aroma Segar - Desinfektan",
+   "tiktok_sku": "",
+   "aneka_product_id": "530",
+   "aneka_variant_id": "",
+   "aneka_product_name": "Desinfektan Kandang 1 Liter - Destan Plus 1 L - Desinfektan BKC 10% Aroma Segar - Desinfektan",
+   "enabled": 1
+  }
+ ]
+}

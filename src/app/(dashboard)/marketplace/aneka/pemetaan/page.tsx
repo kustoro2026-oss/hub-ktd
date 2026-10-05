@@ -7,6 +7,7 @@ import {
   getSeenTiktokProducts,
 } from "@/lib/aneka-map";
 import AnekaMapClient from "@/components/aneka-map-client";
+import seedData from "@/lib/aneka-map-seed.json";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pemetaan Produk Aneka" };
@@ -17,6 +18,13 @@ export default async function AnekaPemetaanPage() {
     getSeenTiktokProducts(),
   ]);
 
+  // ID produk TikTok yang tercakup seed pemetaan awal (untuk tombol impor).
+  const seedIds = (
+    (seedData as { rows?: { tiktok_product_id?: string }[] }).rows ?? []
+  )
+    .map((r) => r.tiktok_product_id ?? "")
+    .filter(Boolean);
+
   return (
     <AnekaMapClient
       initialMaps={maps}
@@ -24,6 +32,7 @@ export default async function AnekaPemetaanPage() {
       seenDetail={seen.ok ? "" : seen.detail}
       catalogAt={anekaCatalogGeneratedAt()}
       catalogCount={766}
+      seedIds={seedIds}
     />
   );
 }

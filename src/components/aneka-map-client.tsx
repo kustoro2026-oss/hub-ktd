@@ -166,12 +166,14 @@ export default function AnekaMapClient({
   seenDetail,
   catalogAt,
   catalogCount,
+  seedIds,
 }: {
   initialMaps: MapRow[];
   initialSeen: SeenProduct[];
   seenDetail: string;
   catalogAt: string;
   catalogCount: number;
+  seedIds: string[];
 }) {
   const [mapsById, setMapsById] = useState<Record<string, MapRow>>(() => {
     const acc: Record<string, MapRow> = {};
@@ -248,6 +250,28 @@ export default function AnekaMapClient({
     },
     [sync],
   );
+
+  // Impor massal pemetaan awal dari seed (100 produk TikTok yang sudah
+  // di-upload). Tidak menimpa pemetaan yang sudah ada.
+  const seedPending = seedIds.filter((id) => !(id in mapsById)).length;
+  const importSeeds = async () => {
+    setSaving("__seed__");
+    setError("");
+    try {
+      const r = await fetch("/api/aneka-map/seed", { method: "POST" });
+      const data = (await r.json()) as {
+        ok?: boolean;
+        detail?: string;
+        inserted?: number;
+      };
+      if (!data.ok) setError(data.detail ?? "Gagal mengimpor pemetaan awal.");
+      else await sync();
+    } catch {
+      setError("Gagal mengimpor pemetaan awal (jaringan).");
+    } finally {
+      setSaving("");
+    }
+  };
 
   // Baris tabel = gabungan produk dari pesanan + pemetaan manual.
   const rows: TableProduct[] = [];
@@ -340,6 +364,25 @@ export default function AnekaMapClient({
       {error ? (
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
           {error}
+        </div>
+      ) : null}
+
+      {seedPending > 0 ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm">
+          <p className="text-sky-900">
+            <span className="font-semibold">{seedPending} pemetaan awal</span>{" "}
+            dari {seedIds.length} produk TikTok yang sudah di-upload belum
+            diimpor. Pemetaan yang sudah ada tidak akan ditimpa.
+          </p>
+          <button
+            onClick={importSeeds}
+            disabled={saving === "__seed__"}
+            className="ml-auto rounded-lg bg-sky-600 px-3 py-1.5 font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+          >
+            {saving === "__seed__"
+              ? "Mengimpor..."
+              : `Impor ${seedPending} pemetaan`}
+          </button>
         </div>
       ) : null}
 
