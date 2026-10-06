@@ -605,11 +605,19 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
         }
         // Satu slot resi Aneka per pesanan (satu paket = satu label).
         // Pesanan multi-paket tidak bisa diwakili satu label — proses manual.
+        // Detail juga sumber sku_name (varian). Bila detail GAGAL diambil,
+        // jumlah paket maupun varian tidak bisa dipastikan — gagal tertutup:
+        // catat kegagalan dan coba lagi siklus berikutnya, jangan sampai
+        // checkout membeli paket/varian yang salah.
         const detail = await getTiktokOrderDetail(cred, [o.order_id]);
-        const pkgs = detail.ok
-          ? (detail.orders.find((d) => d.id === o.order_id)?.package_list ??
-              [])
-          : [];
+        if (!detail.ok) {
+          const alasan = `gagal: detail pesanan tidak bisa diambil (${detail.detail}) — paket & varian tidak bisa dipastikan, proses manual`;
+          errors.push(`${shop.shop_name}: ${o.order_id}: ${alasan}`);
+          await recordTiktokOrderFailure(o.order_id, shop.shop_id, alasan);
+          continue;
+        }
+        const pkgs =
+          detail.orders.find((d) => d.id === o.order_id)?.package_list ?? [];
         if (pkgs.length > 1) {
           const alasan = `gagal: pesanan multi-paket (${pkgs.length} paket) — eksekusi Aneka hanya satu slot resi, proses manual`;
           errors.push(`${shop.shop_name}: ${o.order_id}: ${alasan}`);

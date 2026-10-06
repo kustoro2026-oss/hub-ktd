@@ -370,7 +370,9 @@ export async function getTiktokOrders(
                 0,
               );
             }
-            if (!qty) qty = 1;
+            // Bila tetap 0 (data TikTok tidak lengkap), biarkan 0 — gerbang
+            // eksekusi Aneka menolak qty 0 ke proses manual, jangan menebak 1
+            // dan berisiko membeli jumlah yang salah.
             return {
               product_id: String(i.product_id ?? ""),
               sku_id: String(i.sku_id ?? ""),
