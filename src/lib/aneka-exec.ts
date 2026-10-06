@@ -136,13 +136,29 @@ export async function checkAnekaExecutable(
       subtotal: harga * it.sku_count,
     });
   }
+  // Gabung baris kembar (produk + varian pesanan sama) menjadi satu baris
+  // dengan qty dijumlah. TikTok sering menulis qty besar sebagai beberapa
+  // baris identik (masing-masing sku_count 1), dan /variant/save Aneka
+  // MENIMPA qty produk yang sama — tanpa penggabungan ini, pesanan qty 2
+  // hanya akan membeli 1.
+  const merged = new Map<string, AnekaExecItem>();
+  for (const it of items) {
+    const key = `${it.tiktok_product_id}|${it.sku_name}`;
+    const prev = merged.get(key);
+    if (prev) {
+      prev.qty += it.qty;
+      prev.subtotal = prev.harga_modal * prev.qty;
+    } else {
+      merged.set(key, { ...it });
+    }
+  }
   if (missing.length > 0) {
     return {
       ok: false,
       detail: `Belum bisa dieksekusi otomatis: ${missing.join(", ")}`,
     };
   }
-  return { ok: true, items };
+  return { ok: true, items: [...merged.values()] };
 }
 
 /** PERSIAPAN: simpan label resmi + rincian produk sebagai antrean eksekusi
@@ -470,14 +486,56 @@ export async function executeAnekaOrder(
     );
   }
 
-  // 2. Masukkan produk: satu slot resi untuk pesanan ini (satu paket
-  //    TikTok = satu label) — slot dipasang di produk pertama.
-  const items: AnekaCartItem[] = payload.items.map((it, i) => ({
-    productId: it.aneka_product_id,
-    variantId: it.aneka_variant_id || undefined,
-    qty: it.qty,
+  // 2. Masukkan produk: SATU panggilan variant/save per kombinasi
+  //    produk+varian — endpoint MENIMPA qty produk yang sama, jadi baris
+  //    kembar harus dijumlahkan dulu di sini (pengaman untuk payload lama
+  //    yang disimpan sebelum penggabungan di checkAnekaExecutable, mis.
+  //    dua listing TikTok berbeda yang memetakan ke produk Aneka yang
+  //    sama). Bila produk Aneka yang sama dipesan dengan DUA varian
+  //    berbeda, keranjang Aneka tidak bisa mewakilinya — gagal aman supaya
+  //    tidak membeli varian yang salah. Satu slot resi untuk pesanan ini
+  //    (satu paket TikTok = satu label) — slot dipasang di baris pertama.
+  type Grouped = {
+    productId: string;
+    variantId?: string;
+    qty: number;
+    label: string;
+  };
+  const grouped = new Map<string, Grouped>();
+  const byProduct = new Map<string, { variantId: string; label: string }[]>();
+  for (const it of payload.items) {
+    const variantId = it.aneka_variant_id || undefined;
+    const key = `${it.aneka_product_id}|${variantId ?? ""}`;
+    const prev = grouped.get(key);
+    if (prev) {
+      prev.qty += it.qty;
+    } else {
+      grouped.set(key, {
+        productId: it.aneka_product_id,
+        variantId,
+        qty: it.qty,
+        label: it.sku_name || it.product_name,
+      });
+    }
+    const arr = byProduct.get(it.aneka_product_id) ?? [];
+    arr.push({ variantId: variantId ?? "", label: it.sku_name || it.product_name });
+    byProduct.set(it.aneka_product_id, arr);
+  }
+  for (const [pid, arr] of byProduct) {
+    const variants = [...new Set(arr.map((a) => a.variantId))];
+    if (variants.length > 1) {
+      return gagal(
+        `Produk Aneka ${pid} dipesan dengan ${variants.length} varian berbeda (${arr.map((a) => a.label).join(", ")}) — keranjang Aneka tidak mendukung, proses manual`,
+      );
+    }
+  }
+  const items: AnekaCartItem[] = [...grouped.values()].map((g, i) => ({
+    productId: g.productId,
+    variantId: g.variantId,
+    qty: g.qty,
     resiCount: i === 0 ? 1 : 0,
   }));
+  const totalPcs = items.reduce((s, it) => s + it.qty, 0);
   const save = await anekaVariantSave(login.session, pay.paymentId, items);
   if (!save.ok) {
     await logStep("variant/save", `GAGAL — ${save.detail}`);
@@ -485,7 +543,7 @@ export async function executeAnekaOrder(
   }
   await logStep(
     "variant/save",
-    `berhasil — ${items.length} item masuk keranjang (slot resi 1)`,
+    `berhasil — ${items.length} baris (total ${totalPcs} pcs) masuk keranjang (slot resi 1)`,
   );
 
   // 3. Token halaman checkout → bayar saldo + upload label resmi.
