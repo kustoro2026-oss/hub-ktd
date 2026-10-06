@@ -5,6 +5,12 @@
 # Endpoint idempoten — tabel tiktok_order_seen mencegah kirim ganda.
 # Rahasia CRON_SECRET disimpan di repo: Settings → Secrets and variables →
 # Actions → New repository secret (nilai sama dengan env CRON_SECRET Vercel).
+#
+# Catatan 2026-10-06: jadwal GitHub Actions sempat berhenti membuat run
+# (hanya 2 run dalam 15 jam meski cron */5). Perubahan apa pun pada file ini
+# mendaftarkan ulang jadwal di GitHub; selain itu langkah kini fail-fast bila
+# endpoint menjawab non-2xx (mis. 401 karena secret keliru) dan mencoba ulang
+# 3 kali dengan jeda 10 detik untuk gangguan jaringan sementara.
 name: TikTok order check
 
 on:
@@ -15,9 +21,11 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     steps:
       - name: Panggil endpoint cek pesanan TikTok
         run: |
-          curl -s -o /dev/null -w "%{http_code}\n" \
+          curl -sS -f --retry 3 --retry-delay 10 --retry-all-errors \
+            -o /dev/null -w "%{http_code}\n" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             https://admin.kustoro2026.com/api/tiktok/resi/check
