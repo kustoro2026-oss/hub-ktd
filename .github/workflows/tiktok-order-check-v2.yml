@@ -6,12 +6,14 @@
 # Rahasia CRON_SECRET disimpan di repo: Settings → Secrets and variables →
 # Actions → New repository secret (nilai sama dengan env CRON_SECRET Vercel).
 #
-# Catatan 2026-10-06: jadwal GitHub Actions sempat berhenti membuat run
-# (hanya 2 run dalam 15 jam meski cron */5). Perubahan apa pun pada file ini
-# mendaftarkan ulang jadwal di GitHub; selain itu langkah kini fail-fast bila
-# endpoint menjawab non-2xx (mis. 401 karena secret keliru) dan mencoba ulang
-# 3 kali dengan jeda 10 detik untuk gangguan jaringan sementara.
-name: TikTok order check
+# Catatan 2026-10-06: file ini dibuat ulang dengan nama -v2 karena
+# pendaftaran jadwal file lama di GitHub macet (updated_at mentok di
+# 2026-10-05 dan tidak menghasilkan run baru meski cron */5 dan file
+# sudah diperbarui). Nama file baru memaksa GitHub mendaftarkan jadwal
+# baru dari nol. Selain itu langkah kini fail-fast bila endpoint menjawab
+# non-2xx (mis. 401 karena secret keliru) dan mencoba ulang 3 kali dengan
+# jeda 10 detik untuk gangguan jaringan sementara.
+name: TikTok order check v2
 
 on:
   schedule:
