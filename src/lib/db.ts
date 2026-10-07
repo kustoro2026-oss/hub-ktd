@@ -1124,6 +1124,22 @@ export async function markTiktokOrderSeen(
   await queryRun(sql, [orderId, shopId, notify]);
 }
 
+/** Atur ulang status pesanan supaya diproses ulang dari awal (mis. pesanan
+ *  yang terlanjur jatuh ke jalur resi manual karena bug — dipakai route
+ *  siapkan-ulang yang dijaga CRON_SECRET). Hitungan percobaan di-nol-kan
+ *  supaya tidak tersangkut batas MAX_SEND_ATTEMPTS. Return false bila baris
+ *  pesanan belum pernah tercatat (pesanan belum pernah dilihat pipeline). */
+export async function resetTiktokOrderSeen(
+  orderId: string,
+  notify: string,
+): Promise<boolean> {
+  const updated = await queryOne<{ order_id: string }>(
+    "UPDATE tiktok_order_seen SET notify = ?, attempts = 0, last_attempt_at = '' WHERE order_id = ? RETURNING order_id",
+    [notify, orderId],
+  );
+  return Boolean(updated);
+}
+
 /** Tambah hitungan percobaan kirim resi yang gagal — pesanan yang belum
  *  pernah tercatat otomatis dibuatkan barisnya dengan attempts = 1.
  *  last_attempt_at dicatat supaya percobaan ulang bisa diberi jeda. */
