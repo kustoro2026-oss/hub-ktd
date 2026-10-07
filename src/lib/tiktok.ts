@@ -569,7 +569,14 @@ export async function getTiktokOrderDetail(
   shop: { cipher: string; access_token: string },
   orderIds: string[],
 ): Promise<
-  { ok: true; orders: TiktokOrderDetail[] } | { ok: false; detail: string }
+  | {
+      ok: true;
+      orders: TiktokOrderDetail[];
+      /** Respons mentah (belum diparse) — untuk diagnostik melihat
+       *  field apa saja yang benar-benar dikirim TikTok. */
+      raw: Record<string, unknown>[];
+    }
+  | { ok: false; detail: string }
 > {
   const { appKey, appSecret, ready } = tiktokEnv();
   if (!ready) {
@@ -617,10 +624,9 @@ export async function getTiktokOrderDetail(
         )}`,
       };
     }
-    const orders = (data.data?.orders ?? []).map((o) =>
-      parseDetail(o as Record<string, unknown>),
-    );
-    return { ok: true, orders };
+    const raw = (data.data?.orders ?? []) as Record<string, unknown>[];
+    const orders = raw.map((o) => parseDetail(o));
+    return { ok: true, orders, raw };
   } catch (e) {
     return {
       ok: false,

@@ -1,11 +1,22 @@
-// Diagnostik pesanan TikTok (dijaga secret cron, READ-ONLY): membaca detail
+// Diagnostik pesanan TikTok (dijaga secret cron, READ-ONLY): membaca data
 // pesanan dari API TikTok — qty per baris (sku_count), varian (sku_name),
 // jumlah paket — lalu menjalankan checkAnekaExecutable supaya terlihat
 // KENAPA sebuah pesanan tidak dieksekusi otomatis. Tidak mengubah apa pun.
-// Dipakai lewat GET /api/tiktok/resi/diag?order_id=...&secret=CRON_SECRET.
+//
+// Dua mode:
+// 1. GET /api/tiktok/resi/diag?secret=CRON_SECRET&mode=list
+//    → daftar pesanan terbaru (ringkasan pencarian): jumlah baris per
+//      pesanan + sku_count mentah tiap baris.
+// 2. GET /api/tiktok/resi/diag?order_id=...&secret=CRON_SECRET
+//    → detail pesanan + line_items mentah dari respons TikTok (untuk
+//      melihat field qty apa saja yang benar-benar ada).
 import { checkAnekaExecutable } from "@/lib/aneka-exec";
 import { getTiktokOrderExec, listTiktokShopTokens } from "@/lib/db";
-import { getTiktokOrderDetail, type TiktokOrderSummary } from "@/lib/tiktok";
+import {
+  getTiktokOrderDetail,
+  getTiktokOrders,
+  type TiktokOrderSummary,
+} from "@/lib/tiktok";
 import { prepareShop } from "@/lib/tiktok-orders";
 
 export const dynamic = "force-dynamic";
@@ -23,28 +34,63 @@ function cronAuthorized(request: Request): boolean {
   return given === secret;
 }
 
+/** Ringkas item tanpa data pembeli/alamat. */
+function ringkasLineItems(
+  items: TiktokOrderSummary["items"],
+): Record<string, unknown>[] {
+  return items.map((it) => ({
+    product_id: it.product_id,
+    sku_id: it.sku_id,
+    product_name: it.product_name,
+    sku_name: it.sku_name,
+    seller_sku: it.seller_sku,
+    sku_count: it.sku_count,
+  }));
+}
+
 export async function GET(request: Request) {
   if (!cronAuthorized(request)) {
     return Response.json({ error: "Belum masuk" }, { status: 401 });
   }
-  const orderId = new URL(request.url).searchParams.get("order_id") ?? "";
-  if (!orderId) {
-    return Response.json({ error: "order_id tidak ada" }, { status: 400 });
-  }
+  const url = new URL(request.url);
+  const orderId = url.searchParams.get("order_id") ?? "";
+  const mode = url.searchParams.get("mode") ?? "detail";
 
-  const out: Record<string, unknown> = { order_id: orderId };
+  const out: Record<string, unknown> = { order_id: orderId || "(daftar)" };
   const shops = await listTiktokShopTokens();
   out.shops = shops.length;
+
   for (const shop of shops) {
     const prep = await prepareShop(shop);
     if (!prep.ok) {
       out.prepare_error = prep.detail;
       continue;
     }
-    const detail = await getTiktokOrderDetail(
-      { cipher: prep.cipher, access_token: prep.access_token },
-      [orderId],
-    );
+    const cred = { cipher: prep.cipher, access_token: prep.access_token };
+
+    // Mode daftar: ringkasan pencarian — jumlah baris & sku_count mentah.
+    if (mode === "list") {
+      const list = await getTiktokOrders(cred, { daysBack: 14, pageSize: 50 });
+      if (!list.ok) {
+        out.list_error = list.detail;
+        continue;
+      }
+      out.total_count = list.total_count;
+      out.orders = list.orders.map((o) => ({
+        order_id: o.order_id,
+        order_status: o.order_status,
+        create_time: o.create_time,
+        lines: o.items.length,
+        items: ringkasLineItems(o.items),
+      }));
+      break;
+    }
+
+    if (!orderId) {
+      out.error = "order_id tidak ada (pakai mode=list untuk daftar)";
+      break;
+    }
+    const detail = await getTiktokOrderDetail(cred, [orderId]);
     if (!detail.ok) {
       out.detail_error = detail.detail;
       continue;
@@ -56,29 +102,26 @@ export async function GET(request: Request) {
     }
     out.status = d.status;
     out.packages = (d.package_list ?? []).length;
-    // Ringkas line_items: cukup untuk diagnosis qty/varian/pemetaan —
-    // TANPA data pembeli/alamat.
-    out.line_items = d.line_items.map((li) => ({
-      product_id: li.product_id,
-      sku_id: li.sku_id,
-      product_name: li.product_name,
-      sku_name: li.sku_name,
-      seller_sku: li.seller_sku,
-      sku_count: li.sku_count,
-      combined_listing_skus: li.combined_listing_skus,
-    }));
+    out.line_items = ringkasLineItems(d.line_items);
+    // Dump mentah: hanya line_items & packages dari respons TikTok (bukan
+    // data pembeli) — untuk melihat field qty yang sebenarnya dikirim.
+    const rawO = detail.raw.find((x) => String(x.id) === orderId);
+    if (rawO) {
+      out.raw_line_items = (rawO.line_items ?? []) as unknown;
+      out.raw_packages = (rawO.packages ?? rawO.package_list ?? []) as unknown;
+    }
     const summary: TiktokOrderSummary = {
       order_id: d.id,
       order_status: d.status,
       create_time: d.create_time,
       update_time: d.update_time,
-      items: (out.line_items as Record<string, unknown>[]).map((li) => ({
-        product_id: String(li.product_id ?? ""),
-        sku_id: String(li.sku_id ?? ""),
-        product_name: String(li.product_name ?? ""),
-        sku_count: Number(li.sku_count ?? 0),
-        sku_name: String(li.sku_name ?? ""),
-        seller_sku: String(li.seller_sku ?? ""),
+      items: d.line_items.map((li) => ({
+        product_id: li.product_id,
+        sku_id: li.sku_id,
+        product_name: li.product_name,
+        sku_count: li.sku_count,
+        sku_name: li.sku_name,
+        seller_sku: li.seller_sku,
       })),
     };
     out.exec_check = await checkAnekaExecutable(summary);
