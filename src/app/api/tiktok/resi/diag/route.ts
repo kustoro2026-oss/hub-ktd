@@ -15,6 +15,7 @@ import { getTiktokOrderExec, listTiktokShopTokens } from "@/lib/db";
 import {
   getTiktokOrderDetail,
   getTiktokOrders,
+  resolveLineQty,
   type TiktokOrderSummary,
 } from "@/lib/tiktok";
 import { prepareShop } from "@/lib/tiktok-orders";
@@ -115,11 +116,14 @@ export async function GET(request: Request) {
       order_status: d.status,
       create_time: d.create_time,
       update_time: d.update_time,
+      // Qty per baris di-resolusi persis seperti alur produksi
+      // (resolveLineQty) — tanpa ini exec_check selalu tampak gagal
+      // "qty 0" padahal pipeline akan lanjut.
       items: d.line_items.map((li) => ({
         product_id: li.product_id,
         sku_id: li.sku_id,
         product_name: li.product_name,
-        sku_count: li.sku_count,
+        sku_count: resolveLineQty(li),
         sku_name: li.sku_name,
         seller_sku: li.seller_sku,
       })),

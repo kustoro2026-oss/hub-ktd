@@ -42,6 +42,7 @@ import {
   getPackageShippingDocument,
   getTiktokOrderDetail,
   getTiktokOrders,
+  resolveLineQty,
   searchPackages,
   shipPackage,
   type TiktokOrderDetail,
@@ -612,28 +613,18 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
         continue;
       }
       // Bangun ulang item pesanan dari detail (sumber qty/varian resmi).
-      // Bila detail sekalipun tidak mengisi sku_count, fallback 1 unit per
-      // baris — terbukti dari pesanan nyata toko ini (tiap unit ditulis
-      // sebagai satu baris; mis. pesanan 2 botol = 2 baris kembar).
+      // Baca resolveLineQty: sku_count → gabungan combined_listing_skus →
+      // 1 per baris (TikTok toko ini tidak pernah mengisi sku_count dan
+      // menulis satu baris per unit — pesanan 2 botol = 2 baris kembar).
       if (det && det.line_items.length > 0) {
-        o.items = det.line_items.map((li) => {
-          let qty = Number(li.sku_count ?? 0);
-          if (!qty && li.combined_listing_skus.length > 0) {
-            qty = li.combined_listing_skus.reduce(
-              (a, c) => a + (Number(c.sku_count) || 0),
-              0,
-            );
-          }
-          if (!qty) qty = 1;
-          return {
-            product_id: li.product_id,
-            sku_id: li.sku_id,
-            product_name: li.product_name,
-            sku_count: qty,
-            sku_name: li.sku_name,
-            seller_sku: li.seller_sku,
-          };
-        });
+        o.items = det.line_items.map((li) => ({
+          product_id: li.product_id,
+          sku_id: li.sku_id,
+          product_name: li.product_name,
+          sku_count: resolveLineQty(li),
+          sku_name: li.sku_name,
+          seller_sku: li.seller_sku,
+        }));
       }
 
       // Fase 2: bila SEMUA produk pesanan sudah dipetakan ke Aneka, jangan

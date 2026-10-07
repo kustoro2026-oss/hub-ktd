@@ -266,6 +266,29 @@ export type TiktokOrderSummary = {
   }[];
 };
 
+/** Resolusi qty satu baris pesanan: sku_count → jumlah combined_listing_skus
+ *  → 1 per baris. TikTok toko ini TIDAK mengisi sku_count — ringkasan
+ *  pencarian selalu 0 dan respons detail bahkan tidak memuat field itu
+ *  (terverifikasi dari respons mentah). Sebagai gantinya TikTok menulis
+ *  SATU BARIS PER UNIT: pesanan 2 botol = 2 baris kembar dengan id
+ *  masing-masing (terbukti dari pesanan Sari Lemon qty 2). Maka fallback
+ *  terakhir 1 unit per baris adalah semantik yang benar, bukan tebakan. */
+export function resolveLineQty(
+  line: {
+    sku_count?: number;
+    combined_listing_skus?: { sku_count?: number }[];
+  },
+): number {
+  const q = Number(line.sku_count ?? 0);
+  if (q > 0) return q;
+  const combo = (line.combined_listing_skus ?? []).reduce(
+    (a, c) => a + (Number(c.sku_count) || 0),
+    0,
+  );
+  if (combo > 0) return combo;
+  return 1;
+}
+
 /** Opsi filter pencarian pesanan (POST /order/202309/orders/search).
  *  Bila createTimeGe/createTimeLt diisi → filter & urut berdasarkan waktu
  *  PEMBUATAN pesanan (sort_field=create_time); bila tidak → jendela
