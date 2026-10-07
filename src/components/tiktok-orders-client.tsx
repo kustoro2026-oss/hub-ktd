@@ -150,7 +150,7 @@ export default function TiktokOrdersClient({
                       {o.items.map((it, i) => (
                         <li key={i}>
                           <span className="mr-1.5 inline-flex min-w-6 justify-center rounded bg-slate-100 px-1 text-xs font-semibold text-slate-600">
-                            {it.sku_count}×
+                            {it.sku_count > 0 ? `${it.sku_count}×` : "—"}
                           </span>
                           {it.product_name}
                           {it.product_id ? (

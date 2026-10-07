@@ -446,6 +446,10 @@ export type TiktokOrderDetail = {
     product_name: string;
     sku_name: string;
     seller_sku: string;
+    /** Jumlah unit baris ini — sumber qty RESMI. Ringkasan pencarian
+     *  (/orders/search) mengembalikan sku_count 0 untuk toko ini, jadi qty
+     *  checkout otomatis TIDAK boleh diambil dari ringkasan. */
+    sku_count: number;
     original_price: string;
     sale_price: string;
     seller_discount: string;
@@ -480,6 +484,7 @@ function parseDetailItem(
     product_name: str(r.product_name),
     sku_name: str(r.sku_name),
     seller_sku: str(r.seller_sku),
+    sku_count: num(r.sku_count),
     original_price: str(r.original_price),
     sale_price: str(r.sale_price),
     seller_discount: str(r.seller_discount),

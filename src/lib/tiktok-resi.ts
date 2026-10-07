@@ -587,6 +587,55 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
       // Masa tunggu selesai, atau percobaan ulang untuk kiriman yang gagal.
       newOrders++;
 
+      // Detail pesanan diambil SEKALI di sini — SEBELUM keputusan jalur —
+      // karena dialah sumber data yang benar: qty asli tiap baris
+      // (sku_count), nama varian (sku_name), dan jumlah paket. Ringkasan
+      // pencarian TikTok mengembalikan sku_count 0 untuk toko ini, jadi qty
+      // TIDAK boleh ditebak dari ringkasan. Bila detail GAGAL diambil,
+      // qty/paket/varian tidak bisa dipastikan — gagal tertutup: catat
+      // kegagalan dan coba lagi siklus berikutnya.
+      const detail = await getTiktokOrderDetail(cred, [o.order_id]);
+      if (!detail.ok) {
+        const alasan = `gagal: detail pesanan tidak bisa diambil (${detail.detail}) — paket & qty tidak bisa dipastikan, proses manual`;
+        errors.push(`${shop.shop_name}: ${o.order_id}: ${alasan}`);
+        await recordTiktokOrderFailure(o.order_id, shop.shop_id, alasan);
+        continue;
+      }
+      const det = detail.orders.find((d) => d.id === o.order_id);
+      const pkgs = det?.package_list ?? [];
+      // Satu slot resi Aneka per pesanan (satu paket = satu label).
+      // Pesanan multi-paket tidak bisa diwakili satu label — proses manual.
+      if (pkgs.length > 1) {
+        const alasan = `gagal: pesanan multi-paket (${pkgs.length} paket) — eksekusi Aneka hanya satu slot resi, proses manual`;
+        errors.push(`${shop.shop_name}: ${o.order_id}: ${alasan}`);
+        await recordTiktokOrderFailure(o.order_id, shop.shop_id, alasan);
+        continue;
+      }
+      // Bangun ulang item pesanan dari detail (sumber qty/varian resmi).
+      // Bila detail sekalipun tidak mengisi sku_count, fallback 1 unit per
+      // baris — terbukti dari pesanan nyata toko ini (tiap unit ditulis
+      // sebagai satu baris; mis. pesanan 2 botol = 2 baris kembar).
+      if (det && det.line_items.length > 0) {
+        o.items = det.line_items.map((li) => {
+          let qty = Number(li.sku_count ?? 0);
+          if (!qty && li.combined_listing_skus.length > 0) {
+            qty = li.combined_listing_skus.reduce(
+              (a, c) => a + (Number(c.sku_count) || 0),
+              0,
+            );
+          }
+          if (!qty) qty = 1;
+          return {
+            product_id: li.product_id,
+            sku_id: li.sku_id,
+            product_name: li.product_name,
+            sku_count: qty,
+            sku_name: li.sku_name,
+            seller_sku: li.seller_sku,
+          };
+        });
+      }
+
       // Fase 2: bila SEMUA produk pesanan sudah dipetakan ke Aneka, jangan
       // kirim resi — siapkan eksekusi semi-otomatis (tunggu tombol Setuju
       // di halaman Eksekusi; rantai checkout Aneka baru dijalankan saat
@@ -602,42 +651,6 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
             `gagal: ${official.detail}`,
           );
           continue;
-        }
-        // Satu slot resi Aneka per pesanan (satu paket = satu label).
-        // Pesanan multi-paket tidak bisa diwakili satu label — proses manual.
-        // Detail juga sumber sku_name (varian). Bila detail GAGAL diambil,
-        // jumlah paket maupun varian tidak bisa dipastikan — gagal tertutup:
-        // catat kegagalan dan coba lagi siklus berikutnya, jangan sampai
-        // checkout membeli paket/varian yang salah.
-        const detail = await getTiktokOrderDetail(cred, [o.order_id]);
-        if (!detail.ok) {
-          const alasan = `gagal: detail pesanan tidak bisa diambil (${detail.detail}) — paket & varian tidak bisa dipastikan, proses manual`;
-          errors.push(`${shop.shop_name}: ${o.order_id}: ${alasan}`);
-          await recordTiktokOrderFailure(o.order_id, shop.shop_id, alasan);
-          continue;
-        }
-        const pkgs =
-          detail.orders.find((d) => d.id === o.order_id)?.package_list ?? [];
-        if (pkgs.length > 1) {
-          const alasan = `gagal: pesanan multi-paket (${pkgs.length} paket) — eksekusi Aneka hanya satu slot resi, proses manual`;
-          errors.push(`${shop.shop_name}: ${o.order_id}: ${alasan}`);
-          await recordTiktokOrderFailure(o.order_id, shop.shop_id, alasan);
-          continue;
-        }
-        // Lengkapi nama varian (sku_name) tiap item dari detail pesanan —
-        // petunjuk utama mencocokkan varian Aneka saat checkout otomatis.
-        if (detail.ok) {
-          const det = detail.orders.find((d) => d.id === o.order_id);
-          if (det) {
-            for (const it of o.items) {
-              if (it.sku_name) continue;
-              const li = det.line_items.find(
-                (x) =>
-                  x.product_id === it.product_id && x.sku_id === it.sku_id,
-              );
-              if (li?.sku_name) it.sku_name = li.sku_name;
-            }
-          }
         }
         const prep = await prepareAnekaExec(
           shop,
@@ -689,6 +702,11 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
       if (result.startsWith("ok")) {
         await markTiktokOrderSeen(o.order_id, shop.shop_id, result);
         sent.push(`${shop.shop_name} ${o.order_id} → ${result}`);
+        // Jelaskan KENAPA tidak dieksekusi otomatis — jangan biarkan
+        // pemilik mengira pesanan berjalan otomatis padahal manual.
+        await sendOwnerNotice(
+          `Catatan pesanan ${o.order_id}: eksekusi otomatis TIDAK dijalankan — ${execCheck.detail}. Pesanan ini diproses manual.`,
+        );
       } else {
         errors.push(`${shop.shop_name}: ${o.order_id}: ${result}`);
         await recordTiktokOrderFailure(o.order_id, shop.shop_id, result);
