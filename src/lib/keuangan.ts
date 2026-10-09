@@ -317,7 +317,14 @@ export async function ambilSnapshotAneka(
 function omsetDetail(d: TiktokOrderDetail): number {
   let total = 0;
   for (const it of d.line_items) {
-    const harga = parseRpNomor(it.sale_price) || parseRpNomor(it.original_price);
+    // Omset = harga yang dibayar pembeli + potongan yang ditanggung PLATFORM.
+    // Voucher platform (mis. dari live/big sale) disubsidi TikTok dan
+    // dikembalikan ke penjual saat settlement — hanya seller_discount yang
+    // benar-benar memotong pendapatan. Tanpa ini, order bervoucher tampak rugi
+    // padahal tidak (kasus Alfa Tox: sale 34.500 + platform 15.500 = 50.000).
+    const harga =
+      parseRpNomor(it.sale_price) + parseRpNomor(it.platform_discount) ||
+      parseRpNomor(it.original_price);
     total += harga * resolveLineQty(it);
   }
   return total;
