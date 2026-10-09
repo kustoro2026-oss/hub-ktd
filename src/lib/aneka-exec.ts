@@ -19,19 +19,21 @@ import {
   anekaCreatePayment,
   anekaFindOrderByPayment,
   anekaLogin,
+  anekaPaymentListed,
   anekaProcessPayment,
   anekaResolveVariant,
   anekaVariantSave,
   type AnekaCartItem,
+  type AnekaSession,
 } from "@/lib/aneka-checkout";
 import {
   appendTiktokOrderExecLog,
   claimTiktokOrderExecRunning,
-  clearTiktokOrderExecLog,
   getAnekaProductMap,
   getTiktokOrderExec,
   listTiktokShopTokens,
   saveTiktokOrderExec,
+  setTiktokOrderExecPayment,
 } from "@/lib/db";
 import { getTiktokOrderDetail, type TiktokOrderSummary } from "@/lib/tiktok";
 import { prepareShop } from "@/lib/tiktok-orders";
@@ -201,16 +203,19 @@ export async function prepareAnekaExec(
     total_modal: total,
   };
 
+  // Persiapan ulang = antrean baru. Jejak pembayaran percobaan lama
+  // DIPERTAHANKAN (aneka_payment_id/aneka_order_id + log) — bahan pengaman
+  // anti-dobel bila baris ini dieksekusi lagi.
   await saveTiktokOrderExec({
     order_id: order.order_id,
     shop_id: shop.shop_id,
     status: "menunggu",
     payload: JSON.stringify(payload),
+    aneka_payment_id: existing?.aneka_payment_id ?? "",
+    aneka_order_id: existing?.aneka_order_id ?? "",
     detail: "",
     executed_at: "",
   });
-  // Persiapan ulang = antrean baru — jejak log percobaan lama dihapus.
-  await clearTiktokOrderExecLog(order.order_id);
 
   const baris = check.items
     .map((it) => `- ${it.qty}x ${it.product_name} (${fmtRp(it.subtotal)})`)
@@ -242,6 +247,13 @@ export async function cancelAnekaExec(orderId: string): Promise<void> {
  *  tengah) boleh diambil alih. Rantai dibatasi 60 detik (maxDuration route),
  *  jadi baris "berjalan" dengan jejak lebih tua dari ini pasti sudah mati. */
 const BERJALAN_MIN_MS = 2 * 60 * 1000;
+
+/** Masa tunggu anti-dobel: percobaan yang sampai langkah pembayaran dengan
+ *  hasil meragukan (ambigu/berhasil) tidak boleh dipaksa ulang terlalu
+ *  cepat — riwayat Aneka butuh waktu untuk memuat pembayaran yang
+ *  sebenarnya sudah lolos (membayar ulang saat riwayat belum ter-update
+ *  adalah penyebab pembayaran dobel). */
+const COOLDOWN_PAY_MS = 20 * 60 * 1000;
 
 /** UTC "YYYY-MM-DD HH:MM:SS" → epoch ms (stempel log langkah eksekusi). */
 function parseUtcMs(s: string): number {
@@ -367,12 +379,199 @@ export function buildAnekaCartItems(
   return { ok: true, items, totalPcs };
 }
 
+/** Nomor resi dari payload baris eksekusi (tahan payload rusak). */
+function resiDariPayload(payload: string): string {
+  try {
+    const p = JSON.parse(payload) as AnekaExecPayload;
+    return p.tracking_number ?? "";
+  } catch {
+    return "";
+  }
+}
+
+/** Analisis jejak log percobaan-percobaan sebelumnya: apakah pernah sampai
+ *  langkah pembayaran, dan bagaimana hasilnya. Dipakai pengaman anti-dobel —
+ *  "berhasil"/"ambigu" wajib diverifikasi di riwayat Aneka sebelum baris
+ *  boleh membayar lagi; hanya "ditolak" (validasi ditolak situs, saldo
+ *  pasti tidak bergerak) dan "belum" yang aman langsung diulang. */
+function statusPembayaranSebelumnya(
+  log: string,
+): "berhasil" | "ditolak" | "ambigu" | "belum" {
+  const lines = log
+    .split("\n")
+    .map((l) => l.trim())
+    .filter(Boolean);
+  const proses = lines.filter((l) => l.includes("pembayaran/process"));
+  if (proses.some((l) => l.includes("| berhasil"))) return "berhasil";
+  if (proses.length > 0) {
+    const semuaDitolak = proses.every(
+      (l) =>
+        l.includes("Pembayaran ditolak situs") ||
+        l.includes("Pembayaran ditolak:"),
+    );
+    return semuaDitolak ? "ditolak" : "ambigu";
+  }
+  // Baris checkout berhasil tanpa baris proses setelahnya = proses mati
+  // tepat di langkah pembayaran — hasilnya tak diketahui → ambigu.
+  const idxCheckout = lines.findIndex((l) =>
+    l.includes("| checkout | token didapat"),
+  );
+  if (idxCheckout >= 0) return "ambigu";
+  return "belum";
+}
+
+/** Waktu percobaan terakhir yang sampai di langkah pembayaran dengan hasil
+ *  berhasil/ambigu (dasar masa tunggu anti-dobel) — null bila log tidak
+ *  pernah sampai ke sana atau semua percobaan ditolak situs (saldo pasti
+ *  tidak bergerak, aman diulang kapan saja). */
+function infoCooldownBayar(log: string): { ms: number; teks: string } | null {
+  const st = statusPembayaranSebelumnya(log);
+  if (st !== "berhasil" && st !== "ambigu") return null;
+  let terakhir: { ms: number; teks: string } | null = null;
+  for (const baris of log.split("\n")) {
+    const ts =
+      /^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})/.exec(baris.trim())?.[1] ?? "";
+    const ms = ts ? parseUtcMs(ts) : 0;
+    if (!ms) continue;
+    if (
+      baris.includes("pembayaran/process") ||
+      baris.includes("| checkout | token didapat")
+    ) {
+      if (!terakhir || ms > terakhir.ms) terakhir = { ms, teks: ts };
+    }
+  }
+  return terakhir;
+}
+
+/** "YYYY-MM-DD HH:MM:SS" UTC → "YYYY-MM-DD HH:MM" WIB (label pesan). */
+function utcKeWibJam(tsUtc: string): string {
+  const ms = parseUtcMs(tsUtc);
+  if (!ms) return tsUtc;
+  return new Date(ms + 7 * 3600 * 1000).toISOString().slice(0, 16).replace("T", " ");
+}
+
+/** Bukti pesanan SUDAH terbayar di Aneka (ditemukan lewat riwayat). */
+type BuktiTerbayar = {
+  paymentId: string;
+  orderCode: string;
+  keterangan: string;
+};
+
+/** Cari bukti pesanan ini sudah pernah dibayar di Aneka — kandidat
+ *  payment_id (kolom + log) diperiksa lewat halaman finish (kode ORDER
+ *  numerik yang memuat payment_id), lalu payment_id/nomor resi discan di
+ *  daftar /payment-history beberapa halaman pertama. Resi unik per pesanan
+ *  TikTok — penanda paling andal bahwa pesanan ini sudah dibelikan. */
+async function cariBuktiTerbayar(
+  session: AnekaSession,
+  anekaPaymentId: string,
+  log: string,
+  resi: string,
+): Promise<BuktiTerbayar | null> {
+  const kandidat = new Set<string>();
+  if (anekaPaymentId) kandidat.add(anekaPaymentId);
+  for (const m of log.matchAll(/payment_id (\d+)/g)) kandidat.add(m[1]);
+
+  for (const id of kandidat) {
+    const found = await anekaFindOrderByPayment(session, id);
+    if (
+      found.ok &&
+      found.orderCode &&
+      new RegExp(`ORDER-${id}-\\d{6,}`).test(found.orderCode)
+    ) {
+      return {
+        paymentId: id,
+        orderCode: found.orderCode,
+        keterangan: `kode pesanan ${found.orderCode} memuat payment ${id}`,
+      };
+    }
+  }
+  for (const id of kandidat) {
+    if (await anekaPaymentListed(session, id)) {
+      return {
+        paymentId: id,
+        orderCode: "",
+        keterangan: `payment ${id} terdaftar di riwayat pembayaran`,
+      };
+    }
+  }
+  if (resi && (await anekaPaymentListed(session, resi))) {
+    return {
+      paymentId: "",
+      orderCode: "",
+      keterangan: `nomor resi ${resi} sudah muncul di riwayat pembayaran`,
+    };
+  }
+  return null;
+}
+
+/** Tandai baris selesai dari bukti pembayaran sebelumnya (tanpa membayar
+ *  ulang) + kabari WA. */
+async function pulihkanSelesai(
+  orderId: string,
+  payload: string,
+  bukti: BuktiTerbayar,
+): Promise<{ ok: boolean; detail: string }> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  await saveTiktokOrderExec({
+    order_id: orderId,
+    status: "selesai",
+    payload,
+    aneka_payment_id: bukti.paymentId,
+    aneka_order_id: bukti.orderCode,
+    detail: "",
+    executed_at: nowUtc,
+  });
+  await appendTiktokOrderExecLog(
+    orderId,
+    `${nowUtc} | pemulihan | pembayaran sebelumnya terverifikasi — ${bukti.keterangan}`,
+  );
+  await sendExecNotice(
+    `Eksekusi Aneka BERHASIL untuk pesanan ${orderId} (dipulihkan dari percobaan sebelumnya).\n${bukti.keterangan}${bukti.paymentId ? `\nID pembayaran Aneka: ${bukti.paymentId}` : ""}${bukti.orderCode ? ` (kode pesanan: ${bukti.orderCode})` : ""}\nDetail: https://anekadropship.id/payment-history`,
+  );
+  return { ok: true, detail: `Dipulihkan — ${bukti.keterangan}` };
+}
+
+/** Blokir coba-ulang yang berisiko membayar dobel: percobaan sebelumnya
+ *  sampai langkah pembayaran tetapi bukti terbayar tidak terbaca di
+ *  riwayat. Baris ditandai "gagal" dengan penanda [PERLU CEK MANUAL] —
+ *  UI menampilkan tombol paksa untuk pemilik yang SUDAH memeriksa manual.
+ *  Bila percobaan terakhir baru saja (masa tunggu aktif), batas waktu
+ *  coba-ulang disertakan supaya riwayat Aneka keburu ter-update. */
+async function blokirCekManual(
+  orderId: string,
+  payload: string,
+  log: string,
+  detail: string,
+): Promise<{ ok: false; detail: string }> {
+  const cd = infoCooldownBayar(log);
+  const tunggu =
+    cd && Date.now() - cd.ms < COOLDOWN_PAY_MS
+      ? `\nMasa tunggu: coba lagi setelah ${utcKeWibJam(
+          new Date(cd.ms + COOLDOWN_PAY_MS).toISOString().slice(0, 19).replace("T", " "),
+        )} WIB (menunggu riwayat Aneka ter-update).`
+      : "";
+  await saveTiktokOrderExec({
+    order_id: orderId,
+    status: "gagal",
+    payload,
+    detail: `[PERLU CEK MANUAL] ${detail}${tunggu}`,
+  });
+  await sendExecNotice(
+    `Eksekusi Aneka DITAHAN untuk pesanan ${orderId}: ${detail}${tunggu}\nPeriksa riwayat pembayaran Aneka (https://anekadropship.id/payment-history) — bila pesanan ini BELUM terbayar di sana, gunakan tombol "Sudah dicek manual — bayar ulang" di halaman Eksekusi.`,
+  );
+  return { ok: false, detail: `[PERLU CEK MANUAL] ${detail}${tunggu}` };
+}
+
 /** Jalankan rantai checkout Aneka penuh untuk satu antrean "menunggu"
  *  (atau coba ulang baris "gagal"). Sukses → status "selesai" + ID pesanan
  *  Aneka dikirim ke WA; gagal → status "gagal" + keterangan (bisa dicoba
- *  lagi). */
+ *  lagi). Sebelum membayar, pengaman anti-dobel memverifikasi riwayat Aneka
+ *  (payment_id tersimpan + nomor resi); opts.force melewati pengaman itu —
+ *  hanya boleh dipakai setelah pemilik memeriksa riwayat manual. */
 export async function executeAnekaOrder(
   orderId: string,
+  opts: { force?: boolean } = {},
 ): Promise<{ ok: boolean; detail: string }> {
   const row = await getTiktokOrderExec(orderId);
   if (!row) return { ok: false, detail: "Pesanan ini belum disiapkan untuk eksekusi" };
@@ -397,52 +596,35 @@ export async function executeAnekaOrder(
         detail: "Eksekusi masih berjalan — muat ulang halaman sebentar lagi",
       };
     }
-    // Terputus SETELAH pembayaran lolos → jangan bayar ulang. Verifikasi
-    // lewat riwayat Aneka berdasarkan payment_id yang tercatat di log.
-    if (row.log.includes("pembayaran/process | berhasil")) {
-      const payId = /payment_id (\d+)/.exec(row.log)?.[1] ?? "";
-      if (!payId) {
-        return {
-          ok: false,
-          detail:
-            "Percobaan sebelumnya sudah membayar tetapi payment_id tidak tercatat — periksa riwayat Aneka sebelum mencoba lagi",
-        };
-      }
+    const stBayar = statusPembayaranSebelumnya(row.log);
+    if (stBayar === "berhasil" || stBayar === "ambigu") {
+      // Terputus di/sekitar langkah pembayaran → verifikasi dulu lewat
+      // riwayat Aneka; bila tidak terbukti terbayar, TAHAN (jangan nekat
+      // membayar ulang — risiko dobel lebih mahal daripada tertunda).
       const login = await anekaLogin();
       if (!login.ok) {
-        return {
-          ok: false,
-          detail: `Percobaan sebelumnya sudah membayar (payment ${payId}) tetapi login untuk verifikasi gagal — periksa riwayat Aneka sebelum mencoba lagi`,
-        };
-      }
-      const found = await anekaFindOrderByPayment(login.session, payId);
-      if (found.ok && found.orderCode) {
-        const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
-        await saveTiktokOrderExec({
-          order_id: orderId,
-          status: "selesai",
-          payload: row.payload,
-          aneka_payment_id: payId,
-          aneka_order_id: found.orderCode,
-          detail: "",
-          executed_at: nowUtc,
-        });
-        await appendTiktokOrderExecLog(
+        return blokirCekManual(
           orderId,
-          `${nowUtc} | pemulihan | pembayaran sebelumnya terverifikasi — ${found.orderCode}`,
+          row.payload,
+          row.log,
+          `percobaan sebelumnya sampai langkah pembayaran, tetapi login Aneka untuk verifikasi gagal (${login.detail})`,
         );
-        await sendExecNotice(
-          `Eksekusi Aneka BERHASIL untuk pesanan ${orderId} (dipulihkan dari percobaan terputus).\nID pembayaran Aneka: ${payId} (kode pesanan: ${found.orderCode})\nDetail: https://anekadropship.id/payment-history/finish?payment_id=${payId}&status=success`,
-        );
-        return {
-          ok: true,
-          detail: `Dipulihkan — ID pembayaran Aneka: ${payId} (${found.orderCode})`,
-        };
       }
-      return {
-        ok: false,
-        detail: `Pembayaran sudah diproses (payment ${payId}) tetapi kode pesanan belum terbaca di riwayat — periksa riwayat Aneka sebelum mencoba lagi`,
-      };
+      const bukti = await cariBuktiTerbayar(
+        login.session,
+        row.aneka_payment_id,
+        row.log,
+        resiDariPayload(row.payload),
+      );
+      if (bukti) return pulihkanSelesai(orderId, row.payload, bukti);
+      return blokirCekManual(
+        orderId,
+        row.payload,
+        row.log,
+        stBayar === "berhasil"
+          ? "percobaan sebelumnya mencatat pembayaran berhasil tetapi belum terbukti di riwayat — kemungkinan riwayat Aneka belum ter-update"
+          : "percobaan sebelumnya terputus di langkah pembayaran dan belum terbukti belum terbayar",
+      );
     }
     // Terputus SEBELUM pembayaran — aman diulang: kembalikan ke "gagal"
     // supaya klaim atomik di bawah bisa mengambil alih.
@@ -464,6 +646,22 @@ export async function executeAnekaOrder(
     return { ok: false, detail: "Data eksekusi tidak lengkap — siapkan ulang pesanan ini" };
   }
 
+  // MASA TUNGGU ANTI-DOBEL: pembayaran ulang PAKSA (opts.force) ditolak bila
+  // percobaan sebelumnya baru saja sampai langkah pembayaran dengan hasil
+  // meragukan — riwayat Aneka butuh waktu untuk memuat pembayaran yang
+  // sebenarnya sudah lolos (kalau dipaksa terburu-buru, bisa bayar dobel).
+  // Percobaan biasa TIDAK ditahan di sini: pengaman anti-dobel di bawah
+  // yang memverifikasi (read-only, aman).
+  const cooldown = infoCooldownBayar(row.log);
+  if (opts.force && cooldown && Date.now() - cooldown.ms < COOLDOWN_PAY_MS) {
+    return {
+      ok: false,
+      detail: `Masa tunggu anti-dobel: percobaan sebelumnya sampai langkah pembayaran (${utcKeWibJam(cooldown.teks)} WIB). Tunggu sampai ${utcKeWibJam(
+        new Date(cooldown.ms + COOLDOWN_PAY_MS).toISOString().slice(0, 19).replace("T", " "),
+      )} WIB sebelum memaksa bayar ulang — periksa riwayat Aneka dulu, pembayaran itu mungkin sudah berhasil.`,
+    };
+  }
+
   const gagal = async (detail: string) => {
     await saveTiktokOrderExec({
       order_id: orderId,
@@ -472,7 +670,7 @@ export async function executeAnekaOrder(
       detail,
     });
     await sendExecNotice(
-      `Eksekusi Aneka GAGAL untuk pesanan ${orderId}: ${detail}\nCoba lagi: ${EKSEKUSI_URL}?order=${orderId}`,
+      `Eksekusi Aneka GAGAL untuk pesanan ${orderId}: ${detail}\nCoba lagi: ${EKSEKUSI_URL}?order=${orderId}\nCatatan: periksa dulu riwayat pembayaran Aneka (https://anekadropship.id/payment-history) — pastikan saldo belum terpotong sebelum mencoba lagi.`,
     );
     return { ok: false, detail };
   };
@@ -490,7 +688,13 @@ export async function executeAnekaOrder(
         "Pesanan ini sedang dieksekusi atau sudah diproses — muat ulang halaman",
     };
   }
-  await clearTiktokOrderExecLog(orderId);
+  // Jejak log TIDAK dihapus antar percobaan — log lama adalah bahan
+  // pengaman anti-dobel (statusPembayaranSebelumnya + payment_id tercatat).
+  // Beri pemisah supaya jejak tiap percobaan tetap mudah dibaca.
+  await appendTiktokOrderExecLog(
+    orderId,
+    "---------- percobaan baru ----------",
+  );
   const logStep = async (langkah: string, pesan: string) => {
     const t = new Date().toISOString().slice(0, 19).replace("T", " ");
     await appendTiktokOrderExecLog(orderId, `${t} | ${langkah} | ${pesan}`);
@@ -518,8 +722,75 @@ export async function executeAnekaOrder(
   }
   await logStep("cek-pesanan", `pesanan masih aktif (status ${aktif.detail})`);
 
-  // 3. Login + buat pembayaran (payment_id baru setiap percobaan).
-  const login = await anekaLogin();
+  // PENGAMAN ANTI-DOBEL: sebelum membayar, pastikan percobaan-percobaan
+  // sebelumnya belum benar-benar membayar pesanan ini di Aneka — cek
+  // riwayat berdasarkan payment_id tersimpan/tercatat dan nomor resi
+  // (unik per pesanan TikTok). Hanya boleh dilewati lewat tombol paksa
+  // eksplisit setelah pemilik memeriksa riwayat manual (opts.force).
+  let login = opts.force ? await anekaLogin() : null;
+  if (!opts.force) {
+    const stBayar = statusPembayaranSebelumnya(row.log);
+    const punyaJejak =
+      row.aneka_payment_id !== "" ||
+      stBayar === "berhasil" ||
+      stBayar === "ambigu";
+    if (punyaJejak) {
+      const loginG = await anekaLogin();
+      if (!loginG.ok) {
+        await logStep("anti-dobel", `login verifikasi GAGAL — ${loginG.detail}`);
+        if (stBayar === "berhasil" || stBayar === "ambigu") {
+          return blokirCekManual(
+            orderId,
+            row.payload,
+            row.log,
+            `ada jejak pembayaran sebelumnya tetapi login Aneka untuk verifikasi gagal (${loginG.detail})`,
+          );
+        }
+      } else {
+        login = { ok: true as const, session: loginG.session };
+        const bukti = await cariBuktiTerbayar(
+          loginG.session,
+          row.aneka_payment_id,
+          row.log,
+          payload.tracking_number,
+        );
+        if (bukti) {
+          await logStep(
+            "anti-dobel",
+            `terbukti sudah terbayar — ${bukti.keterangan}`,
+          );
+          return pulihkanSelesai(orderId, row.payload, bukti);
+        }
+        if (stBayar === "berhasil" || stBayar === "ambigu") {
+          await logStep(
+            "anti-dobel",
+            `DITAHAN — ${stBayar} tetapi belum terbukti di riwayat`,
+          );
+          return blokirCekManual(
+            orderId,
+            row.payload,
+            row.log,
+            stBayar === "berhasil"
+              ? "percobaan sebelumnya mencatat pembayaran berhasil tetapi belum terbukti di riwayat — kemungkinan riwayat Aneka belum ter-update"
+              : "percobaan sebelumnya terputus di langkah pembayaran dan belum terbukti belum terbayar",
+          );
+        }
+        await logStep(
+          "anti-dobel",
+          `payment lama ${row.aneka_payment_id} belum terbukti terbayar — aman lanjut dengan payment baru`,
+        );
+      }
+    } else {
+      await logStep("anti-dobel", "tidak ada jejak pembayaran sebelumnya — lanjut");
+    }
+  } else {
+    await logStep("anti-dobel", "pengaman dilewati atas perintah eksplisit pemilik");
+  }
+
+  // Login + buat pembayaran (payment_id baru setiap percobaan).
+  if (!login) {
+    login = await anekaLogin();
+  }
   if (!login.ok) {
     await logStep("login", `GAGAL — ${login.detail}`);
     return gagal(login.detail);
@@ -531,6 +802,11 @@ export async function executeAnekaOrder(
     return gagal(pay.detail);
   }
   await logStep("payment/create", `berhasil — payment_id ${pay.paymentId}`);
+  // SEGERA catat payment_id ke baris — bila percobaan ini gagal/terputus
+  // di langkah mana pun, id ini jadi kunci verifikasi anti-dobel saat
+  // coba ulang (jangan sampai jejak pembayaran hilang seperti kejadian
+  // pembayaran dobel).
+  await setTiktokOrderExecPayment(orderId, pay.paymentId);
 
   // 1b. Tentukan varian produk ber-varian yang belum dipetakan manual
   //     (data varian diambil dari halaman produk Aneka; nama varian pesanan

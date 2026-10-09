@@ -23,6 +23,7 @@ import {
   Boxes,
   Link2,
   PlayCircle,
+  Wallet,
 } from "lucide-react";
 
 export type NavItem = {
@@ -42,7 +43,10 @@ export type NavSection =
 export const NAV: NavSection[] = [
   {
     title: "Utama",
-    items: [{ href: "/", label: "Dasbor", Icon: LayoutDashboard }],
+    items: [
+      { href: "/", label: "Dasbor", Icon: LayoutDashboard },
+      { href: "/keuangan", label: "Keuangan", Icon: Wallet },
+    ],
   },
   {
     title: "Komunikasi",

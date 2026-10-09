@@ -37,16 +37,17 @@ function ExecActions({ row }: { row: ExecRow }) {
   const [busy, setBusy] = useState<"" | "setuju" | "batalkan">("");
   const [error, setError] = useState("");
 
-  async function act(action: "setuju" | "batalkan") {
+  async function act(action: "setuju" | "batalkan", force = false) {
     // Konfirmasi eksplisit sebelum memindahkan saldo Aneka — mencegah
-    // salah klik baris yang salah terbayar.
-    if (
-      action === "setuju" &&
-      !window.confirm(
-        `Yakin jalankan checkout Aneka untuk pesanan ${row.order_id}?\nSaldo Aneka akan terpotong sekitar ${row.total_estimate} (modal ${row.total_modal} + ongkos pengemasan Rp3.000).\nTekan OK untuk melanjutkan, Batal untuk mundur.`,
-      )
-    ) {
-      return;
+    // salah klik baris yang salah terbayar. Force (bayar ulang setelah
+    // dicek manual) memakai peringatan yang jauh lebih keras.
+    if (action === "setuju") {
+      const pesan = force
+        ? `PERINGATAN: paksa bayar ulang pesanan ${row.order_id}.\nHanya lanjutkan bila Anda SUDAH memeriksa riwayat pembayaran Aneka dan YAKIN pesanan ini BELUM dibayar.\nSaldo Aneka akan terpotong sekitar ${row.total_estimate} (modal ${row.total_modal} + ongkos pengemasan Rp3.000).\nTekan OK bila yakin, Batal untuk mundur.`
+        : `Yakin jalankan checkout Aneka untuk pesanan ${row.order_id}?\nSaldo Aneka akan terpotong sekitar ${row.total_estimate} (modal ${row.total_modal} + ongkos pengemasan Rp3.000).\nTekan OK untuk melanjutkan, Batal untuk mundur.`;
+      if (!window.confirm(pesan)) {
+        return;
+      }
     }
     setBusy(action);
     setError("");
@@ -54,7 +55,7 @@ function ExecActions({ row }: { row: ExecRow }) {
       const res = await fetch("/api/tiktok/exec", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order_id: row.order_id, action }),
+        body: JSON.stringify({ order_id: row.order_id, action, force }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         ok?: boolean;
@@ -87,6 +88,16 @@ function ExecActions({ row }: { row: ExecRow }) {
             ? "Setuju"
             : "Coba lagi"}
       </button>
+      {row.detail.includes("[PERLU CEK MANUAL]") ? (
+        <button
+          type="button"
+          onClick={() => act("setuju", true)}
+          disabled={busy !== ""}
+          className="rounded-lg border border-amber-400 bg-amber-50 px-4 py-1.5 text-xs font-medium text-amber-800 transition hover:bg-amber-100 disabled:opacity-60"
+        >
+          {busy === "setuju" ? "Mengeksekusi..." : "Sudah dicek manual — bayar ulang"}
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={() => act("batalkan")}

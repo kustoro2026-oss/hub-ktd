@@ -14,18 +14,22 @@ export async function POST(request: Request) {
 
   let orderId = "";
   let action = "";
+  let force = false;
   const contentType = request.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
     const body = (await request.json().catch(() => ({}))) as {
       order_id?: string;
       action?: string;
+      force?: boolean;
     };
     orderId = String(body.order_id ?? "");
     action = String(body.action ?? "");
+    force = body.force === true;
   }
   if (!orderId) {
     orderId = new URL(request.url).searchParams.get("order_id") ?? "";
     action = new URL(request.url).searchParams.get("action") ?? "";
+    force = new URL(request.url).searchParams.get("force") === "true";
   }
   if (!orderId) {
     return Response.json({ error: "order_id tidak ada" }, { status: 400 });
@@ -41,7 +45,7 @@ export async function POST(request: Request) {
             ok: true,
             detail: "Eksekusi dibatalkan",
           }))
-        : await executeAnekaOrder(orderId);
+        : await executeAnekaOrder(orderId, { force });
     // Di production, body 5xx bisa diganti Cloudflare dengan halaman 502
     // generik — balas 200 + pesan supaya alasan aslinya sampai ke browser.
     const status = res.ok ? 200 : process.env.NODE_ENV === "production" ? 200 : 502;

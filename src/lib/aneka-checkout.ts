@@ -67,8 +67,9 @@ function grabCookie(cookie: string, res: Response): string {
   return jar;
 }
 
-/** Fetch dengan coba-ulang untuk galat jaringan (situs sering 522/timeout). */
-async function fetchRetry(
+/** Fetch dengan coba-ulang untuk galat jaringan (situs sering 522/timeout).
+ *  Diekspor untuk modul read-only lain (mis. dashboard keuangan). */
+export async function fetchRetry(
   cookie: string,
   url: string,
   init: RequestInit = {},
@@ -567,10 +568,16 @@ export async function anekaProcessPayment(
         detail: "Pembayaran ditolak situs (kembali ke halaman checkout) — periksa saldo wallet, varian, dan jumlah resi",
       };
     }
+    // Sukses = pengalihan ke halaman sukses/riwayat. Situs kini
+    // mengalihkan sukses ke /payment-history/finish?... atau
+    // /pembayaran/finish?... — SERTAKAN pola-pola itu supaya respons
+    // sukses tidak lagi disalahartikan gagal (penyebab pembayaran dobel).
     if (
       loc.includes("riwayat") ||
       loc.includes("sukses") ||
-      loc.includes("berhasil")
+      loc.includes("berhasil") ||
+      loc.includes("payment-history") ||
+      loc.includes("pembayaran/finish")
     ) {
       return { ok: true };
     }
@@ -646,23 +653,39 @@ export async function anekaFindOrderByPayment(
   }
 }
 
-/** Apakah payment_id sudah terdaftar di daftar riwayat pembayaran resmi
- *  (/payment-history). Payment yang BELUM dibayar TIDAK pernah muncul di
- *  daftar ini meskipun halaman finish-nya menampilkan kode ORDER
- *  alfanumerik — jadi kehadiran di daftar adalah bukti pesanan benar-benar
- *  terbayar (dipakai cabang respons pembayaran yang tak dikenali). */
+/** Apakah needle (payment_id ATAU nomor resi) sudah terdaftar di daftar
+ *  riwayat pembayaran resmi (/payment-history) — discan beberapa halaman
+ *  pertama. Payment yang BELUM dibayar TIDAK pernah muncul di daftar ini
+ *  meskipun halaman finish-nya menampilkan kode ORDER alfanumerik — jadi
+ *  kehadiran di daftar adalah bukti pesanan benar-benar terbayar (dipakai
+ *  cabang respons pembayaran yang tak dikenali dan pengaman anti-dobel). */
 export async function anekaPaymentListed(
   s: AnekaSession,
-  paymentId: string,
+  needle: string,
+  pages = 3,
 ): Promise<boolean> {
+  if (!needle) return false;
   try {
-    const res = await fetchRetry(
-      s.cookie,
-      `${BASE}/payment-history?page=1`,
-      { redirect: "manual" },
-    );
-    const html = await res.text();
-    return html.includes(paymentId);
+    for (let page = 1; page <= pages; page++) {
+      const res = await fetchRetry(
+        s.cookie,
+        `${BASE}/payment-history?page=${page}`,
+        { redirect: "manual" },
+      );
+      const html = await res.text();
+      // payment_id dicocokkan lewat pola tautan persis (payment_id=…)
+      // supaya id "236133" tidak tertabrak id lain yang memuatnya sebagai
+      // substring (mis. "1236133"); needle non-angka (nomor resi) dicocokkan
+      // sebagai teks biasa.
+      if (/^\d+$/.test(needle)) {
+        if (html.includes(`payment_id=${needle}`)) return true;
+      } else if (html.includes(needle)) {
+        return true;
+      }
+      // Halaman terakhir habis (404) → berhenti; galat sementara → lanjut.
+      if (res.status === 404) break;
+    }
+    return false;
   } catch {
     return false;
   }

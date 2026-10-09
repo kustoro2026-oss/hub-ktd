@@ -7,6 +7,10 @@
     {
       "path": "/api/tiktok/resi/check",
       "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/keuangan/refresh",
+      "schedule": "0 23 * * *"
     }
   ]
 }

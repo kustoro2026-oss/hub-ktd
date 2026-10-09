@@ -287,6 +287,12 @@ function migrateSqlite(db: DatabaseSync) {
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
       executed_at TEXT NOT NULL DEFAULT ''
     );
+
+    CREATE TABLE IF NOT EXISTS aneka_finance_cache (
+      k TEXT PRIMARY KEY,
+      data TEXT NOT NULL DEFAULT '',
+      fetched_at TEXT NOT NULL DEFAULT ''
+    );
   `);
 
   // Migrasi DB lama: kolom shop_cipher untuk panggilan API pesanan.
@@ -501,6 +507,12 @@ async function migratePg(pool: Pool) {
       log TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       executed_at TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS aneka_finance_cache (
+      k TEXT PRIMARY KEY,
+      data TEXT NOT NULL DEFAULT '',
+      fetched_at TEXT NOT NULL DEFAULT ''
     );
   `);
 
@@ -1363,8 +1375,26 @@ export async function clearTiktokOrderExecLog(orderId: string): Promise<void> {
   );
 }
 
+/** Catat payment_id Aneka yang BARU dibuat ke baris eksekusi — dipanggil
+ *  SEGERA setelah /payment/create sukses supaya jejak pembayaran tidak
+ *  hilang bila percobaan gagal/terputus (anti pembayaran dobel saat coba
+ *  ulang: id ini jadi kunci verifikasi riwayat Aneka). Hanya menyentuh
+ *  kolom aneka_payment_id — status/log/kolom lain tidak diubah. */
+export async function setTiktokOrderExecPayment(
+  orderId: string,
+  paymentId: string,
+): Promise<void> {
+  await queryRun(
+    "UPDATE tiktok_order_exec SET aneka_payment_id = ? WHERE order_id = ?",
+    [paymentId, orderId],
+  );
+}
+
 /** Simpan/timpa baris eksekusi (upsert — persiapan ulang menimpa baris
- *  lama, mis. "gagal" → "menunggu" setelah percobaan berikutnya). */
+ *  lama, mis. "gagal" → "menunggu" setelah percobaan berikutnya).
+ *  aneka_payment_id / aneka_order_id HANYA ditimpa bila nilai baru tidak
+ *  kosong (COALESCE) — pemanggil yang tidak menyebutkannya TIDAK akan
+ *  menghapus jejak pembayaran (bahan pengaman anti-dobel). */
 export async function saveTiktokOrderExec(e: {
   order_id: string;
   shop_id?: string;
@@ -1380,14 +1410,18 @@ export async function saveTiktokOrderExec(e: {
       ? `INSERT INTO tiktok_order_exec (order_id, shop_id, status, payload, aneka_payment_id, aneka_order_id, detail, executed_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (order_id) DO UPDATE SET shop_id = EXCLUDED.shop_id, status = EXCLUDED.status,
-           payload = EXCLUDED.payload, aneka_payment_id = EXCLUDED.aneka_payment_id,
-           aneka_order_id = EXCLUDED.aneka_order_id, detail = EXCLUDED.detail,
+           payload = EXCLUDED.payload,
+           aneka_payment_id = COALESCE(NULLIF(EXCLUDED.aneka_payment_id, ''), tiktok_order_exec.aneka_payment_id),
+           aneka_order_id = COALESCE(NULLIF(EXCLUDED.aneka_order_id, ''), tiktok_order_exec.aneka_order_id),
+           detail = EXCLUDED.detail,
            executed_at = EXCLUDED.executed_at`
       : `INSERT INTO tiktok_order_exec (order_id, shop_id, status, payload, aneka_payment_id, aneka_order_id, detail, executed_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (order_id) DO UPDATE SET shop_id = excluded.shop_id, status = excluded.status,
-           payload = excluded.payload, aneka_payment_id = excluded.aneka_payment_id,
-           aneka_order_id = excluded.aneka_order_id, detail = excluded.detail,
+           payload = excluded.payload,
+           aneka_payment_id = COALESCE(NULLIF(excluded.aneka_payment_id, ''), tiktok_order_exec.aneka_payment_id),
+           aneka_order_id = COALESCE(NULLIF(excluded.aneka_order_id, ''), tiktok_order_exec.aneka_order_id),
+           detail = excluded.detail,
            executed_at = excluded.executed_at`;
   await queryRun(sql, [
     e.order_id,
@@ -1415,4 +1449,41 @@ export async function claimTiktokOrderExecRunning(
     [orderId],
   );
   return !!r;
+}
+
+// ---------- Cache snapshot keuangan Aneka (dashboard keuangan) ----------
+// Situs Aneka tidak punya API resmi — riwayat pembayaran + saldo hasil
+// scrape disimpan sebagai satu baris JSON (data) dengan stempel fetched_at
+// (ISO UTC). Halaman keuangan memakainya selama masih segar; cron harian
+// dan tombol Muat Ulang memperbaruinya.
+
+export type AnekaFinanceCacheRow = {
+  k: string;
+  data: string;
+  fetched_at: string;
+};
+
+export async function getAnekaFinanceCache(
+  k: string,
+): Promise<AnekaFinanceCacheRow | null> {
+  return (
+    (await queryOne<AnekaFinanceCacheRow>(
+      "SELECT * FROM aneka_finance_cache WHERE k = ?",
+      [k],
+    )) ?? null
+  );
+}
+
+export async function setAnekaFinanceCache(
+  k: string,
+  data: string,
+  fetchedAt: string,
+): Promise<void> {
+  const sql =
+    dbMode() === "pg"
+      ? `INSERT INTO aneka_finance_cache (k, data, fetched_at) VALUES (?, ?, ?)
+         ON CONFLICT (k) DO UPDATE SET data = EXCLUDED.data, fetched_at = EXCLUDED.fetched_at`
+      : `INSERT INTO aneka_finance_cache (k, data, fetched_at) VALUES (?, ?, ?)
+         ON CONFLICT (k) DO UPDATE SET data = excluded.data, fetched_at = excluded.fetched_at`;
+  await queryRun(sql, [k, data, fetchedAt]);
 }
