@@ -75,6 +75,8 @@ export type BarisKeuangan = {
   resi: string;
   bayarIds: string[];
   bayarAneka: number;
+  /** Bagian dari bayarAneka yang dibayar manual (di luar KTD Hub). */
+  bayarManualAneka: number;
   estimasiModal: number;
   estimasiPacking: number;
   laba: number;
@@ -97,9 +99,16 @@ export type DataKeuangan = {
   baris: BarisKeuangan[];
   /** Baris riwayat Aneka dalam rentang tanggal (semua status). */
   pembayaran: AnekaPaymentRow[];
-  /** Pembayaran Success dalam rentang yang resinya tidak cocok dengan
-   *  order TikTok rentang ini (mis. pembayaran order hari sebelumnya). */
+  /** Pembayaran Success VIA HUB dalam rentang yang resinya tidak cocok
+   *  dengan order TikTok rentang ini (mis. pembayaran order hari
+   *  sebelumnya) — pembayaran manual tampil terpisah di bayarManual. */
   bayarTanpaOrder: AnekaPaymentRow[];
+  /** Pembayaran manual (bukan via KTD Hub) dalam rentang — Success saja,
+   *  beserta pasangan order TikTok-nya (kosong = tidak ada pasangan). */
+  bayarManual: { row: AnekaPaymentRow; orderId: string }[];
+  /** Semua id pembayaran manual dalam rentang (semua status) — untuk
+   *  penanda "Manual" pada tabel pembayaran. */
+  pembayaranManualIds: string[];
   /** Resi yang muncul di 2+ pembayaran Success (indikasi bayar dobel). */
   resiDobel: { resi: string; jumlah: number }[];
   orderBatalTerbayar: BarisKeuangan[];
@@ -389,6 +398,22 @@ export async function ambilDataKeuangan(
     execs.map((e) => [e.order_id, e]),
   );
 
+  // 4b) Himpunan id pembayaran yang dibuat KTD Hub: kolom aneka_payment_id
+  //     tiap baris eksekusi plus jejak id di log (percobaan lama yang id-nya
+  //     tertimpa di kolom tetap terdeteksi dari baris log). Pembayaran di
+  //     luar himpunan ini = orderan manual (dibuat langsung di Aneka).
+  const hubPaymentIds = new Set<string>();
+  for (const e of execs) {
+    if (e.aneka_payment_id) hubPaymentIds.add(e.aneka_payment_id);
+    const log = e.log ?? "";
+    for (const m of log.matchAll(/payment(?:_id| lama)\s+(\d+)/g)) {
+      hubPaymentIds.add(m[1]);
+    }
+    for (const m of log.matchAll(/ID pembayaran Aneka[^\d]*(\d+)/g)) {
+      hubPaymentIds.add(m[1]);
+    }
+  }
+
   // 5) Susun baris per order.
   const baris: BarisKeuangan[] = [];
   for (const so of shopOrders) {
@@ -420,6 +445,9 @@ export async function ambilDataKeuangan(
       const bayarSukses = bayar.filter((r) => r.status === "Success");
       const bayarAneka = bayarSukses.reduce((a, r) => a + r.total, 0);
       const bayarIds = bayarSukses.map((r) => r.paymentId);
+      const bayarManualAneka = bayarSukses
+        .filter((r) => !hubPaymentIds.has(r.paymentId))
+        .reduce((a, r) => a + r.total, 0);
 
       let estimasiModal = 0;
       let estimasiPacking = 0;
@@ -454,6 +482,7 @@ export async function ambilDataKeuangan(
         resi,
         bayarIds,
         bayarAneka,
+        bayarManualAneka,
         estimasiModal,
         estimasiPacking,
         laba,
@@ -477,9 +506,32 @@ export async function ambilDataKeuangan(
   const bayarAneka = bayarSukses.reduce((a, r) => a + r.total, 0);
 
   const resiOrderRentang = new Set(baris.map((b) => b.resi.trim()).filter(Boolean));
+  // Pembayaran via Hub yang resinya tidak cocok dengan order TikTok pada
+  // rentang ini (mis. order dibuat hari sebelumnya) — pembayaran manual
+  // ditampilkan terpisah sebagai "Orderan Manual".
   const bayarTanpaOrder = bayarSukses.filter(
-    (r) => !r.resi || !resiOrderRentang.has(r.resi.trim()),
+    (r) =>
+      hubPaymentIds.has(r.paymentId) &&
+      (!r.resi || !resiOrderRentang.has(r.resi.trim())),
   );
+
+  // Orderan manual: pembayaran Success di luar Hub, dipasangkan dengan
+  // order TikTok bila resinya cocok — biasanya order marketplace lain
+  // atau pesanan WhatsApp.
+  const orderIdByResi = new Map<string, string>();
+  for (const b of baris) {
+    if (b.resi && !orderIdByResi.has(b.resi.trim()))
+      orderIdByResi.set(b.resi.trim(), b.orderId);
+  }
+  const bayarManual = bayarSukses
+    .filter((r) => !hubPaymentIds.has(r.paymentId))
+    .map((r) => ({
+      row: r,
+      orderId: r.resi ? (orderIdByResi.get(r.resi.trim()) ?? "") : "",
+    }));
+  const pembayaranManualIds = pembayaran
+    .filter((r) => !hubPaymentIds.has(r.paymentId))
+    .map((r) => r.paymentId);
 
   const hitungResi = new Map<string, number>();
   for (const r of bayarSukses) {
@@ -521,6 +573,8 @@ export async function ambilDataKeuangan(
     baris: baris.sort((a, b) => b.waktuMs - a.waktuMs),
     pembayaran,
     bayarTanpaOrder,
+    bayarManual,
+    pembayaranManualIds,
     resiDobel,
     orderBatalTerbayar,
     perkiraanTopup,

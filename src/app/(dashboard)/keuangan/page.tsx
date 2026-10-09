@@ -154,6 +154,8 @@ export default async function KeuanganPage({
   const data = await ambilDataKeuangan(rentang.dariMs, rentang.sampaiMs);
 
   const resiDobelSet = new Set(data.resiDobel.map((r) => r.resi));
+  const manualIdSet = new Set(data.pembayaranManualIds);
+  const totalManual = data.bayarManual.reduce((a, m) => a + m.row.total, 0);
 
   return (
     <div className="space-y-6">
@@ -250,7 +252,7 @@ export default async function KeuanganPage({
         <Kartu
           judul="Pembayaran Aneka"
           nilai={fmtRp(data.bayarAneka)}
-          sub={`${data.jumlahBayar} pembayaran sukses`}
+          sub={`${data.jumlahBayar} sukses · ${data.bayarManual.length} manual`}
           cls="text-rose-700"
         />
         <Kartu
@@ -284,9 +286,9 @@ export default async function KeuanganPage({
       />
 
       {data.bayarTanpaOrder.length > 0 ? (
-        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+        <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
           <p className="font-semibold">
-            Pembayaran sukses tanpa pasangan order TikTok pada rentang ini:
+            Pembayaran via KTD Hub tanpa pasangan order TikTok pada rentang ini:
           </p>
           <ul className="mt-1 list-disc space-y-0.5 pl-5">
             {data.bayarTanpaOrder.map((r) => (
@@ -297,8 +299,100 @@ export default async function KeuanganPage({
               </li>
             ))}
           </ul>
+          <p className="mt-1 text-xs text-sky-700">
+            Wajar bila order TikTok-nya dibuat di hari sebelumnya — pilih
+            rentang yang lebih luas untuk melihat pasangannya.
+          </p>
         </div>
       ) : null}
+
+      <section className="space-y-3">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-900">
+            Orderan Manual — di luar KTD Hub ({data.bayarManual.length})
+          </h2>
+          <p className="text-xs text-slate-500">
+            Dibuat langsung di situs Aneka, bukan lewat KTD Hub — biasanya
+            order marketplace lain atau pesanan WhatsApp.
+          </p>
+        </div>
+        <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <table className="w-full min-w-[640px] text-left text-sm">
+            <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+              <tr>
+                <th className="px-4 py-2.5">Waktu</th>
+                <th className="px-4 py-2.5">Kode / Payment</th>
+                <th className="px-4 py-2.5 text-right">Total</th>
+                <th className="px-4 py-2.5">Resi</th>
+                <th className="px-4 py-2.5">Pasangan Order TikTok</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {data.bayarManual.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={5}
+                    className="px-4 py-6 text-center text-slate-400"
+                  >
+                    Tidak ada orderan manual pada rentang ini.
+                  </td>
+                </tr>
+              ) : (
+                data.bayarManual.map(({ row, orderId }) => (
+                  <tr key={row.paymentId}>
+                    <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">
+                      {wibDariMs(row.tanggalMs)}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      <p className="font-medium text-slate-900">
+                        {row.orderCode || "—"}
+                      </p>
+                      <p className="text-xs text-slate-500">
+                        payment {row.paymentId}
+                      </p>
+                    </td>
+                    <td className="px-4 py-2.5 text-right font-medium text-slate-900">
+                      {fmtRp(row.total)}
+                    </td>
+                    <td className="px-4 py-2.5 text-slate-700">
+                      {row.resi || (
+                        <span className="text-slate-400">tanpa resi</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-2.5">
+                      {orderId ? (
+                        <span className="font-medium text-emerald-700">
+                          {orderId}
+                        </span>
+                      ) : (
+                        <span className="text-slate-400">
+                          — (marketplace lain / WA?)
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+            {data.bayarManual.length > 0 ? (
+              <tfoot className="border-t border-slate-200 bg-slate-50">
+                <tr>
+                  <td
+                    colSpan={2}
+                    className="px-4 py-2.5 text-xs font-semibold uppercase tracking-wide text-slate-500"
+                  >
+                    Total {data.bayarManual.length} pembayaran manual
+                  </td>
+                  <td className="px-4 py-2.5 text-right text-sm font-bold text-slate-900">
+                    {fmtRp(totalManual)}
+                  </td>
+                  <td colSpan={2} />
+                </tr>
+              </tfoot>
+            ) : null}
+          </table>
+        </div>
+      </section>
 
       {typeof data.perkiraanTopup === "number" ? (
         <p className="text-xs text-slate-500">
@@ -375,6 +469,11 @@ export default async function KeuanganPage({
                             <span className="block text-[10px] text-slate-400">
                               {b.bayarIds.join(", ")}
                             </span>
+                            {b.bayarManualAneka > 0 ? (
+                              <span className="block text-[10px] font-medium text-violet-600">
+                                manual {fmtRp(b.bayarManualAneka)}
+                              </span>
+                            ) : null}
                           </span>
                         ) : (
                           <span className="text-slate-400">
@@ -430,6 +529,7 @@ export default async function KeuanganPage({
                 <th className="px-4 py-2.5">Waktu</th>
                 <th className="px-4 py-2.5">Kode / Payment</th>
                 <th className="px-4 py-2.5 text-right">Total</th>
+                <th className="px-4 py-2.5">Sumber</th>
                 <th className="px-4 py-2.5">Status</th>
                 <th className="px-4 py-2.5">Resi</th>
               </tr>
@@ -438,7 +538,7 @@ export default async function KeuanganPage({
               {data.pembayaran.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="px-4 py-6 text-center text-slate-400"
                   >
                     Belum ada pembayaran Aneka pada rentang ini.
@@ -462,6 +562,17 @@ export default async function KeuanganPage({
                       </td>
                       <td className="px-4 py-2.5 text-right font-medium text-slate-900">
                         {fmtRp(r.total)}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            manualIdSet.has(r.paymentId)
+                              ? "bg-violet-100 text-violet-800"
+                              : "bg-sky-100 text-sky-800"
+                          }`}
+                        >
+                          {manualIdSet.has(r.paymentId) ? "Manual" : "Hub"}
+                        </span>
                       </td>
                       <td className="px-4 py-2.5">
                         <span
@@ -500,7 +611,9 @@ export default async function KeuanganPage({
         pengemasan Rp3.000 per resi). Belum termasuk komisi TikTok (±8%
         dinamis per kategori sejak 18 Mei 2026 + biaya transaksi) dan komisi
         afiliasi. Order yang belum dibayar ke Aneka memakai laba
-        &quot;proyeksi&quot; berdasarkan harga modal katalog. Data Aneka
+        &quot;proyeksi&quot; berdasarkan harga modal katalog. Pembayaran
+        bertanda &quot;Manual&quot; dibuat langsung di situs Aneka (bukan
+        lewat KTD Hub) — tetap ikut dihitung sebagai biaya. Data Aneka
         diperbarui otomatis maksimal setiap 15 menit saat halaman dibuka —
         tekan &quot;Muat Ulang Data Aneka&quot; untuk memaksa pembaruan
         sekarang.
