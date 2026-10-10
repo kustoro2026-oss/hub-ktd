@@ -1,8 +1,8 @@
 "use client";
 
-// Navigasi samping KTD Hub — disusun per seksi (Utama, Komunikasi,
-// Marketplace, Lainnya). Marketplace berbentuk grup per platform yang
-// bisa dilipat, masing-masing dengan submenu sendiri (Pesanan, Produk).
+// Navigasi samping KTD Hub — disusun per seksi (Utama, Top Up & Isi Saldo,
+// Komunikasi, Marketplace, Lainnya). Marketplace berbentuk grup per platform
+// yang bisa dilipat, masing-masing dengan submenu sendiri (Pesanan, Produk).
 // Item aktif dicocokkan PERSIS dengan pathname (bukan awalan) supaya
 // "/pesan" dan "/pesanan" tidak ikut menyala bersamaan.
 import Link from "next/link";
@@ -24,6 +24,12 @@ import {
   Link2,
   PlayCircle,
   Wallet,
+  Gauge,
+  ReceiptText,
+  Coins,
+  Tags,
+  AlertTriangle,
+  SlidersHorizontal,
 } from "lucide-react";
 
 export type NavItem = {
@@ -46,6 +52,21 @@ export const NAV: NavSection[] = [
     items: [
       { href: "/", label: "Dasbor", Icon: LayoutDashboard },
       { href: "/keuangan", label: "Keuangan", Icon: Wallet },
+    ],
+  },
+  {
+    title: "Top Up & Isi Saldo",
+    items: [
+      { href: "/topup", label: "Ringkasan", Icon: Gauge },
+      { href: "/topup/pesanan", label: "Pesanan", Icon: ReceiptText },
+      { href: "/topup/saldo", label: "Saldo & Deposit", Icon: Coins },
+      { href: "/topup/katalog", label: "Katalog & Margin", Icon: Tags },
+      { href: "/topup/masalah", label: "Log Masalah", Icon: AlertTriangle },
+      {
+        href: "/topup/pengaturan",
+        label: "Pengaturan",
+        Icon: SlidersHorizontal,
+      },
     ],
   },
   {

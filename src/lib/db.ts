@@ -293,6 +293,33 @@ function migrateSqlite(db: DatabaseSync) {
       data TEXT NOT NULL DEFAULT '',
       fetched_at TEXT NOT NULL DEFAULT ''
     );
+
+    CREATE TABLE IF NOT EXISTS topup_orders (
+      id TEXT PRIMARY KEY,
+      ref_id TEXT NOT NULL UNIQUE,
+      sku TEXT NOT NULL DEFAULT '',
+      product_name TEXT NOT NULL DEFAULT '',
+      customer_no TEXT NOT NULL DEFAULT '',
+      amount INTEGER NOT NULL DEFAULT 0,
+      cost INTEGER NOT NULL DEFAULT 0,
+      buyer_name TEXT NOT NULL DEFAULT '',
+      buyer_phone TEXT NOT NULL DEFAULT '',
+      note TEXT NOT NULL DEFAULT '',
+      payment_status TEXT NOT NULL DEFAULT 'pending',
+      topup_status TEXT NOT NULL DEFAULT 'waiting_payment',
+      gateway_session TEXT NOT NULL DEFAULT '',
+      gateway_trx TEXT NOT NULL DEFAULT '',
+      payment_url TEXT NOT NULL DEFAULT '',
+      payment_va TEXT NOT NULL DEFAULT '',
+      payment_qr TEXT NOT NULL DEFAULT '',
+      paid_at TEXT NOT NULL DEFAULT '',
+      digiflazz_sn TEXT NOT NULL DEFAULT '',
+      error_message TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_topup_orders_created
+      ON topup_orders (created_at DESC);
   `);
 
   // Migrasi DB lama: kolom shop_cipher untuk panggilan API pesanan.
@@ -514,6 +541,33 @@ async function migratePg(pool: Pool) {
       data TEXT NOT NULL DEFAULT '',
       fetched_at TEXT NOT NULL DEFAULT ''
     );
+
+    CREATE TABLE IF NOT EXISTS topup_orders (
+      id TEXT PRIMARY KEY,
+      ref_id TEXT NOT NULL UNIQUE,
+      sku TEXT NOT NULL DEFAULT '',
+      product_name TEXT NOT NULL DEFAULT '',
+      customer_no TEXT NOT NULL DEFAULT '',
+      amount INTEGER NOT NULL DEFAULT 0,
+      cost INTEGER NOT NULL DEFAULT 0,
+      buyer_name TEXT NOT NULL DEFAULT '',
+      buyer_phone TEXT NOT NULL DEFAULT '',
+      note TEXT NOT NULL DEFAULT '',
+      payment_status TEXT NOT NULL DEFAULT 'pending',
+      topup_status TEXT NOT NULL DEFAULT 'waiting_payment',
+      gateway_session TEXT NOT NULL DEFAULT '',
+      gateway_trx TEXT NOT NULL DEFAULT '',
+      payment_url TEXT NOT NULL DEFAULT '',
+      payment_va TEXT NOT NULL DEFAULT '',
+      payment_qr TEXT NOT NULL DEFAULT '',
+      paid_at TEXT NOT NULL DEFAULT '',
+      digiflazz_sn TEXT NOT NULL DEFAULT '',
+      error_message TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_topup_orders_created
+      ON topup_orders (created_at DESC);
   `);
 
   // Migrasi DB lama: kolom shop_cipher untuk panggilan API pesanan.
@@ -1481,9 +1535,109 @@ export async function setAnekaFinanceCache(
 ): Promise<void> {
   const sql =
     dbMode() === "pg"
-      ? `INSERT INTO aneka_finance_cache (k, data, fetched_at) VALUES (?, ?, ?)
+      ? `INSERT INTO aneka_finance_cache (k, data, fetched_at) VALUES (?, ?, ?) 
          ON CONFLICT (k) DO UPDATE SET data = EXCLUDED.data, fetched_at = EXCLUDED.fetched_at`
-      : `INSERT INTO aneka_finance_cache (k, data, fetched_at) VALUES (?, ?, ?)
+      : `INSERT INTO aneka_finance_cache (k, data, fetched_at) VALUES (?, ?, ?) 
          ON CONFLICT (k) DO UPDATE SET data = excluded.data, fetched_at = excluded.fetched_at`;
   await queryRun(sql, [k, data, fetchedAt]);
+}
+
+// ---------- Top Up & Isi Saldo (membaca tabel topup_orders milik toko) ----------
+
+/** Baris tabel topup_orders — skema identik dengan yang ditulis toko.
+ *  Hub hanya MEMBACA tabel ini; penulisan tetap di sisi toko. */
+export type TopupOrderRow = {
+  id: string;
+  ref_id: string;
+  sku: string;
+  product_name: string;
+  customer_no: string;
+  amount: number;
+  cost: number;
+  buyer_name: string;
+  buyer_phone: string;
+  note: string;
+  payment_status: string;
+  topup_status: string;
+  gateway_session: string;
+  gateway_trx: string;
+  payment_url: string;
+  payment_va: string;
+  payment_qr: string;
+  paid_at: string;
+  digiflazz_sn: string;
+  error_message: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type TopupFilter = {
+  /** Batas bawah created_at (string UTC "YYYY-MM-DD HH:MM:SS"), inklusif. */
+  dari?: string;
+  /** Batas atas created_at, eksklusif. */
+  sampai?: string;
+  statusBayar?: string;
+  statusTopup?: string;
+  /** Pencarian lintas kolom (id/ref/SKU/produk/tujuan/pembeli). */
+  q?: string;
+  limit?: number;
+  offset?: number;
+};
+
+/** Bangun klausa WHERE + parameter dari filter — sintaks lintas backend
+ *  (LOWER(x) LIKE LOWER(?), TANPA COLLATE NOCASE yang khusus SQLite). */
+function topupWhere(f: TopupFilter): { sql: string; params: SQLInputValue[] } {
+  const cond: string[] = [];
+  const params: SQLInputValue[] = [];
+  if (f.dari) {
+    cond.push("created_at >= ?");
+    params.push(f.dari);
+  }
+  if (f.sampai) {
+    cond.push("created_at < ?");
+    params.push(f.sampai);
+  }
+  if (f.statusBayar) {
+    cond.push("payment_status = ?");
+    params.push(f.statusBayar);
+  }
+  if (f.statusTopup) {
+    cond.push("topup_status = ?");
+    params.push(f.statusTopup);
+  }
+  if (f.q) {
+    const like = `%${f.q}%`;
+    cond.push(
+      `(LOWER(id) LIKE LOWER(?) OR LOWER(ref_id) LIKE LOWER(?) OR LOWER(sku) LIKE LOWER(?) OR LOWER(product_name) LIKE LOWER(?) OR LOWER(customer_no) LIKE LOWER(?) OR LOWER(buyer_name) LIKE LOWER(?) OR LOWER(buyer_phone) LIKE LOWER(?))`,
+    );
+    params.push(like, like, like, like, like, like, like);
+  }
+  return { sql: cond.length ? `WHERE ${cond.join(" AND ")}` : "", params };
+}
+
+export async function listTopupOrders(
+  f: TopupFilter = {},
+): Promise<TopupOrderRow[]> {
+  const w = topupWhere(f);
+  const sql = `SELECT * FROM topup_orders ${w.sql} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+  return queryAll<TopupOrderRow>(sql, [
+    ...w.params,
+    f.limit ?? 50,
+    f.offset ?? 0,
+  ]);
+}
+
+export async function countTopupOrders(f: TopupFilter = {}): Promise<number> {
+  const w = topupWhere(f);
+  const row = await queryOne<{ n: number | string }>(
+    `SELECT COUNT(*) AS n FROM topup_orders ${w.sql}`,
+    w.params,
+  );
+  return Number(row?.n ?? 0);
+}
+
+export async function getTopupOrder(
+  id: string,
+): Promise<TopupOrderRow | undefined> {
+  return queryOne<TopupOrderRow>("SELECT * FROM topup_orders WHERE id = ?", [id]);
 }
