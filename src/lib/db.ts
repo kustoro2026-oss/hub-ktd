@@ -62,7 +62,7 @@ export type InboundMessage = {
   wa_from: string;
   body: string;
   reply: string;
-  kind: "general" | "order" | "ad" | "faq" | "question" | "proof";
+  kind: "general" | "order" | "ad" | "faq" | "question" | "ai" | "proof";
   ad_id: string;
   direction: "in" | "out";
   read: number;

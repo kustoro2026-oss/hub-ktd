@@ -141,7 +141,7 @@ export function isProofOfTransfer(m: WaMessage): boolean {
   return PROOF_PATTERNS.some((p) => p.test(body.toLowerCase()));
 }
 
-export type ReplyKind = "general" | "order" | "ad" | "faq" | "question" | "proof";
+export type ReplyKind = "general" | "order" | "ad" | "faq" | "question" | "ai" | "proof";
 
 /** Pilih balasan + klasifikasi untuk satu pesan masuk. */
 export function pickReply(m: WaMessage): { kind: ReplyKind; reply: string } {

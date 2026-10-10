@@ -24,6 +24,7 @@ import {
   type WaMessage,
 } from "@/lib/replies";
 import { notifyOrderOwner, sendText } from "@/lib/wa";
+import { answerWithAi } from "@/lib/ai-reply";
 import { runDueScheduledBroadcasts } from "@/lib/broadcast-send";
 import { checkNewTiktokOrders } from "@/lib/tiktok-resi";
 import { after } from "next/server";
@@ -91,6 +92,31 @@ export async function POST(request: Request) {
             reply = "";
           }
 
+          // Jeda bot: cek LEBIH AWAL supaya cabang AI di bawah tidak membuang
+          // panggilan API saat admin baru saja membalas manual nomor ini.
+          const lastOut = await getLatestOutMessage(m.from);
+          const handover = isBotHandoverActive(lastOut);
+
+          // Cabang AI: pertanyaan yang tidak terjawab FAQ dijawab dengan
+          // basis pengetahuan toko (produk + top-up) via Gemini. Gagal,
+          // timeout, atau di luar data → tetap pakai ajakan hubungi CS.
+          if (
+            isText &&
+            kind === "question" &&
+            !handover &&
+            process.env.GEMINI_API_KEY
+          ) {
+            try {
+              const aiReply = await answerWithAi(body);
+              if (aiReply) {
+                kind = "ai";
+                reply = aiReply;
+              }
+            } catch (e) {
+              console.error("[wa-webhook] balasan AI gagal:", e);
+            }
+          }
+
           // Bukti transfer: pesan sebelumnya dari nomor ini adalah order
           // ber-metode transfer, dan pesan sekarang berupa foto/screenshot
           // atau teks bukti → kirim konfirmasi pesanan resmi.
@@ -108,10 +134,9 @@ export async function POST(request: Request) {
           // supaya orderan tidak pernah terlewat oleh manusia.
           const notify =
             kind === "order" ? await notifyOrderOwner(m.from, body) : "";
-          // Jeda bot: kalau admin baru saja membalas manual nomor ini, biarkan
-          // manusia yang menangani — pesan tetap dicatat tanpa balasan otomatis.
-          const lastOut = await getLatestOutMessage(m.from);
-          if (isBotHandoverActive(lastOut)) {
+          // Jeda bot: biarkan manusia yang menangani — pesan tetap dicatat
+          // tanpa balasan otomatis.
+          if (handover) {
             await insertMessage({
               id: m.id,
               wa_from: m.from,
