@@ -468,6 +468,18 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
       const cancelled =
         o.order_status === "CANCELLED" || o.order_status === "CANCELED";
 
+      // Gerbang status: hanya pesanan berbayar yang belum selesai yang
+      // dianggap "baru". UNPAID belum dibayar — bila nanti dibayar,
+      // statusnya berubah dan diproses saat itu. COMPLETED adalah pesanan
+      // LAMA yang baru saja berubah status: update_time-nya ikut berubah
+      // sehingga muncul lagi di jendela pencarian 7 hari — tanpa gerbang
+      // ini, order lama diumumkan sebagai "pesanan baru" dan berisiko
+      // dieksekusi ulang (bayar dobel). Kasus nyata: 586148585295545791
+      // (dibuat 19 Sep, baru selesai 10 Okt, sempat diumumkan jam 01:15).
+      if (o.order_status === "UNPAID" || o.order_status === "COMPLETED") {
+        continue;
+      }
+
       // Sudah pernah dikabari pembatalannya — lewati.
       if (prev && prev.notify.startsWith("batal")) continue;
 
