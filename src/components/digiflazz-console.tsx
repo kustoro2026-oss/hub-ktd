@@ -37,6 +37,10 @@ type Hasil = {
   cmd?: string;
   status?: number;
   klasifikasi?: { success: boolean; pending: boolean };
+  matched?: boolean;
+  orderId?: string;
+  orderStatusSekarang?: string;
+  mapped?: string;
 };
 
 type Konfirmasi = {
@@ -72,6 +76,10 @@ type FormState = {
   depAmount: string;
   depBank: string;
   depOwner: string;
+  whRef: string;
+  whStatus: string;
+  whSn: string;
+  whMessage: string;
 };
 
 const FORM_AWAL: FormState = {
@@ -98,6 +106,10 @@ const FORM_AWAL: FormState = {
   depAmount: "",
   depBank: "Flip",
   depOwner: "",
+  whRef: "",
+  whStatus: "Sukses",
+  whSn: "",
+  whMessage: "",
 };
 
 const INPUT =
@@ -354,6 +366,69 @@ function HasilPanel({ sec, hasil }: { sec: string; hasil: Hasil | null }) {
   );
 }
 
+/** Hasil simulasi webhook — ref cocok atau tidak + status yang AKAN ditulis. */
+function WhSimHasil({ hasil }: { hasil: Hasil | null }) {
+  if (!hasil) return null;
+  if (!hasil.ok) {
+    return (
+      <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p className="font-medium">Simulasi gagal</p>
+        <p className="mt-1 text-xs leading-relaxed">{hasil.detail ?? "Tanpa detail"}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2">
+      <div className="flex flex-wrap items-center gap-2 text-sm font-medium text-emerald-800">
+        <CheckCircle2 className="h-4 w-4" />
+        {hasil.matched ? "ref_id cocok" : "ref_id tidak cocok"}
+        {hasil.mapped ? (
+          <span className="rounded bg-white px-1.5 py-0.5 text-xs font-medium text-slate-600">
+            status webhook → {hasil.mapped}
+          </span>
+        ) : null}
+      </div>
+      {hasil.orderId ? (
+        <dl className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-slate-600">
+          <div>Pesanan: <b>{hasil.orderId}</b></div>
+          <div>Status sekarang: <b>{hasil.orderStatusSekarang}</b></div>
+        </dl>
+      ) : null}
+      <p className="mt-1.5 text-xs leading-relaxed text-slate-600">{hasil.detail}</p>
+    </div>
+  );
+}
+
+/** Tabel log webhook terbaru (audit) dari toko. */
+function WhLogTable({ logs }: { logs: unknown }) {
+  const rows = Array.isArray(logs) ? (logs as Record<string, unknown>[]) : [];
+  if (!rows.length) {
+    return <p className="mt-2 text-xs text-slate-500">Belum ada log webhook.</p>;
+  }
+  return (
+    <div className="mt-2 max-h-72 overflow-auto rounded-lg border border-slate-200 bg-white">
+      <table className="w-full text-left text-xs">
+        <thead className="sticky top-0 bg-slate-50 text-slate-600">
+          <tr>
+            <th className="px-3 py-1.5 font-semibold">Waktu (UTC)</th>
+            <th className="px-3 py-1.5 font-semibold">ref_id</th>
+            <th className="px-3 py-1.5 font-semibold">Hasil proses</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} className="border-t border-slate-100 align-top">
+              <td className="whitespace-nowrap px-3 py-1.5">{teks(r.created_at)}</td>
+              <td className="px-3 py-1.5 font-mono text-[11px]">{teks(r.ref_id) || "-"}</td>
+              <td className="px-3 py-1.5 text-slate-600">{teks(r.action)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function KonfirmasiModal({
   konfirmasi,
   busy,
@@ -482,6 +557,7 @@ export default function DigiflazzConsole() {
           <li>Endpoint <b>1–3, 7</b> tidak memotong saldo; endpoint <b>3 (tanpa testing), 5, 8</b> memotong saldo asli dan wajib konfirmasi.</li>
           <li>Centang <b>testing</b> untuk dev — catatan: relay saat ini merusak payload testing (rc=41) sampai dg_relay.php diperbaiki.</li>
           <li>Endpoint <b>7 (inquiry-pln)</b> dan <b>8 (deposit)</b> adalah jalur relay baru — bila kena blokir, izinkan dulu di allowlist dg_relay.php.</li>
+          <li>Webhook (seksi <b>9</b>) menarik status transaksi dari Digiflazz secara real-time — lapisan tambahan di atas pola sinkron + polling.</li>
         </ul>
       </div>
 
@@ -757,6 +833,65 @@ export default function DigiflazzConsole() {
           <HasilPanel sec="deposit" hasil={hasilIni("dep")} />
         </Seksi>
       </div>
+
+      {/* 9. Webhook */}
+      <Seksi
+        nomor="9"
+        judul="Webhook (Callback Status Transaksi)"
+        deskripsi="Digiflazz POST hasil transaksi ke URL toko — status pesanan diperbarui otomatis tanpa polling. Simulasi di bawah tidak menulis apa pun."
+      >
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-600">
+          <p className="font-semibold text-slate-700">Cara penerapan</p>
+          <ol className="mt-1 list-decimal pl-4">
+            <li>Token <b className="font-mono">TOPUP_WEBHOOK_TOKEN</b> sudah diatur di server toko (env Vercel).</li>
+            <li>Daftarkan Payload URL di member area Digiflazz (Atur Koneksi → Webhook): <b className="font-mono">https://toko.kustoro2026.com/api/topup/webhook</b> — atau kirim <b className="font-mono">cb_url</b> per transaksi (field di seksi 3).</li>
+            <li>Digiflazz akan POST status transaksi; sistem mencocokkan ref_id, memperbarui status pesanan + notifikasi WA. Polling tetap jadi cadangan.</li>
+          </ol>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Field label="ref_id (pesanan kita)">
+            <input value={f.whRef} onChange={(e) => atur("whRef", e.target.value)} placeholder="KTD..." className={`${INPUT} font-mono`} />
+          </Field>
+          <Field label="status webhook">
+            <select value={f.whStatus} onChange={(e) => atur("whStatus", e.target.value)} className={SELECT}>
+              <option value="Sukses">Sukses</option>
+              <option value="Pending">Pending</option>
+              <option value="Gagal">Gagal</option>
+            </select>
+          </Field>
+          <Field label="sn (opsional)">
+            <input value={f.whSn} onChange={(e) => atur("whSn", e.target.value)} placeholder="SN..." className={INPUT} />
+          </Field>
+          <Field label="message (opsional)">
+            <input value={f.whMessage} onChange={(e) => atur("whMessage", e.target.value)} placeholder="..." className={INPUT} />
+          </Field>
+        </div>
+        <button
+          onClick={() => panggil("whsim", "webhook-sim", {
+            refId: f.whRef.trim(),
+            status: f.whStatus,
+            sn: f.whSn.trim() || undefined,
+            message: f.whMessage.trim() || undefined,
+          })}
+          disabled={busyIni("whsim") || !f.whRef.trim()}
+          className={BTN}
+        >
+          {busyIni("whsim") ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+          Simulasikan (tanpa menulis)
+        </button>
+        <WhSimHasil hasil={hasilIni("whsim")} />
+        <div className="border-t border-slate-100 pt-3">
+          <button
+            onClick={() => panggil("whlog", "webhook-log", { limit: 20 })}
+            disabled={busyIni("whlog")}
+            className={BTN_GARIS}
+          >
+            {busyIni("whlog") ? <Loader2 className="h-4 w-4 animate-spin" /> : <ChevronDown className="h-4 w-4" />}
+            Muat Log Webhook Terakhir
+          </button>
+          <WhLogTable logs={(hasilIni("whlog") as Hasil | null)?.data} />
+        </div>
+      </Seksi>
 
       {confirm ? (
         <KonfirmasiModal
