@@ -844,7 +844,8 @@ export default function DigiflazzConsole() {
           <p className="font-semibold text-slate-700">Cara penerapan</p>
           <ol className="mt-1 list-decimal pl-4">
             <li>Token <b className="font-mono">TOPUP_WEBHOOK_TOKEN</b> sudah diatur di server toko (env Vercel).</li>
-            <li>Daftarkan Payload URL di member area Digiflazz (Atur Koneksi → Webhook): <b className="font-mono">https://toko.kustoro2026.com/api/topup/webhook</b> — atau kirim <b className="font-mono">cb_url</b> per transaksi (field di seksi 3).</li>
+            <li>Daftarkan Payload URL di member area Digiflazz (Atur Koneksi → Webhook): <b className="font-mono">https://toko.kustoro2026.com/api/topup/webhook?token=TOKEN</b> — atau kirim <b className="font-mono">cb_url</b> per transaksi (field di seksi 3).</li>
+            <li>Isi kolom <b>Secret</b> di form webhook dengan token yang sama, lalu tombol jadikan <b>Aktif</b> → Simpan. Digiflazz menandatangani tiap event dengan HMAC-SHA1 (header X-Hub-Signature) yang diverifikasi server; event ping otomatis terkirim saat disimpan sebagai uji URL.</li>
             <li>Digiflazz akan POST status transaksi; sistem mencocokkan ref_id, memperbarui status pesanan + notifikasi WA. Polling tetap jadi cadangan.</li>
           </ol>
         </div>
