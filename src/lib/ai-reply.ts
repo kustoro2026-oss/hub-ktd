@@ -27,35 +27,54 @@ Aturan:
 4. Untuk produk kesehatan/suplemen, jangan memberi nasihat medis — arahkan membaca deskripsi produk (legalitas BPOM) dan konsultasi tenaga kesehatan.
 5. Untuk keluhan, retur, status pesanan, resi, pembatalan, refund, atau tagihan — balas PERSIS "TIDAK_TAHU" (ditangani CS manusia).
 6. Pertanyaan di luar topik toko (politik, umum, candaan, permintaan ngobrol) — balas PERSIS "TIDAK_TAHU".
-7. Bila data relevan tidak ada — balas PERSIS "TIDAK_TAHU".
-8. Akhiri jawaban dengan "Hormat kami,\nKTD Store".`;
+7. Bila produk persis yang ditanyakan tidak ada di data, jawab JUJUR seperti manusia toko (mis. "Kami tidak menjual padi, tetapi tersedia pupuk untuk tanaman padi") dan tawarkan alternatif terdekat dari data. Bila data relevan kosong, jawab dari DESKRIPSI TOKO (kategori yang dijual, cara beli, link). Balas PERSIS "TIDAK_TAHU" hanya bila pertanyaan benar-benar tidak ada kaitannya dengan toko.
+8. Bila ada PESAN PELANGGAN SEBELUMNYA, pakai sebagai konteks untuk memahami pertanyaan singkat atau merujuk (mis. "list nya apa saja" setelah bertanya tentang satu produk).
+9. Akhiri jawaban dengan "Hormat kami,\nKTD Store".`;
 
-function buildPrompt(kb: BotKnowledge, question: string): string {
+/** Batas panjang pesan sebelumnya yang ikut dikirim sebagai konteks (karakter). */
+const MAX_PRIOR = 200;
+
+function buildPrompt(kb: BotKnowledge, question: string, prior: string): string {
   const ctx = retrieve(kb, question);
   const lines = [
     SYSTEM_RULES,
     "",
-    "DATA TOKO:",
+    "DESKRIPSI TOKO:",
     kb.store,
     "",
     "DATA RELEVAN (bila kosong berarti tidak ditemukan):",
     formatContext(ctx) || "(tidak ada)",
     "",
-    `PERTANYAAN PELANGGAN: ${question}`,
   ];
+  if (prior) {
+    lines.push(
+      `PESAN PELANGGAN SEBELUMNYA: ${prior}`,
+      "",
+    );
+  }
+  lines.push(`PERTANYAAN PELANGGAN: ${question}`);
   return lines.join("\n");
 }
 
 /** Jawab satu pertanyaan dengan AI. Mengembalikan null bila: kunci tidak ada,
- *  pertanyaan terlalu panjang, API gagal/timeout, atau jawabannya TIDAK_TAHU. */
-export async function answerWithAi(question: string): Promise<string | null> {
+ *  pertanyaan terlalu panjang, API gagal/timeout, atau jawabannya TIDAK_TAHU.
+ *  `prior` adalah pesan pelanggan sebelumnya (opsional) untuk konteks
+ *  pertanyaan lanjutan singkat seperti "list nya apa saja". */
+export async function answerWithAi(
+  question: string,
+  prior = "",
+): Promise<string | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
   const t = question.replace(/\s+/g, " ").trim();
   if (!t || t.length > MAX_QUESTION) return null;
 
   const kb = knowledge as BotKnowledge;
-  const prompt = buildPrompt(kb, t);
+  const prompt = buildPrompt(
+    kb,
+    t,
+    prior.replace(/\s+/g, " ").trim().slice(0, MAX_PRIOR),
+  );
   const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
 
@@ -86,8 +105,10 @@ export async function answerWithAi(question: string): Promise<string | null> {
     if (!text) return null;
     if (/\bTIDAK_TAHU\b/i.test(text)) return null;
     let cleaned = text.slice(0, 600).trim();
-    // Pastikan ada tanda tangan formal khas proyek.
+    // Pastikan ada tanda tangan formal khas proyek. Bila AI sudah menulis
+    // salam "Hormat kami," tanpa nama toko, buang dulu supaya tidak dobel.
     if (!cleaned.includes("KTD Store")) {
+      cleaned = cleaned.replace(/Hormat kami,?\s*$/i, "").trim();
       cleaned += "\n\nHormat kami,\nKTD Store";
     }
     return cleaned;

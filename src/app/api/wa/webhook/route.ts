@@ -97,6 +97,11 @@ export async function POST(request: Request) {
           const lastOut = await getLatestOutMessage(m.from);
           const handover = isBotHandoverActive(lastOut);
 
+          // Pesan masuk terakhir dari nomor ini — dipakai sebagai konteks
+          // jawaban AI (pertanyaan lanjutan singkat) dan pengecekan bukti
+          // transfer di bawah.
+          const lastIn = await getLatestInMessage(m.from);
+
           // Cabang AI: pertanyaan yang tidak terjawab FAQ dijawab dengan
           // basis pengetahuan toko (produk + top-up) via Gemini. Gagal,
           // timeout, atau di luar data → tetap pakai ajakan hubungi CS.
@@ -107,7 +112,7 @@ export async function POST(request: Request) {
             process.env.GEMINI_API_KEY
           ) {
             try {
-              const aiReply = await answerWithAi(body);
+              const aiReply = await answerWithAi(body, lastIn?.body ?? "");
               if (aiReply) {
                 kind = "ai";
                 reply = aiReply;
@@ -120,7 +125,6 @@ export async function POST(request: Request) {
           // Bukti transfer: pesan sebelumnya dari nomor ini adalah order
           // ber-metode transfer, dan pesan sekarang berupa foto/screenshot
           // atau teks bukti → kirim konfirmasi pesanan resmi.
-          const lastIn = await getLatestInMessage(m.from);
           if (
             lastIn &&
             paymentMethodOfOrder(lastIn.body) === "transfer" &&
