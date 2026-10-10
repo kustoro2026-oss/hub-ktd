@@ -30,6 +30,7 @@ import {
   Tags,
   AlertTriangle,
   SlidersHorizontal,
+  Terminal,
 } from "lucide-react";
 
 export type NavItem = {
@@ -62,6 +63,11 @@ export const NAV: NavSection[] = [
       { href: "/topup/saldo", label: "Saldo & Deposit", Icon: Coins },
       { href: "/topup/katalog", label: "Katalog & Margin", Icon: Tags },
       { href: "/topup/masalah", label: "Log Masalah", Icon: AlertTriangle },
+      {
+        href: "/topup/api-digiflazz",
+        label: "API Digiflazz",
+        Icon: Terminal,
+      },
       {
         href: "/topup/pengaturan",
         label: "Pengaturan",
