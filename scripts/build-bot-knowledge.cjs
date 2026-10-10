@@ -26,6 +26,11 @@ const OUT = path.join(ROOT, "src", "lib", "bot-knowledge.json");
 
 const CATALOG_URL = "https://toko.kustoro2026.com";
 
+// Buang pasangan surrogate (emoji) SEBELUM pemangkasan: memotong di tengah
+// emoji menghasilkan \uDXXX menggantung yang membuat JSON tidak valid bagi
+// parser ketat Turbopack (padahal Node JSON.parse memaafkannya).
+const clean = (s) => String(s ?? "").replace(/[\uD800-\uDFFF]/g, "");
+
 // ---------- Ringkasan kebijakan toko (selalu disertakan di prompt) ----------
 const STORE_BLOCK = `KTD Store adalah toko online (situs ${CATALOG_URL}) yang menjual produk fisik (kesehatan, kecantikan, rumah tangga, pertanian, otomotif, dan lainnya) serta produk digital (top up pulsa, paket data, token listrik PLN, e-money, dan voucher game).
 Cara beli produk fisik: buka katalog ${CATALOG_URL} , pilih produk, klik tombol "Order via WhatsApp", lengkapi nama dan alamat (provinsi, kota, kecamatan), ongkir dihitung otomatis, lalu kirim pesan WhatsApp.
@@ -57,11 +62,11 @@ function loadProducts() {
     const d = desc.products?.[String(p.id)] ?? "";
     products.push({
       id: String(p.id),
-      name: String(p.name).trim(),
+      name: clean(p.name).trim(),
       price: String(p.rekomendasiJual ?? ""),
       stok: String(p.stok ?? ""),
       berat: String(p.berat ?? ""),
-      desc: stripHtml(d).slice(0, 240),
+      desc: clean(stripHtml(d)).slice(0, 240),
       link: `${CATALOG_URL}/produk/${p.id}`,
     });
   }
@@ -90,14 +95,14 @@ function loadTopup() {
       "";
     return {
       slug: p.slug,
-      brand: p.brand ?? "",
-      label: p.label ?? p.brand ?? "",
-      category: cat,
+      brand: clean(p.brand),
+      label: clean(p.label ?? p.brand),
+      category: clean(cat),
       count: nominals.length,
       priceMin: sells.length ? Math.min(...sells) : 0,
       priceMax: sells.length ? Math.max(...sells) : 0,
-      examples: nominals.slice(0, 10).map((n) => n.name).filter(Boolean),
-      customerNoLabel: p.customerNoLabel ?? "",
+      examples: nominals.slice(0, 10).map((n) => clean(n.name)).filter(Boolean),
+      customerNoLabel: clean(p.customerNoLabel),
       link: `${CATALOG_URL}/topup/${p.slug}`,
     };
   });
