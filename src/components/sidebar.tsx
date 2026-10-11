@@ -107,7 +107,21 @@ export const NAV: NavSection[] = [
       {
         title: "Blibli",
         items: [
-          { href: "", label: "Pesanan", Icon: Package, segera: true },
+          {
+            href: "/marketplace/blibli/pesanan",
+            label: "Pesanan",
+            Icon: Package,
+          },
+          {
+            href: "/marketplace/blibli/eksekusi",
+            label: "Eksekusi Pesanan",
+            Icon: PlayCircle,
+          },
+          {
+            href: "/marketplace/blibli/pemetaan",
+            label: "Pemetaan Produk",
+            Icon: Link2,
+          },
           { href: "", label: "Produk", Icon: Boxes, segera: true },
         ],
       },
@@ -196,10 +210,11 @@ export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
-  // Grup marketplace yang sedang dibuka — TikTok Shop dibuka sejak awal
-  // karena sudah aktif; grup lain tertutup sampai fiturnya hadir.
+  // Grup marketplace yang sedang dibuka — TikTok Shop dan Blibli dibuka
+  // sejak awal karena sudah aktif; grup lain tertutup sampai fiturnya hadir.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
     "TikTok Shop": true,
+    Blibli: true,
   });
 
   async function logout() {

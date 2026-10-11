@@ -303,6 +303,38 @@ function migrateSqlite(db: DatabaseSync) {
       executed_at TEXT NOT NULL DEFAULT ''
     );
 
+    CREATE TABLE IF NOT EXISTS blibli_order_seen (
+      order_item_id TEXT PRIMARY KEY,
+      store_code TEXT NOT NULL DEFAULT '',
+      first_seen_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      notify TEXT NOT NULL DEFAULT '',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_attempt_at TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS blibli_product_map (
+      seller_sku TEXT PRIMARY KEY,
+      product_name TEXT NOT NULL DEFAULT '',
+      aneka_product_id TEXT NOT NULL DEFAULT '',
+      aneka_variant_id TEXT NOT NULL DEFAULT '',
+      aneka_product_name TEXT NOT NULL DEFAULT '',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS blibli_order_exec (
+      package_id TEXT PRIMARY KEY,
+      store_code TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'menunggu',
+      payload TEXT NOT NULL DEFAULT '',
+      aneka_payment_id TEXT NOT NULL DEFAULT '',
+      aneka_order_id TEXT NOT NULL DEFAULT '',
+      detail TEXT NOT NULL DEFAULT '',
+      log TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      executed_at TEXT NOT NULL DEFAULT ''
+    );
+
     CREATE TABLE IF NOT EXISTS aneka_finance_cache (
       k TEXT PRIMARY KEY,
       data TEXT NOT NULL DEFAULT '',
@@ -439,6 +471,31 @@ function migrateSqlite(db: DatabaseSync) {
   if (!bcols.some((c) => c.name === "group_id")) {
     db.exec("ALTER TABLE broadcasts ADD COLUMN group_id INTEGER");
   }
+
+  // Migrasi skema awal blibli_order_exec (kunci order_item_id → package_id):
+  // satu baris eksekusi Aneka = SATU paket Blibli (satu paket = satu label
+  // = satu slot resi). Modul Blibli belum rilis, jadi tabel lama (kosong)
+  // aman dibuang sekali lalu dibuat ulang dengan skema baru.
+  const bexecols = db
+    .prepare("PRAGMA table_info(blibli_order_exec)")
+    .all() as unknown as { name: string }[];
+  if (bexecols.length > 0 && !bexecols.some((c) => c.name === "package_id")) {
+    db.exec("DROP TABLE blibli_order_exec");
+    db.exec(`
+      CREATE TABLE blibli_order_exec (
+        package_id TEXT PRIMARY KEY,
+        store_code TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'menunggu',
+        payload TEXT NOT NULL DEFAULT '',
+        aneka_payment_id TEXT NOT NULL DEFAULT '',
+        aneka_order_id TEXT NOT NULL DEFAULT '',
+        detail TEXT NOT NULL DEFAULT '',
+        log TEXT NOT NULL DEFAULT '',
+        created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+        executed_at TEXT NOT NULL DEFAULT ''
+      );
+    `);
+  }
 }
 
 async function migratePg(pool: Pool) {
@@ -557,6 +614,38 @@ async function migratePg(pool: Pool) {
       executed_at TEXT NOT NULL DEFAULT ''
     );
 
+    CREATE TABLE IF NOT EXISTS blibli_order_seen (
+      order_item_id TEXT PRIMARY KEY,
+      store_code TEXT NOT NULL DEFAULT '',
+      first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      notify TEXT NOT NULL DEFAULT '',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_attempt_at TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS blibli_product_map (
+      seller_sku TEXT PRIMARY KEY,
+      product_name TEXT NOT NULL DEFAULT '',
+      aneka_product_id TEXT NOT NULL DEFAULT '',
+      aneka_variant_id TEXT NOT NULL DEFAULT '',
+      aneka_product_name TEXT NOT NULL DEFAULT '',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS blibli_order_exec (
+      package_id TEXT PRIMARY KEY,
+      store_code TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'menunggu',
+      payload TEXT NOT NULL DEFAULT '',
+      aneka_payment_id TEXT NOT NULL DEFAULT '',
+      aneka_order_id TEXT NOT NULL DEFAULT '',
+      detail TEXT NOT NULL DEFAULT '',
+      log TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      executed_at TEXT NOT NULL DEFAULT ''
+    );
+
     CREATE TABLE IF NOT EXISTS aneka_finance_cache (
       k TEXT PRIMARY KEY,
       data TEXT NOT NULL DEFAULT '',
@@ -590,6 +679,33 @@ async function migratePg(pool: Pool) {
     CREATE INDEX IF NOT EXISTS idx_topup_orders_created
       ON topup_orders (created_at DESC);
   `);
+
+  // Migrasi skema awal blibli_order_exec (kunci order_item_id → package_id),
+  // sama seperti versi SQLite — tabel lama kosong aman dibuang sekali.
+  const ecols = await pool.query<{ column_name: string }>(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_name = 'blibli_order_exec'`,
+  );
+  if (
+    ecols.rows.length > 0 &&
+    !ecols.rows.some((c) => c.column_name === "package_id")
+  ) {
+    await pool.query("DROP TABLE blibli_order_exec");
+    await pool.query(`
+      CREATE TABLE blibli_order_exec (
+        package_id TEXT PRIMARY KEY,
+        store_code TEXT NOT NULL DEFAULT '',
+        status TEXT NOT NULL DEFAULT 'menunggu',
+        payload TEXT NOT NULL DEFAULT '',
+        aneka_payment_id TEXT NOT NULL DEFAULT '',
+        aneka_order_id TEXT NOT NULL DEFAULT '',
+        detail TEXT NOT NULL DEFAULT '',
+        log TEXT NOT NULL DEFAULT '',
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        executed_at TEXT NOT NULL DEFAULT ''
+      );
+    `);
+  }
 
   // Migrasi DB lama: kolom shop_cipher untuk panggilan API pesanan.
   await pool.query(
@@ -1734,4 +1850,298 @@ export async function getTopupOrder(
   id: string,
 ): Promise<TopupOrderRow | undefined> {
   return queryOne<TopupOrderRow>("SELECT * FROM topup_orders WHERE id = ?", [id]);
+}
+
+// ---------- Riwayat resi pesanan Blibli (deteksi pesanan baru) ----------
+
+export type BlibliOrderSeen = {
+  order_item_id: string;
+  store_code: string;
+  first_seen_at: string;
+  notify: string;
+  attempts: number;
+  /** Waktu percobaan ulang terakhir (UTC "YYYY-MM-DD HH:MM:SS") — dipakai
+   *  sebagai pengatur jeda antar percobaan ulang. */
+  last_attempt_at: string;
+};
+
+/** Jumlah order item Blibli yang sudah pernah diproses. 0 berarti tabel
+ *  kosong dan pengecekan berikutnya berjalan dalam mode baseline (tandai
+ *  semua pesanan yang ada tanpa kirim resi — mencegah banjir resi pesanan
+ *  lama). */
+export async function countSeenBlibliOrders(): Promise<number> {
+  const row = await queryOne<{ n: string | number }>(
+    "SELECT COUNT(*) AS n FROM blibli_order_seen",
+  );
+  return Number(row?.n ?? 0);
+}
+
+/** Semua baris riwayat resi Blibli — untuk memfilter order item baru dan
+ *  mencoba ulang kiriman yang sebelumnya gagal (dibatasi kolom attempts). */
+export async function listSeenBlibliOrders(): Promise<BlibliOrderSeen[]> {
+  return queryAll<BlibliOrderSeen>("SELECT * FROM blibli_order_seen");
+}
+
+/** Catat order item sebagai sudah diproses (upsert: notifikasi terakhir
+ *  menggantikan yang lama, mis. "menunggu" → "ok", tanpa mengubah
+ *  first_seen_at). `notify` = hasil kirim resi ('ok', 'ok (template)',
+ *  'skip', 'menunggu:<epoch_ms>', 'batal: ...', atau 'gagal: ...'). */
+export async function markBlibliOrderSeen(
+  orderItemId: string,
+  storeCode: string,
+  notify = "",
+): Promise<void> {
+  const sql =
+    dbMode() === "pg"
+      ? "INSERT INTO blibli_order_seen (order_item_id, store_code, notify) VALUES (?, ?, ?) ON CONFLICT (order_item_id) DO UPDATE SET notify = EXCLUDED.notify, store_code = EXCLUDED.store_code"
+      : "INSERT INTO blibli_order_seen (order_item_id, store_code, notify) VALUES (?, ?, ?) ON CONFLICT (order_item_id) DO UPDATE SET notify = excluded.notify, store_code = excluded.store_code";
+  await queryRun(sql, [orderItemId, storeCode, notify]);
+}
+
+/** Atur ulang status order item supaya diproses ulang dari awal (dipakai
+ *  route siapkan-ulang yang dijaga CRON_SECRET). Hitungan percobaan
+ *  di-nol-kan supaya tidak tersangkut batas MAX_SEND_ATTEMPTS. Return false
+ *  bila baris belum pernah tercatat. */
+export async function resetBlibliOrderSeen(
+  orderItemId: string,
+  notify: string,
+): Promise<boolean> {
+  const updated = await queryOne<{ order_item_id: string }>(
+    "UPDATE blibli_order_seen SET notify = ?, attempts = 0, last_attempt_at = '' WHERE order_item_id = ? RETURNING order_item_id",
+    [notify, orderItemId],
+  );
+  return Boolean(updated);
+}
+
+/** Tambah hitungan percobaan kirim resi yang gagal — order item yang belum
+ *  pernah tercatat otomatis dibuatkan barisnya dengan attempts = 1.
+ *  last_attempt_at dicatat supaya percobaan ulang bisa diberi jeda. */
+export async function recordBlibliOrderFailure(
+  orderItemId: string,
+  storeCode: string,
+  notify: string,
+): Promise<void> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const updated = await queryOne<{ order_item_id: string }>(
+    "UPDATE blibli_order_seen SET attempts = attempts + 1, notify = ?, last_attempt_at = ? WHERE order_item_id = ? RETURNING order_item_id",
+    [notify, nowUtc, orderItemId],
+  );
+  if (!updated) {
+    const sql =
+      dbMode() === "pg"
+        ? "INSERT INTO blibli_order_seen (order_item_id, store_code, notify, attempts, last_attempt_at) VALUES (?, ?, ?, 1, ?) ON CONFLICT (order_item_id) DO NOTHING"
+        : "INSERT OR IGNORE INTO blibli_order_seen (order_item_id, store_code, notify, attempts, last_attempt_at) VALUES (?, ?, ?, 1, ?)";
+    await queryRun(sql, [orderItemId, storeCode, notify, nowUtc]);
+  }
+}
+
+// ---------- Pemetaan produk Blibli (seller SKU) → Aneka ----------
+
+export type BlibliProductMap = {
+  seller_sku: string;
+  product_name: string;
+  aneka_product_id: string;
+  aneka_variant_id: string;
+  aneka_product_name: string;
+  enabled: number;
+  updated_at: string;
+};
+
+/** Semua pemetaan produk tersimpan (kunci: seller_sku). Urutkan tanpa
+ *  COLLATE NOCASE — itu sintaks khusus SQLite dan membuat Postgres
+ *  melempar "collation \"nocase\" does not exist" (halaman 500). */
+export async function listBlibliProductMaps(): Promise<BlibliProductMap[]> {
+  return queryAll<BlibliProductMap>(
+    "SELECT * FROM blibli_product_map ORDER BY LOWER(product_name) ASC",
+  );
+}
+
+/** Satu pemetaan untuk seller SKU Blibli tertentu (null = belum dipetakan). */
+export async function getBlibliProductMap(
+  sellerSku: string,
+): Promise<BlibliProductMap | null> {
+  return (
+    (await queryOne<BlibliProductMap>(
+      "SELECT * FROM blibli_product_map WHERE seller_sku = ?",
+      [sellerSku],
+    )) ?? null
+  );
+}
+
+/** Simpan/timpa pemetaan (upsert). `enabled` = 0 menonaktifkan eksekusi
+ *  otomatis untuk produk itu tanpa menghapus barisnya. */
+export async function saveBlibliProductMap(m: {
+  seller_sku: string;
+  product_name?: string;
+  aneka_product_id: string;
+  aneka_variant_id?: string;
+  aneka_product_name?: string;
+  enabled?: number;
+}): Promise<void> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const sql =
+    dbMode() === "pg"
+      ? `INSERT INTO blibli_product_map (seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (seller_sku) DO UPDATE SET product_name = EXCLUDED.product_name,
+           aneka_product_id = EXCLUDED.aneka_product_id,
+           aneka_variant_id = EXCLUDED.aneka_variant_id, aneka_product_name = EXCLUDED.aneka_product_name,
+           enabled = EXCLUDED.enabled, updated_at = EXCLUDED.updated_at`
+      : `INSERT INTO blibli_product_map (seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (seller_sku) DO UPDATE SET product_name = excluded.product_name,
+           aneka_product_id = excluded.aneka_product_id,
+           aneka_variant_id = excluded.aneka_variant_id, aneka_product_name = excluded.aneka_product_name,
+           enabled = excluded.enabled, updated_at = excluded.updated_at`;
+  await queryRun(sql, [
+    m.seller_sku,
+    m.product_name ?? "",
+    m.aneka_product_id,
+    m.aneka_variant_id ?? "",
+    m.aneka_product_name ?? "",
+    m.enabled ?? 1,
+    nowUtc,
+  ]);
+}
+
+/** Hapus pemetaan untuk satu seller SKU Blibli. */
+export async function deleteBlibliProductMap(sellerSku: string): Promise<void> {
+  await queryRun(
+    "DELETE FROM blibli_product_map WHERE seller_sku = ?",
+    [sellerSku],
+  );
+}
+
+// ---------- Eksekusi pesanan Blibli → Aneka (semi-otomatis) ----------
+
+export type BlibliOrderExec = {
+  package_id: string;
+  store_code: string;
+  status: string;
+  payload: string;
+  aneka_payment_id: string;
+  aneka_order_id: string;
+  detail: string;
+  /** Jejak langkah eksekusi checkout Aneka (satu baris per langkah,
+   *  format "WAKTU | langkah | keterangan") — ditulis per langkah supaya
+   *  diagnosa tetap tersedia bila proses terputus di tengah jalan. */
+  log: string;
+  created_at: string;
+  executed_at: string;
+};
+
+/** Satu baris eksekusi paket (null = belum pernah disiapkan). */
+export async function getBlibliOrderExec(
+  packageId: string,
+): Promise<BlibliOrderExec | null> {
+  return (
+    (await queryOne<BlibliOrderExec>(
+      "SELECT * FROM blibli_order_exec WHERE package_id = ?",
+      [packageId],
+    )) ?? null
+  );
+}
+
+/** Semua baris eksekusi (menunggu persetujuan di depan, lalu terbaru). */
+export async function listBlibliOrderExecs(): Promise<BlibliOrderExec[]> {
+  return queryAll<BlibliOrderExec>(
+    `SELECT * FROM blibli_order_exec
+     ORDER BY CASE status WHEN 'menunggu' THEN 0 ELSE 1 END, created_at DESC`,
+  );
+}
+
+/** Tambah satu baris ke jejak log eksekusi (langkah checkout Aneka). */
+export async function appendBlibliOrderExecLog(
+  packageId: string,
+  line: string,
+): Promise<void> {
+  await queryRun(
+    "UPDATE blibli_order_exec SET log = log || ? WHERE package_id = ?",
+    ["\n" + line, packageId],
+  );
+}
+
+/** Kosongkan jejak log (awal percobaan baru / persiapan ulang). */
+export async function clearBlibliOrderExecLog(
+  packageId: string,
+): Promise<void> {
+  await queryRun(
+    "UPDATE blibli_order_exec SET log = '' WHERE package_id = ?",
+    [packageId],
+  );
+}
+
+/** Catat payment_id Aneka yang BARU dibuat ke baris eksekusi — dipanggil
+ *  SEGERA setelah /payment/create sukses supaya jejak pembayaran tidak
+ *  hilang bila percobaan gagal/terputus (anti pembayaran dobel saat coba
+ *  ulang). Hanya menyentuh kolom aneka_payment_id. */
+export async function setBlibliOrderExecPayment(
+  packageId: string,
+  paymentId: string,
+): Promise<void> {
+  await queryRun(
+    "UPDATE blibli_order_exec SET aneka_payment_id = ? WHERE package_id = ?",
+    [paymentId, packageId],
+  );
+}
+
+/** Simpan/timpa baris eksekusi (upsert — persiapan ulang menimpa baris
+ *  lama, mis. "gagal" → "menunggu" setelah percobaan berikutnya).
+ *  aneka_payment_id / aneka_order_id HANYA ditimpa bila nilai baru tidak
+ *  kosong (COALESCE) — pemanggil yang tidak menyebutkannya TIDAK akan
+ *  menghapus jejak pembayaran (bahan pengaman anti-dobel). */
+export async function saveBlibliOrderExec(e: {
+  package_id: string;
+  store_code?: string;
+  status?: string;
+  payload?: string;
+  aneka_payment_id?: string;
+  aneka_order_id?: string;
+  detail?: string;
+  executed_at?: string;
+}): Promise<void> {
+  const sql =
+    dbMode() === "pg"
+      ? `INSERT INTO blibli_order_exec (package_id, store_code, status, payload, aneka_payment_id, aneka_order_id, detail, executed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (package_id) DO UPDATE SET store_code = EXCLUDED.store_code, status = EXCLUDED.status,
+           payload = EXCLUDED.payload,
+           aneka_payment_id = COALESCE(NULLIF(EXCLUDED.aneka_payment_id, ''), blibli_order_exec.aneka_payment_id),
+           aneka_order_id = COALESCE(NULLIF(EXCLUDED.aneka_order_id, ''), blibli_order_exec.aneka_order_id),
+           detail = EXCLUDED.detail,
+           executed_at = EXCLUDED.executed_at`
+      : `INSERT INTO blibli_order_exec (package_id, store_code, status, payload, aneka_payment_id, aneka_order_id, detail, executed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (package_id) DO UPDATE SET store_code = excluded.store_code, status = excluded.status,
+           payload = excluded.payload,
+           aneka_payment_id = COALESCE(NULLIF(excluded.aneka_payment_id, ''), blibli_order_exec.aneka_payment_id),
+           aneka_order_id = COALESCE(NULLIF(excluded.aneka_order_id, ''), blibli_order_exec.aneka_order_id),
+           detail = excluded.detail,
+           executed_at = excluded.executed_at`;
+  await queryRun(sql, [
+    e.package_id,
+    e.store_code ?? "",
+    e.status ?? "menunggu",
+    e.payload ?? "",
+    e.aneka_payment_id ?? "",
+    e.aneka_order_id ?? "",
+    e.detail ?? "",
+    e.executed_at ?? "",
+  ]);
+}
+
+/** Klaim atomik antrean eksekusi → status "berjalan". HANYA baris berstatus
+ *  "menunggu" atau "gagal" yang boleh diklaim — mengembalikan false bila
+ *  baris sedang berjalan (mencegah dua klik Setuju bersamaan membayar dua
+ *  kali di Aneka) atau sudah selesai/batal. */
+export async function claimBlibliOrderExecRunning(
+  packageId: string,
+): Promise<boolean> {
+  const r = await queryOne<{ package_id: string }>(
+    `UPDATE blibli_order_exec SET status = 'berjalan', detail = ''
+     WHERE package_id = ? AND status IN ('menunggu', 'gagal')
+     RETURNING package_id`,
+    [packageId],
+  );
+  return !!r;
 }

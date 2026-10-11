@@ -9,6 +9,10 @@
       "schedule": "0 4 * * *"
     },
     {
+      "path": "/api/blibli/resi/check",
+      "schedule": "0 5 * * *"
+    },
+    {
       "path": "/api/keuangan/refresh",
       "schedule": "0 23 * * *"
     }
