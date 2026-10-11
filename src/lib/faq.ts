@@ -486,7 +486,10 @@ ${SIGN}`,
       /\bktd( ?store)? (ya|kah|aja|doang|beneran)\b|\bktdstore\b/,
       /\b(bot|robot) (kah|ya|atau|apa)\b|\b(atau|apa) (bot|robot)\b/,
       /\b(orang|manusia) (atau|apa) (bot|robot)\b/,
-      /\bsiapa\b/,
+      // Pola "\bsiapa\b" telanjang sengaja TIDAK dipakai: pertanyaan
+      // "siapa" yang tidak dikenal (mis. "siapa presiden indonesia")
+      // lebih baik dijawab AI dengan penolakan sopan daripada templat
+      // perkenalan bot.
     ],
     answer: `Halo! , Saya adalah asisten resmi KTD Store.
 Temukan berbagai produk pilihan kami di:
