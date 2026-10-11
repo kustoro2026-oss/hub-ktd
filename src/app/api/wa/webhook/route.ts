@@ -30,6 +30,7 @@ import { answerWithAi } from "@/lib/ai-reply";
 import { SPAM_WINDOW_MINUTES, spamDecision } from "@/lib/spam";
 import { runDueScheduledBroadcasts } from "@/lib/broadcast-send";
 import { checkNewTiktokOrders } from "@/lib/tiktok-resi";
+import { checkNewBlibliOrders } from "@/lib/blibli-resi";
 import { after } from "next/server";
 
 type WaStatusEvent = {
@@ -46,9 +47,9 @@ type WaValue = {
 
 type WaEntry = { changes?: { field?: string; value?: WaValue }[] };
 
-/** Waktu pengecekan pesanan TikTok terakhir lewat tick webhook (epoch ms) —
- *  pembatas supaya webhook yang deras (event status kiriman broadcast)
- *  tidak memanggil API TikTok pada setiap event. */
+/** Waktu pengecekan pesanan marketplace terakhir lewat tick webhook
+ *  (epoch ms) — pembatas supaya webhook yang deras (event status kiriman
+ *  broadcast) tidak memanggil API TikTok/Blibli pada setiap event. */
 let lastOrderCheckAt = 0;
 
 export async function GET(request: Request) {
@@ -246,7 +247,10 @@ export async function POST(request: Request) {
     if (now - lastOrderCheckAt >= 60_000) {
       lastOrderCheckAt = now;
       checkNewTiktokOrders().catch((e) =>
-        console.error("[wa-webhook] tick pesanan gagal:", e),
+        console.error("[wa-webhook] tick pesanan TikTok gagal:", e),
+      );
+      checkNewBlibliOrders().catch((e) =>
+        console.error("[wa-webhook] tick pesanan Blibli gagal:", e),
       );
     }
   });
