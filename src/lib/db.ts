@@ -1985,6 +1985,19 @@ export async function recordBlibliOrderFailure(
   }
 }
 
+/** Sentuh last_attempt_at tanpa mengubah notify — dipakai sebagai penanda
+ *  waktu cek terakhir deteksi "paket dikembalikan" (blibli-resi.ts) supaya
+ *  cek detail API tidak diulang setiap tick. */
+export async function touchBlibliOrderSeen(
+  orderItemId: string,
+  atUtc: string,
+): Promise<void> {
+  await queryRun(
+    "UPDATE blibli_order_seen SET last_attempt_at = ? WHERE order_item_id = ?",
+    [atUtc, orderItemId],
+  );
+}
+
 // ---------- Pemetaan produk Blibli (productSku) → Aneka ----------
 
 export type BlibliProductMap = {

@@ -1,0 +1,9 @@
+feat: deteksi paket Blibli dikembalikan/gagal antar lewat riwayat detail API
+
+- blibli-resi.ts: item SUDAH diproses (notify ok/eksekusi) berstatus PU/PF/CX
+  dicek Order Detail V2 tiap 30 menit per item — riwayat histories yang memuat
+  kata return/retur/dikembalikan/gagal antar memicu notif WA minta refund Aneka
+  (dengan ID pembayaran + total modal), lalu notify jadi terminal "refund:"
+- jeda 30 menit memakai last_attempt_at sebagai penanda cek terakhir supaya
+  kuota API Blibli 100 req/30 menit tidak habis oleh tick tiap menit
+- db.ts: touchBlibliOrderSeen menyentuh last_attempt_at tanpa mengubah notify

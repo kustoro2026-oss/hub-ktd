@@ -1,0 +1,20 @@
+
+> ktd-hub@0.1.0 dev
+> next dev
+
+▲ Next.js 16.3.8 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.56.1:3000
+- Environments: .env.local
+✓ Ready in 1088ms
+✓ Running next.config.ts took 82ms
+⚠ Slow filesystem detected. The benchmark took 552ms. If \\?\C:\Users\exe\Documents\clonejackmal\jakmall-clone\ktd-hub\.next\dev is a network drive, consider moving it to a local folder.
+See more: https://nextjs.org/docs/app/guides/local-development
+
+✓ Finished filesystem cache database compaction in 28.2s
+ GET /api/blibli/resi/diag?mode=mapping 401 in 1165ms (next.js: 1061ms, application-code: 104ms)
+ GET /api/blibli/resi/diag?mode=mapping&secret=ktd-hub-d808ea6fb36b46a8834fb5a647ccb353-44de33b15fb34ef48f8d7ea51e799081 200 in 59ms (next.js: 11ms, application-code: 49ms)
+ GET /api/blibli/resi/diag?mode=list&secret=ktd-hub-d808ea6fb36b46a8834fb5a647ccb353-44de33b15fb34ef48f8d7ea51e799081 200 in 364ms (next.js: 12ms, application-code: 351ms)
+ POST /api/blibli/resi/prepare-ulang 401 in 256ms (next.js: 245ms, application-code: 11ms)
+ POST /api/blibli/resi/prepare-ulang?order_item_id=999999&secret=ktd-hub-d808ea6fb36b46a8834fb5a647ccb353-44de33b15fb34ef48f8d7ea51e799081 200 in 16ms (next.js: 5ms, application-code: 11ms)
+[?25h

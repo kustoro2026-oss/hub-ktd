@@ -1,0 +1,29 @@
+
+> ktd-hub@0.1.0 dev
+> next dev
+
+▲ Next.js 16.3.8 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.56.1:3000
+- Environments: .env.local
+✓ Ready in 973ms
+✓ Running next.config.ts took 78ms
+
+ POST /api/blibli/map/seed 401 in 1100ms (next.js: 1041ms, application-code: 58ms)
+ POST /api/blibli/map/seed 200 in 73s (next.js: 11ms, application-code: 73s)
+✓ Finished filesystem cache database compaction in 63s
+ POST /api/blibli/map/seed 200 in 86ms (next.js: 13ms, application-code: 72ms)
+ GET /api/blibli/map 200 in 1062ms (next.js: 522ms, application-code: 540ms)
+ DELETE /api/blibli/map 401 in 18ms (next.js: 6ms, application-code: 12ms)
+ GET /marketplace/blibli/pemetaan 200 in 3.3s (next.js: 1333ms, application-code: 1920ms)
+✓ Finished filesystem cache database compaction in 32.5s
+ DELETE /api/blibli/map?blibli_sku=KTS-70007-00811 200 in 52ms (next.js: 7ms, application-code: 46ms)
+ GET /marketplace/blibli/pemetaan 200 in 1425ms (next.js: 9ms, application-code: 1417ms)
+ POST /api/blibli/map/seed 200 in 98ms (next.js: 9ms, application-code: 90ms)
+ GET /api/blibli/map 200 in 379ms (next.js: 6ms, application-code: 373ms)
+ GET /marketplace/blibli/pemetaan 200 in 1374ms (next.js: 9ms, application-code: 1366ms)
+ DELETE /api/blibli/map?blibli_sku=KTS-70007-00811 200 in 36ms (next.js: 5ms, application-code: 31ms)
+ GET /api/blibli/map 200 in 269ms (next.js: 5ms, application-code: 264ms)
+ GET /marketplace/blibli/pemetaan 200 in 1398ms (next.js: 9ms, application-code: 1388ms)
+ POST /api/blibli/map/seed 200 in 96ms (next.js: 5ms, application-code: 91ms)
+[?25h

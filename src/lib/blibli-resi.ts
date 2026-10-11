@@ -30,6 +30,7 @@ import {
   listBlibliOrderExecs,
   markBlibliOrderSeen,
   recordBlibliOrderFailure,
+  touchBlibliOrderSeen,
 } from "@/lib/db";
 import {
   cancelBlibliExec,
@@ -74,6 +75,11 @@ const RETRY_COOLDOWN_MS = 30 * 60 * 1000;
  *  tidak dicetak/dikirim percuma. */
 const NEW_ORDER_WAIT_MS =
   (Number(process.env.BLIBLI_RESI_DELAY_MINUTES) || 15) * 60 * 1000;
+
+/** Jeda minimal antar cek "paket dikembalikan" untuk satu item (penanda
+ *  waktu cek disimpan di last_attempt_at). Kuota API Blibli hanya
+ *  100 request/30 menit — tanpa jeda, tick tiap menit akan menghabiskannya. */
+const RETURN_CHECK_INTERVAL_MS = 30 * 60 * 1000;
 
 /** Status item yang relevan dengan pipeline (tanpa C/D/OS/BP/CX — bukan
  *  urusan penjual aktif, atau sudah ditangani). */
@@ -473,6 +479,67 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
           errors.push(`${BLIBLI_STORE_NAME}: ${itemId}: ${res}`);
           await recordBlibliOrderFailure(itemId, env.storeCode, `gagal batal: ${res}`);
         }
+        continue;
+      }
+
+      // Deteksi paket dikembalikan / gagal antar untuk item yang SUDAH
+      // diproses dan sedang dikirim (PU/PF/CX). API Blibli tidak punya
+      // endpoint status paket — sumbernya riwayat status Order Detail V2
+      // (histories) yang memuat transisi berbahasa campur kode/prosa.
+      // Dijeda RETURN_CHECK_INTERVAL_MS per item supaya kuota 100 req/30
+      // menit tidak habis oleh tick tiap menit. Bila detail gagal diambil,
+      // cek diulang pada jendela berikutnya (tidak ada tindakan).
+      if (
+        prev &&
+        (prev.notify.startsWith("ok") || prev.notify.startsWith("eksekusi")) &&
+        (it.order.itemStatus === "PU" ||
+          it.order.itemStatus === "PF" ||
+          it.order.itemStatus === "CX")
+      ) {
+        const lastCheck = prev.last_attempt_at
+          ? parseUtcMs(prev.last_attempt_at)
+          : 0;
+        if (Date.now() - lastCheck < RETURN_CHECK_INTERVAL_MS) continue;
+        const det = await getBlibliOrderDetail(itemId);
+        let returnHit = "";
+        if (det.ok) {
+          const d = det.data as {
+            status?: string;
+            histories?: { status?: string }[];
+          };
+          const histTxt = (d.histories ?? [])
+            .map((h) => h.status ?? "")
+            .join(" ");
+          const m = /return|retur|dikembalikan|undeliver|gagal antar|failed deliver/i.exec(
+            `${d.status ?? ""} ${histTxt}`,
+          );
+          if (m) returnHit = m[0];
+        }
+        if (returnHit) {
+          const exec = execByPkg.get(p.packageId);
+          const msg = `Paket pesanan Blibli dikembalikan/gagal antar: ${itemId} — ${it.product.itemName} (riwayat: ${returnHit}).${refundAnekaInfo(exec)}`;
+          const res = await sendOwnerNotice(msg);
+          if (res.startsWith("ok")) {
+            await markSeen(itemId, `refund: ${res}`);
+            sent.push(`${BLIBLI_STORE_NAME} ${itemId} → refund: ${res}`);
+          } else {
+            errors.push(`${BLIBLI_STORE_NAME}: ${itemId}: ${res}`);
+            await recordBlibliOrderFailure(
+              itemId,
+              env.storeCode,
+              `gagal refund: ${res}`,
+            );
+          }
+          continue;
+        }
+        // Catat waktu cek terakhir (notify tidak diubah) supaya cek
+        // berikutnya diberi jeda.
+        const nowStr = new Date().toISOString().slice(0, 19).replace("T", " ");
+        await touchBlibliOrderSeen(itemId, nowStr);
+        seen.set(itemId, {
+          ...(prev ?? { notify: "", attempts: 0, last_attempt_at: "" }),
+          last_attempt_at: nowStr,
+        });
         continue;
       }
 
