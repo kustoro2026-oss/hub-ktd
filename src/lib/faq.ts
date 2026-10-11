@@ -253,8 +253,11 @@ ${SIGN}`,
       /\bbatal(kan|in)? (pesan|pesanan|order|beli)\b/,
     ],
     answer:
-      "Pengembalian dan penukaran dapat diajukan melalui CS WhatsApp kami. Pastikan produk dalam kondisi asli beserta kemasannya, dan sertakan bukti pembelian.\n\nSampaikan kendala Anda di chat ini — CS akan segera membantu.\n\n" +
-      SIGN,
+      `Untuk refund (pengembalian dana), retur, penukaran, dan hal lain yang menyangkut barang atau produk, silakan hubungi admin kami di WhatsApp ${CS_NUMBER_DISPLAY}. Refund dan transfer dana hanya ditangani oleh admin.
+
+Pastikan produk dalam kondisi asli beserta kemasannya, dan sertakan bukti pembelian.
+
+${SIGN}`,
   },
   {
     id: "asli",
