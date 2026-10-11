@@ -26,6 +26,7 @@
 import {
   countSeenTiktokOrders,
   listSeenTiktokOrders,
+  listTiktokOrderExecs,
   listTiktokShopTokens,
   markTiktokOrderSeen,
   recordTiktokOrderFailure,
@@ -450,6 +451,40 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
   const errors: string[] = [];
   let newOrders = 0;
 
+  // Baris eksekusi Aneka per pesanan — dipakai untuk notifikasi refund.
+  const execByOrder = new Map(
+    (await listTiktokOrderExecs()).map((e) => [e.order_id, e]),
+  );
+
+  /** Potongan pesan "minta refund ke CS Aneka" berdasar baris eksekusi
+   *  (bila ada) — sebutkan ID pembayaran, kode pesanan, dan total modal
+   *  supaya admin tinggal membacakan datanya ke CS Aneka. */
+  function refundAnekaInfo(
+    exec:
+      | { aneka_payment_id: string; aneka_order_id: string; payload: string }
+      | undefined,
+  ): string {
+    if (!exec) {
+      return " Bila sudah dibayar ke Aneka, SEGERA minta refund ke CS Aneka.";
+    }
+    const parts: string[] = [];
+    if (exec.aneka_payment_id) {
+      parts.push(`ID pembayaran ${exec.aneka_payment_id}`);
+    }
+    if (exec.aneka_order_id) {
+      parts.push(`pesanan ${exec.aneka_order_id}`);
+    }
+    try {
+      const t = Number(JSON.parse(exec.payload).total_modal ?? 0);
+      if (t > 0) parts.push(`total ${"Rp" + t.toLocaleString("id-ID")}`);
+    } catch {
+      /* payload rusak — lewati total */
+    }
+    return parts.length > 0
+      ? ` SEGERA minta refund ke CS Aneka (${parts.join(", ")}).`
+      : " SEGERA minta refund ke CS Aneka.";
+  }
+
   for (const shop of shops) {
     const prep = await prepareShop(shop);
     if (!prep.ok) {
@@ -480,8 +515,12 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
         continue;
       }
 
-      // Sudah pernah dikabari pembatalannya — lewati.
-      if (prev && prev.notify.startsWith("batal")) continue;
+      // Sudah pernah dikabari pembatalan/pengembaliannya — lewati.
+      if (
+        prev &&
+        (prev.notify.startsWith("batal") || prev.notify.startsWith("refund"))
+      )
+        continue;
 
       // Pesanan dibatalkan: kabari admin (sekali) — resi tidak dikirim.
       if (cancelled) {
@@ -516,15 +555,21 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
               }`
             : "";
         const resiTerlanjur = prev && prev.notify.startsWith("ok");
-        const msg = `Pesanan TikTok Shop dibatalkan: ${o.order_id}${itemsTxt}.${
-          resiTerlanjur
-            ? " Resi yang sudah terkirim mohon diabaikan."
-            : " Tidak perlu disiapkan/dikirim."
-        }`;
+        // Pesanan yang SUDAH diproses (resi terkirim, eksekusi disiapkan,
+        // atau sudah ada pembayaran Aneka) lalu dibatalkan = uang sudah
+        // keluar ke Aneka — ingatkan admin untuk minta refund ke CS Aneka.
+        const exec = execByOrder.get(o.order_id);
+        const terlanjurBayar =
+          resiTerlanjur ||
+          prev?.notify.startsWith("eksekusi") ||
+          (exec?.aneka_payment_id ?? "") !== "";
+        const msg = terlanjurBayar
+          ? `Pesanan TikTok Shop dibatalkan SETELAH diproses: ${o.order_id}${itemsTxt}.${refundAnekaInfo(exec)} Resi yang sempat terkirim mohon diabaikan.`
+          : `Pesanan TikTok Shop dibatalkan: ${o.order_id}${itemsTxt}. Tidak perlu disiapkan/dikirim.`;
         const res = await sendOwnerNotice(msg);
         if (res.startsWith("ok")) {
           const mark = `batal: ${res}${
-            resiTerlanjur ? " (resi sempat terkirim)" : ""
+            terlanjurBayar ? " (minta refund Aneka)" : ""
           }`;
           await markTiktokOrderSeen(o.order_id, shop.shop_id, mark);
           sent.push(`${shop.shop_name} ${o.order_id} → ${mark}`);
@@ -537,6 +582,60 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
           );
         }
         continue;
+      }
+
+      // Deteksi paket dikembalikan / gagal antar untuk pesanan yang SUDAH
+      // diproses (resi terkirim atau eksekusi Aneka disiapkan). Status
+      // order tidak selalu berubah saat paket kembali — status paket
+      // fulfilment-lah sumber yang pasti. Hanya dicek untuk pesanan dalam
+      // pengiriman; bila API gagal, cek ulang pada tick berikutnya.
+      if (
+        prev &&
+        (prev.notify.startsWith("ok") || prev.notify.startsWith("eksekusi")) &&
+        (o.order_status === "PARTIALLY_SHIPPING" ||
+          o.order_status === "AWAITING_COLLECTION" ||
+          o.order_status === "IN_TRANSIT")
+      ) {
+        const pkgFind = await findPackageIdForOrder(cred, o.order_id);
+        if (pkgFind.ok) {
+          const pkg = await getPackageDetail(cred, pkgFind.packageId);
+          if (
+            pkg.ok &&
+            /return|failed|logistic/i.test(
+              `${pkg.package_status} ${pkg.package_sub_status}`,
+            )
+          ) {
+            const itemsTxt =
+              o.items.length > 0
+                ? ` — ${o.items[0].product_name}${
+                    o.items.length > 1
+                      ? ` (+${o.items.length - 1} produk lain)`
+                      : ""
+                  }`
+                : "";
+            const exec = execByOrder.get(o.order_id);
+            const msg = `Paket pesanan TikTok Shop dikembalikan/gagal antar: ${o.order_id}${itemsTxt} (status paket: ${pkg.package_status}${
+              pkg.package_sub_status ? ` / ${pkg.package_sub_status}` : ""
+            }).${refundAnekaInfo(exec)}`;
+            const res = await sendOwnerNotice(msg);
+            if (res.startsWith("ok")) {
+              await markTiktokOrderSeen(
+                o.order_id,
+                shop.shop_id,
+                `refund: ${res}`,
+              );
+              sent.push(`${shop.shop_name} ${o.order_id} → refund: ${res}`);
+            } else {
+              errors.push(`${shop.shop_name}: ${o.order_id}: ${res}`);
+              await recordTiktokOrderFailure(
+                o.order_id,
+                shop.shop_id,
+                `gagal refund: ${res}`,
+              );
+            }
+            continue;
+          }
+        }
       }
 
       // Mode baseline: tandai saja pesanan lama, jangan kirim resi.

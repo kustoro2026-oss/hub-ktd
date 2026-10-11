@@ -27,6 +27,7 @@
 import {
   countSeenBlibliOrders,
   listSeenBlibliOrders,
+  listBlibliOrderExecs,
   markBlibliOrderSeen,
   recordBlibliOrderFailure,
 } from "@/lib/db";
@@ -370,6 +371,41 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
   const sent: string[] = [];
   const errors: string[] = [];
   let newOrders = 0;
+
+  // Baris eksekusi Aneka per paket — dipakai untuk notifikasi refund.
+  const execByPkg = new Map(
+    (await listBlibliOrderExecs()).map((e) => [e.package_id, e]),
+  );
+
+  /** Potongan pesan "minta refund ke CS Aneka" berdasar baris eksekusi
+   *  (bila ada) — sebutkan ID pembayaran, kode pesanan, dan total modal
+   *  supaya admin tinggal membacakan datanya ke CS Aneka. */
+  function refundAnekaInfo(
+    exec:
+      | { aneka_payment_id: string; aneka_order_id: string; payload: string }
+      | undefined,
+  ): string {
+    if (!exec) {
+      return " Bila sudah dibayar ke Aneka, SEGERA minta refund ke CS Aneka.";
+    }
+    const parts: string[] = [];
+    if (exec.aneka_payment_id) {
+      parts.push(`ID pembayaran ${exec.aneka_payment_id}`);
+    }
+    if (exec.aneka_order_id) {
+      parts.push(`pesanan ${exec.aneka_order_id}`);
+    }
+    try {
+      const t = Number(JSON.parse(exec.payload).total_modal ?? 0);
+      if (t > 0) parts.push(`total ${"Rp" + t.toLocaleString("id-ID")}`);
+    } catch {
+      /* payload rusak — lewati total */
+    }
+    return parts.length > 0
+      ? ` SEGERA minta refund ke CS Aneka (${parts.join(", ")}).`
+      : " SEGERA minta refund ke CS Aneka.";
+  }
+
   const noticedPkgs = new Set<string>(); // notif "pesanan baru" sekali per paket
   const handledPkgs = new Set<string>(); // proses label/eksekusi sekali per paket
 
@@ -380,8 +416,12 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
       const cancelled = it.order.itemStatus === "X";
       const isNew = it.order.itemStatus === "FP";
 
-      // Sudah pernah dikabari pembatalannya — lewati.
-      if (prev && prev.notify.startsWith("batal")) continue;
+      // Sudah pernah dikabari pembatalan/pengembaliannya — lewati.
+      if (
+        prev &&
+        (prev.notify.startsWith("batal") || prev.notify.startsWith("refund"))
+      )
+        continue;
 
       // Item dibatalkan: kabari admin (sekali per paket) — resi tidak
       // dikirim untuk item batal.
@@ -411,15 +451,21 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
         }
         const itemsTxt = ` — ${it.product.itemName}`;
         const resiTerlanjur = prev && prev.notify.startsWith("ok");
-        const msg = `Pesanan Blibli dibatalkan: ${itemId}${itemsTxt}.${
-          resiTerlanjur
-            ? " Resi yang sudah terkirim mohon diabaikan."
-            : " Tidak perlu disiapkan/dikirim."
-        }`;
+        // Item yang SUDAH diproses (label terkirim, eksekusi disiapkan,
+        // atau sudah ada pembayaran Aneka) lalu dibatalkan = uang sudah
+        // keluar ke Aneka — ingatkan admin untuk minta refund ke CS Aneka.
+        const exec = execByPkg.get(p.packageId);
+        const terlanjurBayar =
+          resiTerlanjur ||
+          prev?.notify.startsWith("eksekusi") ||
+          (exec?.aneka_payment_id ?? "") !== "";
+        const msg = terlanjurBayar
+          ? `Pesanan Blibli dibatalkan SETELAH diproses: ${itemId}${itemsTxt}.${refundAnekaInfo(exec)} Label yang sempat terkirim mohon diabaikan.`
+          : `Pesanan Blibli dibatalkan: ${itemId}${itemsTxt}. Tidak perlu disiapkan/dikirim.`;
         const res = await sendOwnerNotice(msg);
         if (res.startsWith("ok")) {
           const mark = `batal: ${res}${
-            resiTerlanjur ? " (resi sempat terkirim)" : ""
+            terlanjurBayar ? " (minta refund Aneka)" : ""
           }`;
           await markSeen(itemId, mark);
           sent.push(`${BLIBLI_STORE_NAME} ${itemId} → ${mark}`);
