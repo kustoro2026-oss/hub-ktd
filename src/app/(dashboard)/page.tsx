@@ -19,6 +19,8 @@ const KIND_LABELS: Record<string, string> = {
   question: "Pertanyaan",
   ai: "AI",
   proof: "Bukti TF",
+  spam: "Spam",
+  blocked: "Diblokir",
 };
 
 export default async function DashboardPage() {

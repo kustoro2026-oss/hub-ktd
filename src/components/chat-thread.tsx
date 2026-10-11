@@ -19,6 +19,8 @@ type Node =
       time: string;
       failed: boolean;
       notify?: string;
+      note?: string;
+      noteTone?: "amber" | "red";
     };
 
 function buildNodes(messages: InboundMessage[]): Node[] {
@@ -40,6 +42,13 @@ function buildNodes(messages: InboundMessage[]): Node[] {
         time: hm,
         failed: false,
         notify: m.notify || undefined,
+        note:
+          m.kind === "spam"
+            ? "Bot tidak membalas — pesan dibatasi sementara (spam)"
+            : m.kind === "blocked"
+              ? "Bot tidak membalas — nomor diblokir"
+              : undefined,
+        noteTone: m.kind === "blocked" ? "red" : undefined,
       });
       if (m.reply) {
         nodes.push({
@@ -156,6 +165,17 @@ export default function ChatThread({
                     <p className="whitespace-pre-line break-words text-sm leading-relaxed text-slate-800">
                       {n.body}
                     </p>
+                    {n.note && (
+                      <div
+                        className={`mt-1 text-[10px] font-medium ${
+                          n.noteTone === "red"
+                            ? "text-red-600"
+                            : "text-amber-700"
+                        }`}
+                      >
+                        {n.note}
+                      </div>
+                    )}
                     {n.notify && (() => {
                       if (n.notify === "ok")
                         return (

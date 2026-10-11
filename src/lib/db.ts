@@ -62,7 +62,16 @@ export type InboundMessage = {
   wa_from: string;
   body: string;
   reply: string;
-  kind: "general" | "order" | "ad" | "faq" | "question" | "ai" | "proof";
+  kind:
+    | "general"
+    | "order"
+    | "ad"
+    | "faq"
+    | "question"
+    | "ai"
+    | "proof"
+    | "spam"
+    | "blocked";
   ad_id: string;
   direction: "in" | "out";
   read: number;
@@ -232,6 +241,12 @@ function migrateSqlite(db: DatabaseSync) {
       ON broadcast_items (broadcast_id);
     CREATE INDEX IF NOT EXISTS idx_messages_created
       ON messages (created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS blocked_numbers (
+      wa_from TEXT PRIMARY KEY,
+      note TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
 
     CREATE TABLE IF NOT EXISTS contact_groups (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -480,6 +495,12 @@ async function migratePg(pool: Pool) {
       ON broadcast_items (broadcast_id);
     CREATE INDEX IF NOT EXISTS idx_messages_created
       ON messages (created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS blocked_numbers (
+      wa_from TEXT PRIMARY KEY,
+      note TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
 
     CREATE TABLE IF NOT EXISTS contact_groups (
       id SERIAL PRIMARY KEY,
@@ -1008,6 +1029,67 @@ export async function messageExists(id: string): Promise<boolean> {
     [id],
   );
   return !!row;
+}
+
+export type BlockedNumber = {
+  wa_from: string;
+  note: string;
+  created_at: string;
+};
+
+/** Jumlah pesan masuk dari satu nomor dalam N menit terakhir — dasar
+ *  pembatas spam. Dihitung dari tabel messages (bukan memori) supaya tetap
+ *  akurat di serverless yang instansnya berganti-ganti. */
+export async function countInboundSince(
+  waFrom: string,
+  minutes: number,
+): Promise<number> {
+  if (dbMode() === "pg") {
+    const row = await queryOne<{ c: number }>(
+      "SELECT COUNT(*)::int AS c FROM messages WHERE wa_from = ? AND direction = 'in' AND created_at >= NOW() - (?::int * INTERVAL '1 minute')",
+      [waFrom, minutes],
+    );
+    return row?.c ?? 0;
+  }
+  const cutoff = new Date(Date.now() - minutes * 60_000)
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ");
+  const row = await queryOne<{ c: number }>(
+    "SELECT COUNT(*) AS c FROM messages WHERE wa_from = ? AND direction = 'in' AND created_at >= ?",
+    [waFrom, cutoff],
+  );
+  return row?.c ?? 0;
+}
+
+// ---------- Daftar blokir anti-spam ----------
+
+/** True bila nomor ini diblokir admin — bot diam total (pesan tetap
+ *  dicatat di Pesan Masuk, tetapi tidak dibalas dan AI tidak dipanggil). */
+export async function isNumberBlocked(waFrom: string): Promise<boolean> {
+  const row = await queryOne<{ x: number }>(
+    "SELECT 1 AS x FROM blocked_numbers WHERE wa_from = ?",
+    [waFrom],
+  );
+  return !!row;
+}
+
+export async function blockNumber(waFrom: string, note = ""): Promise<void> {
+  const sql =
+    dbMode() === "pg"
+      ? "INSERT INTO blocked_numbers (wa_from, note) VALUES (?, ?) ON CONFLICT (wa_from) DO UPDATE SET note = EXCLUDED.note"
+      : "INSERT OR REPLACE INTO blocked_numbers (wa_from, note, created_at) VALUES (?, ?, datetime('now'))";
+  await queryRun(sql, [waFrom, note]);
+}
+
+export async function unblockNumber(waFrom: string): Promise<void> {
+  await queryRun("DELETE FROM blocked_numbers WHERE wa_from = ?", [waFrom]);
+}
+
+export async function listBlockedNumbers(): Promise<BlockedNumber[]> {
+  return queryAll<BlockedNumber>(
+    "SELECT wa_from, note, created_at FROM blocked_numbers ORDER BY created_at DESC",
+  );
 }
 
 export async function listMessages(limit = 100): Promise<InboundMessage[]> {

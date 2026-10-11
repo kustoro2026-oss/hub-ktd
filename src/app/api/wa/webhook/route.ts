@@ -9,9 +9,11 @@
 // ini; endpoint lama di situs toko tetap dibiarkan sebagai cadangan.
 import {
   applyBroadcastDeliveryStatus,
+  countInboundSince,
   getLatestInMessages,
   getLatestOutMessage,
   insertMessage,
+  isNumberBlocked,
   messageExists,
 } from "@/lib/db";
 import { isBotHandoverActive } from "@/lib/handover";
@@ -25,6 +27,7 @@ import {
 } from "@/lib/replies";
 import { notifyOrderOwner, sendText } from "@/lib/wa";
 import { answerWithAi } from "@/lib/ai-reply";
+import { SPAM_WINDOW_MINUTES, spamDecision } from "@/lib/spam";
 import { runDueScheduledBroadcasts } from "@/lib/broadcast-send";
 import { checkNewTiktokOrders } from "@/lib/tiktok-resi";
 import { after } from "next/server";
@@ -92,6 +95,21 @@ export async function POST(request: Request) {
             reply = "";
           }
 
+          // Anti-spam, dua lapis: (1) nomor yang diblokir admin di Hub —
+          // bot diam total, pesan tetap dicatat; (2) nomor yang membanjiri
+          // pesan dalam jendela singkat — bot tidak membalas dan AI tidak
+          // dipanggil, supaya kredit tidak habis dibakar spam. Pesanan
+          // (kind "order") selalu diproses normal agar orderan asli tidak
+          // pernah terlewat. Keputusan dihitung dari tabel messages, jadi
+          // akurat meski instans serverless berganti-ganti.
+          const blocked = await isNumberBlocked(m.from);
+          const recent = await countInboundSince(m.from, SPAM_WINDOW_MINUTES);
+          const suppressed = spamDecision(kind, blocked, recent);
+          if (suppressed) {
+            kind = suppressed;
+            reply = "";
+          }
+
           // Jeda bot: cek LEBIH AWAL supaya cabang AI di bawah tidak membuang
           // panggilan API saat admin baru saja membalas manual nomor ini.
           const lastOut = await getLatestOutMessage(m.from);
@@ -136,6 +154,7 @@ export async function POST(request: Request) {
           // ber-metode transfer, dan pesan sekarang berupa foto/screenshot
           // atau teks bukti → kirim konfirmasi pesanan resmi.
           if (
+            !suppressed &&
             lastIn &&
             paymentMethodOfOrder(lastIn.body) === "transfer" &&
             isProofOfTransfer(m)

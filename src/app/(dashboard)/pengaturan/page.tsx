@@ -1,6 +1,7 @@
 // Pengaturan — status env, catatan webhook, dan info deploy.
 import { AD_PRODUCT_MAP } from "@/lib/replies";
 import DisplayNameStatus from "@/components/display-name-status";
+import BlocklistCard from "@/components/blocklist-card";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pengaturan" };
@@ -72,6 +73,13 @@ export default function PengaturanPage() {
           Status nama tampilan WhatsApp (dari API Meta)
         </h2>
         <DisplayNameStatus />
+      </div>
+
+      <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <h2 className="mb-2 text-sm font-semibold text-slate-900">
+          Nomor diblokir (anti-spam)
+        </h2>
+        <BlocklistCard />
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
@@ -168,6 +176,16 @@ export default function PengaturanPage() {
             <code>BOT_HANDOVER_MINUTES</code>) — percakapan dianggap sedang
             ditangani manusia, lalu bot aktif kembali bila tidak ada balasan
             manual baru.
+          </li>
+          <li>
+            <strong>Anti-spam:</strong> nomor yang mengirim 8 pesan atau lebih
+            dalam 3 menit dianggap spam — bot berhenti membalas sementara
+            (pesan tetap dicatat, AI tidak dipanggil). Nomor yang diblokir
+            lewat tombol <strong>Blokir</strong> di halaman chat atau daftar
+            di atas tidak dibalas bot sama sekali. Pesanan selalu diproses
+            normal supaya orderan asli tidak terlewat. Catatan: Meta tidak
+            menyediakan fitur blokir nomor di Cloud API, jadi pembatasan
+            sepenuhnya diatur dari sisi Hub.
           </li>
         </ul>
       </div>

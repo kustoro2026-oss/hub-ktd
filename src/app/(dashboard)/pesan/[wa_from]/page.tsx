@@ -2,13 +2,14 @@
 // kolom balasan manual. Membuka halaman ini menandai pesan sudah dibaca.
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { listConversationMessages, markConversationRead } from "@/lib/db";
+import { isNumberBlocked, listConversationMessages, markConversationRead } from "@/lib/db";
 import { formatWa } from "@/lib/format";
 import {
   handoverUntilLabel,
   isBotHandoverActive,
   lastManualOut,
 } from "@/lib/handover";
+import BlockButton from "@/components/block-button";
 import ChatThread from "@/components/chat-thread";
 
 export const dynamic = "force-dynamic";
@@ -24,6 +25,7 @@ export default async function ConversationPage({
   await markConversationRead(wa_from);
   const lastOut = lastManualOut(messages);
   const botPaused = isBotHandoverActive(lastOut);
+  const isBlocked = await isNumberBlocked(wa_from);
 
   return (
     <div className="flex h-dvh flex-col overflow-hidden bg-white md:h-full">
@@ -45,7 +47,18 @@ export default async function ConversationPage({
           </h1>
           <p className="text-xs text-emerald-100">Pelanggan</p>
         </div>
+        <div className="ml-auto">
+          <BlockButton waFrom={wa_from} blocked={isBlocked} />
+        </div>
       </header>
+
+      {isBlocked && (
+        <div className="shrink-0 border-b border-red-100 bg-red-50 px-4 py-2 text-xs text-red-800">
+          <span className="font-semibold">Nomor ini diblokir.</span> Bot tidak
+          membalas otomatis — pesan tetap dicatat. Buka blokir kapan saja dari
+          tombol di atas atau menu Pengaturan.
+        </div>
+      )}
 
       {botPaused && lastOut && (
         <div className="shrink-0 border-b border-amber-100 bg-amber-50 px-4 py-2 text-xs text-amber-800">
