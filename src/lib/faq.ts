@@ -113,6 +113,23 @@ Tersedia berbagai produk: obat & alat pertanian, suplemen, kesehatan & kecantika
 ${SIGN}`,
   },
   {
+    id: "topup",
+    patterns: [
+      // Pertanyaan ketersediaan layanan top up secara umum — pola sengaja
+      // TIDAK menyertakan kata "pulsa" telanjang supaya pertanyaan provider
+      // spesifik (mis. "Isi pulsa Telkomsel bisa") tetap dijawab AI dengan
+      // data provider yang tepat.
+      /\bada(kah)?\b.{0,30}\b(top ?up|topup|isi saldo|e-?money|token listrik|voucher game)\b/,
+      /\b(top ?up|topup|isi saldo|e-?money|token listrik|voucher game).{0,30}\b(gimana|gmn|bagaimana|apa|apakah|ada|bisa|gak|ga|nggak|tidak)\b/,
+    ],
+    answer: `Ya, KTD Store menyediakan layanan top up digital: pulsa, paket data, token listrik PLN, e-money, dan voucher game. Silakan pilih provider dan nominal di halaman top up:
+https://toko.kustoro2026.com/topup
+
+Cara beli top up: pilih provider, masukkan nomor tujuan, lalu selesaikan pembayaran (COD atau transfer bank).
+
+${SIGN}`,
+  },
+  {
     id: "harga",
     patterns: [
       /\b(berapa|brp) harganya\b|\bharga(nya)? (berapa|brp)\b/,

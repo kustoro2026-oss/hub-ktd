@@ -27,12 +27,13 @@ Aturan:
 4. Untuk produk kesehatan/suplemen, jangan memberi nasihat medis — arahkan membaca deskripsi produk (legalitas BPOM) dan konsultasi tenaga kesehatan.
 5. Untuk keluhan, retur, status pesanan, resi, pembatalan, refund, atau tagihan — balas PERSIS "TIDAK_TAHU" (ditangani CS manusia).
 6. Pertanyaan di luar topik toko (politik, umum, candaan, permintaan ngobrol) — balas PERSIS "TIDAK_TAHU".
-7. Bila produk persis yang ditanyakan tidak ada di data, jawab JUJUR seperti manusia toko (mis. "Kami tidak menjual padi, tetapi tersedia pupuk untuk tanaman padi") dan tawarkan alternatif terdekat dari data. Bila data relevan kosong, jawab dari DESKRIPSI TOKO. Balas PERSIS "TIDAK_TAHU" hanya bila pertanyaan benar-benar tidak ada kaitannya dengan toko.
+7. Bila produk persis yang ditanyakan tidak ada di data, jawab JUJUR seperti manusia toko (mis. "Kami tidak menjual padi, tetapi tersedia pupuk untuk tanaman padi") dan tawarkan alternatif terdekat dari data. Untuk TOP-UP: bila nama provider yang ditanyakan ADA di DATA RELEVAN, jawab layanannya TERSEDIA — satu provider dapat menjual beberapa jenis (pulsa, data, dsb), kategori bukan pembatas. Bila data relevan kosong, jawab dari DESKRIPSI TOKO. Balas PERSIS "TIDAK_TAHU" hanya bila pertanyaan benar-benar tidak ada kaitannya dengan toko.
 8. Bila pelanggan bertanya "apa ada produk lain / hanya satu / berapa banyak / minta daftar atau varian", jawab pertanyaan itu secara eksplisit: sebutkan SEMUA produk relevan di DATA RELEVAN satu per satu dengan nama dan link. Bila hanya satu yang cocok dengan topik, katakan jujur "hanya ada satu" dan tawarkan produk terdekat lain yang ada di data bila pantas.
 9. Bila ada RIWAYAT PERCAKAPAN, pakai sebagai konteks untuk memahami pertanyaan singkat atau merujuk (mis. "list nya apa saja" setelah bertanya tentang satu produk). Jangan mengulang BALASAN BOT SEBELUMNYA persis sama — jawab pesan terbaru.
 10. Bila pesan pelanggan berupa tanggapan singkat (mis. "oke", "terima kasih", "oh ya benih"), balas singkat dan natural merujuk topik riwayat percakapan; bila berterima kasih, balas ramah "Sama-sama" lalu tawarkan bantuan. Bila pelanggan meminta izin bertanya (mis. "nanya lain boleh", "boleh tanya"), balas "Tentu, silakan bertanya. Ada yang bisa kami bantu?" — jangan pernah membalas pertanyaan hanya dengan "Oke" atau "Ok". Jangan kirim panduan pemesanan panjang bila tidak diminta, dan jangan pernah menulis frasa "Baik, Anda".
 11. Pertanyaan tentang cara memesan, pembayaran, atau pengiriman (mis. "pesan via apa", "gimana cara order") — jawab dari bagian "Cara beli"/"Pembayaran" DESKRIPSI TOKO: pemesanan via WhatsApp (klik tombol "Order via WhatsApp" pada halaman produk), pembayaran COD atau transfer bank Mandiri, pengiriman ke seluruh Indonesia.
-12. Akhiri jawaban dengan "Hormat kami,\nKTD Store".`;
+12. Akhiri jawaban dengan "Hormat kami,\nKTD Store".
+13. JANGAN menulis URL/tautan (https://...) dan JANGAN menyebut kata "link", "tautan", atau "halaman berikut" di dalam jawaban — cukup jawab pertanyaannya dengan kalimat utuh; tautan ditambahkan otomatis oleh sistem.`;
 
 /** Batas panjang pesan sebelumnya yang ikut dikirim sebagai konteks (karakter). */
 const MAX_PRIOR = 200;
@@ -107,22 +108,45 @@ export async function answerWithAi(
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: { maxOutputTokens: 350, temperature: 0.4 },
-      }),
-      signal: ctrl.signal,
-    });
-    if (!res.ok) {
-      console.error(`[bot-ai] gemini HTTP ${res.status}`);
-      return null;
-    }
-    const data = (await res.json()) as {
-      candidates?: { content?: { parts?: { text?: string }[] } }[];
+    type GeminiData = {
+      candidates?: {
+        finishReason?: string;
+        content?: { parts?: { text?: string }[] };
+      }[];
     };
+    let data: GeminiData | null = null;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            maxOutputTokens: 700,
+            temperature: 0.4,
+            // Gemini 2.5 Flash menyalakan mode "thinking" secara default —
+            // token pemikiran ikut memakan jatah maxOutputTokens sehingga
+            // jawaban pendek terpotong di tengah kalimat (finishReason
+            // MAX_TOKENS, mis. "...pulsa Tel" atau "...saldo. Anda").
+            // Matikan thinking supaya seluruh jatah token dipakai untuk
+            // teks jawaban.
+            thinkingConfig: { thinkingBudget: 0 },
+          },
+        }),
+        signal: ctrl.signal,
+      });
+      if (!res.ok) {
+        console.error(`[bot-ai] gemini HTTP ${res.status}`);
+        return null;
+      }
+      const parsed = (await res.json()) as GeminiData;
+      // Bila jawaban tetap terpotong (MAX_TOKENS), coba sekali lagi —
+      // kalimat setengah jadi lebih buruk daripada pesan CS umum.
+      if (parsed.candidates?.[0]?.finishReason === "MAX_TOKENS" && attempt === 0) continue;
+      data = parsed;
+      break;
+    }
+    if (!data || data.candidates?.[0]?.finishReason === "MAX_TOKENS") return null;
     const text =
       data.candidates?.[0]?.content?.parts
         ?.map((p) => p.text ?? "")
@@ -149,6 +173,17 @@ export async function answerWithAi(
       // "di sini: [link]" → "di halaman berikut" (frasa asli sering dipakai
       // model sebelum tautan inline diganti).
       .replace(/\b(?:di sini|disini)\s*[:.]?\s*(?=halaman berikut)/gi, "di ")
+      // "melalui/klik tautan ini: [url]" → "di halaman berikut" — sisa frasa
+      // pengantar tautan setelah URL-nya diganti frasa "halaman berikut".
+      .replace(/\b(?:melalui|lewat|dari|klik|buka|kunjungi|di)\s+(?:tautan|link)\s+ini\s*[:.]?\s*(?=halaman berikut)/gi, "di ")
+      // "halaman ini: [url]" → "halaman berikut" (hindari pengulangan).
+      .replace(/\bhalaman ini\s*[:.]?\s*(?=halaman berikut)/gi, "halaman berikut")
+      // Model kadang menulis "halaman berikut:" sendiri lalu URL-nya diganti
+      // frasa yang sama → "halaman berikut: halaman berikut". Buang yang pertama.
+      .replace(/\bhalaman berikut\s*[:.]?\s+(?=halaman berikut)/gi, "")
+      // Kalimat baru yang dimulai tepat setelah "halaman berikut" tanpa titik
+      // (mis. "...halaman berikut Untuk Free Fire Max") — sisipkan titik.
+      .replace(/\bhalaman berikut\s+(?=[A-Z])/g, "halaman berikut. ")
       .replace(/\b(link|tautan)\s*[:.]?\s*(?=\s*halaman berikut|$)/gi, "")
       // Sisa markdown yang bentuknya tidak sempurna (mis. "[teks] (url)"
       // dengan spasi sebelum kurung) — buang sisa kurung siku/pembuka.
@@ -157,14 +192,30 @@ export async function answerWithAi(
       .replace(/\s+/g, " ")
       .replace(/\s+\./g, ".")
       .trim();
+    // Model kadang berhenti di tengah kalimat (mis. "...saldo. Anda" atau
+    // "...pulsa,") — buang ekor fragmen (koma dan "Anda" beserta kata
+    // depan sebelumnya) supaya jawaban tetap utuh.
+    body = body
+      .replace(/,\s*$/, "")
+      .replace(/(?:\b(kepada|untuk|ke|dari|di|pada|melalui)\s+)?\banda\s*$/i, "")
+      .replace(/\s+/g, " ")
+      .trim();
+    // Model kadang berhenti tepat setelah mulai menulis URL ("...di https") —
+    // buang ekor URL setengah jadi supaya jawaban tetap utuh.
+    body = body
+      .replace(/\b(di|pada|melalui|kunjungi)\s+https?:?\/?\s*$/gi, "")
+      .replace(/\s+https?:?\/?\s*$/gi, "")
+      .replace(/\s+/g, " ")
+      .trim();
     // Buang ekor frasa yang kehilangan link-nya — baik di akhir teks
     // maupun tepat sebelum salam "Hormat kami" (mis. "katalog kami di").
     const danglers =
-      /(?:di|pada|melalui|kunjungi|tautan|link)\s*[:.]?\s*(?=$|Hormat kami)/gi;
+      /(?:di|pada|melalui|kunjungi|tautan|link|untuk|ke|dari)\s*[:.]?\s*(?=$|Hormat kami)/gi;
     body = body.replace(danglers, "").replace(/\s+/g, " ").trim();
-    // Pastikan ada tanda tangan formal khas proyek. Bila AI sudah menulis
-    // salam "Hormat kami," tanpa nama toko, buang dulu supaya tidak dobel.
-    if (!body.includes("KTD Store")) {
+    // Pastikan ada tanda tangan formal khas proyek. Cek harus menunjuk KE
+    // AKHIR teks — bila AI menyebut "KTD Store" di tengah kalimat (mis.
+    // "Ya, KTD Store menyediakan...") tanda tangan tetap wajib ditambah.
+    if (!/Hormat kami,\s*KTD Store\s*$/i.test(body.trimEnd())) {
       body = body.replace(/Hormat kami,?\s*$/i, "").trim();
       body += "\n\nHormat kami,\nKTD Store";
     }
@@ -190,10 +241,16 @@ export async function answerWithAi(
     };
     let linkLine = "";
     const first = ctx.products[0]?.link ?? ctx.topup[0]?.link;
+    // Pertanyaan domain top-up: bila jawaban tidak menyebut produk/provider
+    // tertentu, arahkan ke halaman top-up (bukan katalog umum).
+    const topupish =
+      /\b(top ?up|topup|pulsa|paket data|kuota|token listrik|saldo|e-?money|diamond|voucher game)\b/i.test(t);
     if (mentionsProduct(body)) {
       if (first) linkLine = `Link: ${first}`;
     } else if (found[0]) {
       linkLine = `Link: ${found[0]}`;
+    } else if (topupish) {
+      linkLine = "Link: https://toko.kustoro2026.com/topup";
     } else if (/katalog|memesan|order|pembayaran|pengiriman|beli/i.test(body)) {
       linkLine = `Katalog: https://toko.kustoro2026.com/`;
     }

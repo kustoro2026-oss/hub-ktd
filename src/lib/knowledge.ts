@@ -113,7 +113,13 @@ function scoreTopup(kb: BotKnowledge, words: string[]) {
       const hay = `${t.brand} ${t.label} ${t.category} ${t.examples.join(" ")}`.toLowerCase();
       let s = 0;
       for (const w of words) {
-        if (matcherFor(w)(hay)) s += 2;
+        // Nama provider yang disebut eksplisit (brand/label) jauh lebih
+        // kuat daripada kata kategori ("pulsa") yang kebetulan cocok —
+        // supaya "Isi pulsa Telkomsel" menang atas provider lain yang
+        // kategorinya "pulsa" (sebelumnya seri skor dipecahkan urutan
+        // array sehingga Telkomsel, yang kategorinya "data", terlempar).
+        if (matcherFor(w)(`${t.brand} ${t.label}`)) s += 4;
+        else if (matcherFor(w)(hay)) s += 2;
       }
       return { t, s };
     })
@@ -155,8 +161,11 @@ export function retrieve(
   // ada hasil top-up); bila tidak ada produk yang cocok sama sekali, hasil
   // top-up tetap ditawarkan sebagai cadangan.
   if (topupish) {
-    if (topup.length) return { products: [], topup };
-    return { products, topup: [] };
+    // Pertanyaan domain top-up: produk fisik jangan ikut dijejalkan —
+    // bila tidak ada provider top-up yang cocok, biarkan AI menjawab dari
+    // DESKRIPSI TOKO (bagian "Cara beli top up digital") alih-alih
+    // menyodorkan produk acak yang kebetulan mengandung kata "isi/saldo".
+    return { products: [], topup };
   }
   return { products, topup: products.length ? [] : topup };
 }
@@ -179,7 +188,7 @@ export function formatContext(ctx: {
         ? ` | Harga nominal: Rp ${t.priceMin} - Rp ${t.priceMax}`
         : "";
     parts.push(
-      `Top-up: ${t.label} (${t.brand}) | Kategori: ${t.category} | Jumlah nominal: ${t.count}${range} | Contoh: ${t.examples.slice(0, 8).join(", ")} | Isian yang diminta: ${t.customerNoLabel} | Link: ${t.link}`,
+      `Top-up: ${t.label} (${t.brand}) | Jumlah nominal: ${t.count}${range} | Contoh: ${t.examples.slice(0, 8).join(", ")} | Isian yang diminta: ${t.customerNoLabel} | Link: ${t.link}`,
     );
   }
   return parts.join("\n");
