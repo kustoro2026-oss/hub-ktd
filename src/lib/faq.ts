@@ -58,6 +58,20 @@ Jika ada pertanyaan lain, kami siap membantu.
 ${SIGN}`,
   },
   {
+    id: "tanya-lagi",
+    short: true,
+    patterns: [
+      // "nanya lain boleh?" / "boleh nanya lagi?" — izin bertanya lanjutan.
+      // Pola ditambatkan ke akhir pesan supaya pertanyaan sesungguhnya
+      // (mis. "boleh nanya harga pupuk?") tidak tersapu jawaban izin ini.
+      /\b(boleh|bisa|bolehkah|bisakah)\s+(nanya|tanya|bertanya)\s*[?]?$/,
+      /\b(nanya|tanya)\s+(lagi|lain|dulu|aja|saja)\s*(boleh|bisa|ga|gak|nggak|tidak)?\s*[?]?$/,
+    ],
+    answer: `Tentu, silakan bertanya. Ada yang bisa kami bantu?
+
+${SIGN}`,
+  },
+  {
     id: "cara-pesan",
     patterns: [
       /\bcara (pesan|order|beli|checkout)(nya)?\b/,
@@ -65,11 +79,11 @@ ${SIGN}`,
       /\b(pesan|order|beli)(nya)? gimana\b|\bcaranya (pesan|order|beli)\b/,
       /\blangkah (pesan|order|beli)\b/,
       // "pesan via apa" / "order lewat mana" / "beli di mana" — pertanyaan
-      // saluran pemesanan yang sering lolos dari pola di atas. Pola "via apa"
-      // telanjang sengaja tidak dipakai supaya "pembayaran via apa" tetap
-      // jatuh ke kategori pembayaran.
-      /\b(pesan|order|beli|checkout) (via|lewat|melalui) (apa|mana|siapa)\b/,
-      /\b(pesan|order|beli)(nya)? (ke|di|dari) mana\b/,
+      // saluran pemesanan yang sering lolos dari pola di atas (termasuk varian
+      // "pesanan"). Pola "via apa" telanjang sengaja tidak dipakai supaya
+      // "pembayaran via apa" tetap jatuh ke kategori pembayaran.
+      /\b(pesan|pesanan|order|orderan|beli|checkout) (via|lewat|melalui) (apa|mana|siapa)\b/,
+      /\b(pesan|pesanan|order|orderan|beli)(nya)? (ke|di|dari) mana\b/,
       /\bgimana (cara )?(memesan|membeli|order|belanja)\b/,
     ],
     answer: `Cara pemesanan di KTD Store:
@@ -233,6 +247,10 @@ ${SIGN}`,
       /\bretur\b|\bdiretur\b|\bpengembalian\b|\bpenukaran\b/,
       /\btukar\b|\bditukar\b|\bgaransi\b|\bklaim\b|\bkomplain\b/,
       /\brusak\b|\bcacat\b|\bbarang salah\b|\bsalah kirim\b/,
+      // refund / uang kembali / pembatalan — ditangani CS manusia.
+      /\brefund\b/,
+      /\b(uang|duit)(\s+(saya|ku|gue|gua))?\s*(kembali|balik|refund)\b/,
+      /\bbatal(kan|in)? (pesan|pesanan|order|beli)\b/,
     ],
     answer:
       "Pengembalian dan penukaran dapat diajukan melalui CS WhatsApp kami. Pastikan produk dalam kondisi asli beserta kemasannya, dan sertakan bukti pembelian.\n\nSampaikan kendala Anda di chat ini — CS akan segera membantu.\n\n" +
