@@ -1,12 +1,15 @@
 "use client";
 
-// Pemetaan produk Blibli → Aneka (Fase 1): tabel produk Blibli yang pernah
-// muncul di pesanan, dengan pencarian produk Aneka per baris + formulir
-// pemetaan manual untuk produk yang belum pernah ada pesanan.
+// Pemetaan produk Blibli → Aneka: tabel produk Blibli yang pernah muncul di
+// pesanan + pemetaan manual, dengan pencarian produk Aneka per baris.
+// Kunci pemetaan = productSku Blibli ("KTS-70007-XXXXX") — tingkat produk
+// seperti product_id TikTok, satu baris menaungi semua varian (warna/ukuran);
+// varian dipilih saat eksekusi dari varian yang dipesan pembeli.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link2, Search, X } from "lucide-react";
 
 type MapRow = {
+  blibli_sku: string;
   seller_sku: string;
   product_name: string;
   aneka_product_id: string;
@@ -17,6 +20,7 @@ type MapRow = {
 };
 
 type SeenProduct = {
+  blibli_sku: string;
   seller_sku: string;
   product_name: string;
   order_count: number;
@@ -33,6 +37,7 @@ type CatalogHit = {
 };
 
 type TableProduct = {
+  blibli_sku: string;
   seller_sku: string;
   product_name: string;
   order_count: number;
@@ -163,16 +168,18 @@ export default function BlibliMapClient({
   seenDetail,
   catalogAt,
   catalogCount,
+  seedIds,
 }: {
   initialMaps: MapRow[];
   initialSeen: SeenProduct[];
   seenDetail: string;
   catalogAt: string;
   catalogCount: number;
+  seedIds: string[];
 }) {
   const [mapsById, setMapsById] = useState<Record<string, MapRow>>(() => {
     const acc: Record<string, MapRow> = {};
-    for (const m of initialMaps) acc[m.seller_sku] = m;
+    for (const m of initialMaps) acc[m.blibli_sku] = m;
     return acc;
   });
   const [seen, setSeen] = useState<SeenProduct[]>(initialSeen);
@@ -192,7 +199,7 @@ export default function BlibliMapClient({
     };
     if (data.maps) {
       const acc: Record<string, MapRow> = {};
-      for (const m of data.maps) acc[m.seller_sku] = m;
+      for (const m of data.maps) acc[m.blibli_sku] = m;
       setMapsById(acc);
     }
     if (data.seen) setSeen(data.seen);
@@ -200,15 +207,15 @@ export default function BlibliMapClient({
   }, []);
 
   const saveMap = useCallback(
-    async (sellerSku: string, productName: string, hit: CatalogHit) => {
-      setSaving(sellerSku);
+    async (blibliSku: string, productName: string, hit: CatalogHit) => {
+      setSaving(blibliSku);
       setError("");
       try {
         const r = await fetch("/api/blibli/map", {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
-            seller_sku: sellerSku,
+            blibli_sku: blibliSku,
             product_name: productName,
             aneka_product_id: hit.id,
           }),
@@ -226,12 +233,12 @@ export default function BlibliMapClient({
   );
 
   const deleteMap = useCallback(
-    async (sellerSku: string) => {
-      setSaving(sellerSku);
+    async (blibliSku: string) => {
+      setSaving(blibliSku);
       setError("");
       try {
         const r = await fetch(
-          `/api/blibli/map?seller_sku=${encodeURIComponent(sellerSku)}`,
+          `/api/blibli/map?blibli_sku=${encodeURIComponent(blibliSku)}`,
           { method: "DELETE" },
         );
         const data = (await r.json()) as { ok?: boolean };
@@ -246,12 +253,35 @@ export default function BlibliMapClient({
     [sync],
   );
 
-  // Baris tabel = gabungan produk dari pesanan + pemetaan manual.
+  // Impor massal pemetaan awal dari seed (listing aktif Blibli). Tidak
+  // menimpa pemetaan yang sudah ada.
+  const seedPending = seedIds.filter((id) => !(id in mapsById)).length;
+  const importSeeds = async () => {
+    setSaving("__seed__");
+    setError("");
+    try {
+      const r = await fetch("/api/blibli/map/seed", { method: "POST" });
+      const data = (await r.json()) as {
+        ok?: boolean;
+        detail?: string;
+        inserted?: number;
+      };
+      if (!data.ok) setError(data.detail ?? "Gagal mengimpor pemetaan awal.");
+      else await sync();
+    } catch {
+      setError("Gagal mengimpor pemetaan awal (jaringan).");
+    } finally {
+      setSaving("");
+    }
+  };
+
+  // Baris tabel = gabungan produk dari pesanan + pemetaan tersimpan.
   const rows: TableProduct[] = [];
   const seenIds = new Set<string>();
   for (const s of seen) {
-    seenIds.add(s.seller_sku);
+    seenIds.add(s.blibli_sku);
     rows.push({
+      blibli_sku: s.blibli_sku,
       seller_sku: s.seller_sku,
       product_name: s.product_name,
       order_count: s.order_count,
@@ -260,8 +290,9 @@ export default function BlibliMapClient({
     });
   }
   for (const m of Object.values(mapsById)) {
-    if (!seenIds.has(m.seller_sku)) {
+    if (!seenIds.has(m.blibli_sku)) {
       rows.push({
+        blibli_sku: m.blibli_sku,
         seller_sku: m.seller_sku,
         product_name: m.product_name || "(tanpa nama)",
         order_count: 0,
@@ -272,7 +303,7 @@ export default function BlibliMapClient({
   }
 
   const mappedCount = Object.values(mapsById).filter((m) => m.enabled === 1).length;
-  const unmappedCount = rows.filter((r) => !mapsById[r.seller_sku]).length;
+  const unmappedCount = rows.filter((r) => !mapsById[r.blibli_sku]).length;
 
   const saveManual = async () => {
     if (!manualId.trim() || !manualAneka) return;
@@ -283,7 +314,7 @@ export default function BlibliMapClient({
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          seller_sku: manualId.trim(),
+          blibli_sku: manualId.trim(),
           product_name: manualName.trim(),
           aneka_product_id: manualAneka.id,
         }),
@@ -322,12 +353,15 @@ export default function BlibliMapClient({
             WhatsApp.
           </li>
           <li>
-            Pemetaan memakai <span className="font-mono">seller SKU</span>{" "}
-            Blibli (terlihat di pesanan) ke ID produk Aneka.
+            Pemetaan memakai <span className="font-mono">productSku</span>{" "}
+            Blibli (<span className="font-mono">KTS-70007-XXXXX</span>) — satu
+            baris menaungi semua varian (warna, ukuran, dll.). Varian yang
+            dipesan pembeli dicocokkan otomatis saat eksekusi.
           </li>
           <li>
             Produk di bawah muncul otomatis dari pesanan 30 hari terakhir;
-            produk yang belum pernah dipesan bisa ditambahkan manual.
+            produk lainnya bisa diimpor massal lewat tombol biru di atas atau
+            ditambahkan manual.
           </li>
         </ul>
       </div>
@@ -335,6 +369,25 @@ export default function BlibliMapClient({
       {error ? (
         <div className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
           {error}
+        </div>
+      ) : null}
+
+      {seedPending > 0 ? (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm">
+          <p className="text-sky-900">
+            <span className="font-semibold">{seedPending} pemetaan awal</span>{" "}
+            dari {seedIds.length} produk Blibli yang live belum diimpor.
+            Pemetaan yang sudah ada tidak akan ditimpa.
+          </p>
+          <button
+            onClick={importSeeds}
+            disabled={saving === "__seed__"}
+            className="ml-auto rounded-lg bg-sky-600 px-3 py-1.5 font-medium text-white hover:bg-sky-700 disabled:opacity-50"
+          >
+            {saving === "__seed__"
+              ? "Mengimpor..."
+              : `Impor ${seedPending} pemetaan`}
+          </button>
         </div>
       ) : null}
 
@@ -363,8 +416,9 @@ export default function BlibliMapClient({
         ) : null}
         {rows.length === 0 ? (
           <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-            Belum ada produk yang terlihat dari pesanan Blibli. Pemetaan bisa
-            ditambahkan manual di bawah, atau tunggu pesanan masuk.
+            Belum ada produk yang terlihat dari pesanan Blibli. Impor pemetaan
+            awal lewat tombol biru, tambahkan manual di bawah, atau tunggu
+            pesanan masuk.
           </div>
         ) : (
           <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
@@ -379,23 +433,26 @@ export default function BlibliMapClient({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {rows.map((r) => {
-                  const map = mapsById[r.seller_sku];
+                  const map = mapsById[r.blibli_sku];
                   return (
-                    <tr key={r.seller_sku} className="align-top hover:bg-slate-50">
+                    <tr key={r.blibli_sku} className="align-top hover:bg-slate-50">
                       <td className="px-4 py-3">
                         <div className="font-medium text-slate-800">
                           {r.product_name}
                         </div>
                         <div className="mt-0.5 font-mono text-xs text-slate-400">
-                          SKU {r.seller_sku}
+                          SKU {r.blibli_sku}
                           {r.manual ? (
                             <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-500">
                               MANUAL
                             </span>
                           ) : null}
+                          {r.seller_sku && r.seller_sku !== r.blibli_sku ? (
+                            <span className="ml-2">· seller SKU {r.seller_sku}</span>
+                          ) : null}
                         </div>
                         <a
-                          href={`https://seller.blibli.com/product/list?search=${encodeURIComponent(r.seller_sku)}`}
+                          href={`https://seller.blibli.com/product/list?search=${encodeURIComponent(r.blibli_sku)}`}
                           target="_blank"
                           rel="noreferrer"
                           title="Buka halaman produk di Seller Center untuk memastikan produknya"
@@ -413,7 +470,7 @@ export default function BlibliMapClient({
                             <div className="text-xs text-slate-400">
                               terakhir{" "}
                               {wibDariEpoch(
-                                seen.find((s) => s.seller_sku === r.seller_sku)
+                                seen.find((s) => s.blibli_sku === r.blibli_sku)
                                   ?.last_order_at ?? 0,
                               )}
                             </div>
@@ -438,7 +495,7 @@ export default function BlibliMapClient({
                             <AnekaSearch
                               placeholder="Pilih produk Aneka…"
                               onSelect={(h) =>
-                                saveMap(r.seller_sku, r.product_name, h)
+                                saveMap(r.blibli_sku, r.product_name, h)
                               }
                             />
                           </div>
@@ -449,16 +506,16 @@ export default function BlibliMapClient({
                           <div className="flex gap-2">
                             <button
                               type="button"
-                              onClick={() => deleteMap(r.seller_sku)}
-                              disabled={saving === r.seller_sku}
+                              onClick={() => deleteMap(r.blibli_sku)}
+                              disabled={saving === r.blibli_sku}
                               className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:border-rose-300 hover:text-rose-600 disabled:opacity-50"
                             >
-                              {saving === r.seller_sku
+                              {saving === r.blibli_sku
                                 ? "…"
                                 : "Lepas"}
                             </button>
                           </div>
-                        ) : saving === r.seller_sku ? (
+                        ) : saving === r.blibli_sku ? (
                           <span className="text-xs text-slate-400">
                             Menyimpan…
                           </span>
@@ -479,7 +536,8 @@ export default function BlibliMapClient({
         </h2>
         <p className="mt-0.5 text-xs text-slate-500">
           Untuk produk Blibli yang belum pernah muncul di pesanan.{" "}
-          <span className="font-mono">seller SKU</span> Blibli bisa dilihat di
+          <span className="font-mono">productSku</span>{" "}
+          (<span className="font-mono">KTS-70007-XXXXX</span>) terlihat di
           Seller Center → Produk, atau dari detail pesanan nanti.
         </p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -487,7 +545,7 @@ export default function BlibliMapClient({
             type="text"
             value={manualId}
             onChange={(e) => setManualId(e.target.value)}
-            placeholder="seller SKU Blibli"
+            placeholder="productSku Blibli (KTS-70007-XXXXX)"
             className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
           />
           <input

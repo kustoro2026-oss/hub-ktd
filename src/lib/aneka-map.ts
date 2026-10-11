@@ -6,7 +6,7 @@ import catalogData from "@/lib/aneka-catalog.json";
 import { listTiktokShopTokens } from "@/lib/db";
 import { getTiktokOrders } from "@/lib/tiktok";
 import { prepareShop } from "@/lib/tiktok-orders";
-import { listBlibliOrders } from "@/lib/blibli";
+import { blibliProductSku, listBlibliOrders } from "@/lib/blibli";
 
 export type AnekaCatalogProduct = {
   id: string;
@@ -124,8 +124,11 @@ export async function getSeenTiktokProducts(): Promise<
 }
 
 /** Produk Blibli yang pernah tampil di pesanan (kunci pemetaan:
- *  seller_sku dari order item). */
+ *  productSku "KTS-70007-XXXXX" dari blibliSku order item — tingkat produk
+ *  seperti product_id TikTok, satu baris menaungi semua varian). */
 export type SeenBlibliProduct = {
+  blibli_sku: string;
+  /** Seller SKU baris terakhir yang terlihat (tampilan saja). */
   seller_sku: string;
   product_name: string;
   order_count: number;
@@ -134,7 +137,7 @@ export type SeenBlibliProduct = {
 };
 
 /** Tarik produk Blibli dari pesanan 30 hari terakhir (distinct per
- *  seller_sku) — sumber daftar produk yang perlu dipetakan. Tanpa
+ *  productSku) — sumber daftar produk yang perlu dipetakan. Tanpa
  *  kredensial kembalikan ok:false dengan keterangan. */
 export async function getSeenBlibliProducts(): Promise<
   { ok: true; products: SeenBlibliProduct[] } | { ok: false; detail: string }
@@ -151,18 +154,22 @@ export async function getSeenBlibliProducts(): Promise<
   const bySku = new Map<string, SeenBlibliProduct>();
   for (const pkg of r.data.packages) {
     for (const it of pkg.orderItems) {
-      const sku = it.product.sellerSku;
-      if (!sku) continue;
-      const cur = bySku.get(sku);
+      // Kunci produk = productSku (dari blibliSku); bila blibliSku kosong
+      // pakai sellerSku apa adanya supaya tetap bisa dipetakan manual.
+      const key = blibliProductSku(it.product.blibliSku ?? it.product.sellerSku);
+      if (!key) continue;
+      const cur = bySku.get(key);
       if (cur) {
         cur.order_count += 1;
         cur.total_qty += it.order.quantity;
+        if (it.product.sellerSku) cur.seller_sku = it.product.sellerSku;
         if (it.order.date > cur.last_order_at) {
           cur.last_order_at = it.order.date;
         }
       } else {
-        bySku.set(sku, {
-          seller_sku: sku,
+        bySku.set(key, {
+          blibli_sku: key,
+          seller_sku: it.product.sellerSku,
           product_name: it.product.itemName,
           order_count: 1,
           total_qty: it.order.quantity,

@@ -34,22 +34,24 @@ export async function POST(request: Request) {
     return Response.json({ error: "Belum masuk" }, { status: 401 });
   }
   const body = (await request.json().catch(() => ({}))) as {
+    blibli_sku?: string;
     seller_sku?: string;
     product_name?: string;
     aneka_product_id?: string;
   };
-  const sellerSku = String(body.seller_sku ?? "").trim();
+  const blibliSku = String(body.blibli_sku ?? "").trim();
   const anekaProductId = String(body.aneka_product_id ?? "").trim();
-  if (!sellerSku || !anekaProductId) {
+  if (!blibliSku || !anekaProductId) {
     return Response.json(
-      { ok: false, detail: "SKU Blibli dan product_id Aneka wajib diisi." },
+      { ok: false, detail: "productSku Blibli dan product_id Aneka wajib diisi." },
       { status: 400 },
     );
   }
   const aneka = findAnekaCatalogById(anekaProductId);
   try {
     await saveBlibliProductMap({
-      seller_sku: sellerSku,
+      blibli_sku: blibliSku,
+      seller_sku: String(body.seller_sku ?? "").trim(),
       product_name: String(body.product_name ?? "").trim(),
       aneka_product_id: anekaProductId,
       aneka_product_name: aneka?.name ?? "",
@@ -68,16 +70,16 @@ export async function DELETE(request: Request) {
   if (!(await isAuthed())) {
     return Response.json({ error: "Belum masuk" }, { status: 401 });
   }
-  const sellerSku =
-    new URL(request.url).searchParams.get("seller_sku") ?? "";
-  if (!sellerSku) {
+  const blibliSku =
+    new URL(request.url).searchParams.get("blibli_sku") ?? "";
+  if (!blibliSku) {
     return Response.json(
-      { error: "seller_sku tidak ada" },
+      { error: "blibli_sku tidak ada" },
       { status: 400 },
     );
   }
   try {
-    await deleteBlibliProductMap(sellerSku);
+    await deleteBlibliProductMap(blibliSku);
     return Response.json({ ok: true });
   } catch (e) {
     const result = `Kesalahan server: ${

@@ -15,8 +15,9 @@
 // pembayaran mangkrak di akun Aneka bila pemilik tidak menyetujui.
 //
 // Perbedaan dengan TikTok: kunci antrean = packageId (satu paket = satu
-// label = satu slot resi Aneka); kunci pemetaan = sellerSku; petunjuk
-// varian = product.variantName dari detail order item.
+// label = satu slot resi Aneka); kunci pemetaan = productSku blibliSku
+// (tingkat produk seperti product_id TikTok — satu baris menaungi semua
+// varian); petunjuk varian = product.variantName dari detail order item.
 import { findAnekaCatalogById } from "@/lib/aneka-map";
 import {
   anekaCheckoutToken,
@@ -51,6 +52,9 @@ const EKSEKUSI_URL =
 
 /** Satu baris produk paket yang siap dibelikan di Aneka. */
 export type BlibliExecItem = {
+  /** Kunci pemetaan: productSku Blibli ("KTS-70007-XXXXX"). */
+  blibli_sku: string;
+  /** Seller SKU baris mass-upload (tampilan/identifikasi saja). */
   seller_sku: string;
   item_name: string;
   /** Nama varian dari detail order item Blibli (padanan sku_name TikTok —
@@ -66,6 +70,7 @@ export type BlibliExecItem = {
 
 /** Satu baris produk dari detail order item (bahan checkBlibliExecutable). */
 export type BlibliExecSourceItem = {
+  blibli_sku: string;
   seller_sku: string;
   item_name: string;
   variant_name: string;
@@ -118,7 +123,7 @@ async function sendExecNotice(msg: string): Promise<string> {
 export function mergeBlibliExecItems(items: BlibliExecItem[]): BlibliExecItem[] {
   const merged = new Map<string, BlibliExecItem>();
   for (const it of items) {
-    const key = `${it.seller_sku}|${it.variant_name}`;
+    const key = `${it.blibli_sku}|${it.variant_name}`;
     const prev = merged.get(key);
     if (prev) {
       prev.qty += it.qty;
@@ -148,9 +153,9 @@ export async function checkBlibliExecutable(
       missing.push(`${it.item_name} (qty ${it.qty})`);
       continue;
     }
-    const map = await getBlibliProductMap(it.seller_sku);
+    const map = await getBlibliProductMap(it.blibli_sku);
     if (!map || map.enabled !== 1 || !map.aneka_product_id) {
-      missing.push(`${it.item_name} (SKU ${it.seller_sku})`);
+      missing.push(`${it.item_name} (SKU ${it.blibli_sku})`);
       continue;
     }
     const cat = findAnekaCatalogById(map.aneka_product_id);
@@ -160,6 +165,7 @@ export async function checkBlibliExecutable(
       continue;
     }
     out.push({
+      blibli_sku: it.blibli_sku,
       seller_sku: it.seller_sku,
       item_name: it.item_name,
       variant_name: it.variant_name,
@@ -813,7 +819,7 @@ export async function executeBlibliOrder(
   //    qty + guard gagal-aman untuk varian campur).
   const cart = buildAnekaCartItems(
     payload.items.map((it) => ({
-      tiktok_product_id: it.seller_sku,
+      tiktok_product_id: it.blibli_sku,
       product_name: it.item_name,
       sku_name: it.variant_name,
       qty: it.qty,

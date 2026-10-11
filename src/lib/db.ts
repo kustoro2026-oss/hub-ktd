@@ -313,7 +313,8 @@ function migrateSqlite(db: DatabaseSync) {
     );
 
     CREATE TABLE IF NOT EXISTS blibli_product_map (
-      seller_sku TEXT PRIMARY KEY,
+      blibli_sku TEXT PRIMARY KEY,
+      seller_sku TEXT NOT NULL DEFAULT '',
       product_name TEXT NOT NULL DEFAULT '',
       aneka_product_id TEXT NOT NULL DEFAULT '',
       aneka_variant_id TEXT NOT NULL DEFAULT '',
@@ -496,6 +497,29 @@ function migrateSqlite(db: DatabaseSync) {
       );
     `);
   }
+
+  // Migrasi skema awal blibli_product_map (kunci seller_sku → blibli_sku
+  // productSku, tingkat produk seperti product_id TikTok — satu baris
+  // pemetaan menaungi SEMUA varian produk). Tabel lama kosong (modul baru
+  // rilis), jadi aman dibuang sekali lalu dibuat ulang.
+  const bmapcols = db
+    .prepare("PRAGMA table_info(blibli_product_map)")
+    .all() as unknown as { name: string }[];
+  if (bmapcols.length > 0 && !bmapcols.some((c) => c.name === "blibli_sku")) {
+    db.exec("DROP TABLE blibli_product_map");
+    db.exec(`
+      CREATE TABLE blibli_product_map (
+        blibli_sku TEXT PRIMARY KEY,
+        seller_sku TEXT NOT NULL DEFAULT '',
+        product_name TEXT NOT NULL DEFAULT '',
+        aneka_product_id TEXT NOT NULL DEFAULT '',
+        aneka_variant_id TEXT NOT NULL DEFAULT '',
+        aneka_product_name TEXT NOT NULL DEFAULT '',
+        enabled INTEGER NOT NULL DEFAULT 1,
+        updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+      );
+    `);
+  }
 }
 
 async function migratePg(pool: Pool) {
@@ -624,7 +648,8 @@ async function migratePg(pool: Pool) {
     );
 
     CREATE TABLE IF NOT EXISTS blibli_product_map (
-      seller_sku TEXT PRIMARY KEY,
+      blibli_sku TEXT PRIMARY KEY,
+      seller_sku TEXT NOT NULL DEFAULT '',
       product_name TEXT NOT NULL DEFAULT '',
       aneka_product_id TEXT NOT NULL DEFAULT '',
       aneka_variant_id TEXT NOT NULL DEFAULT '',
@@ -703,6 +728,31 @@ async function migratePg(pool: Pool) {
         log TEXT NOT NULL DEFAULT '',
         created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         executed_at TEXT NOT NULL DEFAULT ''
+      );
+    `);
+  }
+
+  // Migrasi skema awal blibli_product_map (kunci seller_sku → blibli_sku
+  // productSku), sama seperti versi SQLite — tabel lama kosong aman dibuang.
+  const bmcols = await pool.query<{ column_name: string }>(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_name = 'blibli_product_map'`,
+  );
+  if (
+    bmcols.rows.length > 0 &&
+    !bmcols.rows.some((c) => c.column_name === "blibli_sku")
+  ) {
+    await pool.query("DROP TABLE blibli_product_map");
+    await pool.query(`
+      CREATE TABLE blibli_product_map (
+        blibli_sku TEXT PRIMARY KEY,
+        seller_sku TEXT NOT NULL DEFAULT '',
+        product_name TEXT NOT NULL DEFAULT '',
+        aneka_product_id TEXT NOT NULL DEFAULT '',
+        aneka_variant_id TEXT NOT NULL DEFAULT '',
+        aneka_product_name TEXT NOT NULL DEFAULT '',
+        enabled INTEGER NOT NULL DEFAULT 1,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
     `);
   }
@@ -1935,9 +1985,13 @@ export async function recordBlibliOrderFailure(
   }
 }
 
-// ---------- Pemetaan produk Blibli (seller SKU) → Aneka ----------
+// ---------- Pemetaan produk Blibli (productSku) → Aneka ----------
 
 export type BlibliProductMap = {
+  /** Kunci pemetaan: productSku Blibli ("KTS-70007-XXXXX") — tingkat
+   *  produk seperti product_id TikTok, satu baris menaungi semua varian. */
+  blibli_sku: string;
+  /** Seller SKU baris mass-upload (per varian) — hanya untuk tampilan. */
   seller_sku: string;
   product_name: string;
   aneka_product_id: string;
@@ -1947,7 +2001,7 @@ export type BlibliProductMap = {
   updated_at: string;
 };
 
-/** Semua pemetaan produk tersimpan (kunci: seller_sku). Urutkan tanpa
+/** Semua pemetaan produk tersimpan (kunci: blibli_sku). Urutkan tanpa
  *  COLLATE NOCASE — itu sintaks khusus SQLite dan membuat Postgres
  *  melempar "collation \"nocase\" does not exist" (halaman 500). */
 export async function listBlibliProductMaps(): Promise<BlibliProductMap[]> {
@@ -1956,14 +2010,14 @@ export async function listBlibliProductMaps(): Promise<BlibliProductMap[]> {
   );
 }
 
-/** Satu pemetaan untuk seller SKU Blibli tertentu (null = belum dipetakan). */
+/** Satu pemetaan untuk productSku Blibli tertentu (null = belum dipetakan). */
 export async function getBlibliProductMap(
-  sellerSku: string,
+  blibliSku: string,
 ): Promise<BlibliProductMap | null> {
   return (
     (await queryOne<BlibliProductMap>(
-      "SELECT * FROM blibli_product_map WHERE seller_sku = ?",
-      [sellerSku],
+      "SELECT * FROM blibli_product_map WHERE blibli_sku = ?",
+      [blibliSku],
     )) ?? null
   );
 }
@@ -1971,7 +2025,8 @@ export async function getBlibliProductMap(
 /** Simpan/timpa pemetaan (upsert). `enabled` = 0 menonaktifkan eksekusi
  *  otomatis untuk produk itu tanpa menghapus barisnya. */
 export async function saveBlibliProductMap(m: {
-  seller_sku: string;
+  blibli_sku: string;
+  seller_sku?: string;
   product_name?: string;
   aneka_product_id: string;
   aneka_variant_id?: string;
@@ -1981,20 +2036,21 @@ export async function saveBlibliProductMap(m: {
   const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
   const sql =
     dbMode() === "pg"
-      ? `INSERT INTO blibli_product_map (seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT (seller_sku) DO UPDATE SET product_name = EXCLUDED.product_name,
+      ? `INSERT INTO blibli_product_map (blibli_sku, seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (blibli_sku) DO UPDATE SET seller_sku = EXCLUDED.seller_sku, product_name = EXCLUDED.product_name,
            aneka_product_id = EXCLUDED.aneka_product_id,
            aneka_variant_id = EXCLUDED.aneka_variant_id, aneka_product_name = EXCLUDED.aneka_product_name,
            enabled = EXCLUDED.enabled, updated_at = EXCLUDED.updated_at`
-      : `INSERT INTO blibli_product_map (seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)
-         ON CONFLICT (seller_sku) DO UPDATE SET product_name = excluded.product_name,
+      : `INSERT INTO blibli_product_map (blibli_sku, seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (blibli_sku) DO UPDATE SET seller_sku = excluded.seller_sku, product_name = excluded.product_name,
            aneka_product_id = excluded.aneka_product_id,
            aneka_variant_id = excluded.aneka_variant_id, aneka_product_name = excluded.aneka_product_name,
            enabled = excluded.enabled, updated_at = excluded.updated_at`;
   await queryRun(sql, [
-    m.seller_sku,
+    m.blibli_sku,
+    m.seller_sku ?? "",
     m.product_name ?? "",
     m.aneka_product_id,
     m.aneka_variant_id ?? "",
@@ -2004,12 +2060,72 @@ export async function saveBlibliProductMap(m: {
   ]);
 }
 
-/** Hapus pemetaan untuk satu seller SKU Blibli. */
-export async function deleteBlibliProductMap(sellerSku: string): Promise<void> {
+/** Hapus pemetaan untuk satu productSku Blibli. */
+export async function deleteBlibliProductMap(blibliSku: string): Promise<void> {
   await queryRun(
-    "DELETE FROM blibli_product_map WHERE seller_sku = ?",
-    [sellerSku],
+    "DELETE FROM blibli_product_map WHERE blibli_sku = ?",
+    [blibliSku],
   );
+}
+
+/** Impor massal pemetaan awal (seed) Blibli → Aneka dari
+ *  src/lib/blibli-map-seed.json. Hanya menambah baris yang belum ada —
+ *  pemetaan manual yang sudah tersimpan tidak ditimpa. */
+export async function seedBlibliProductMaps(
+  rows: {
+    blibli_sku: string;
+    seller_sku?: string;
+    product_name?: string;
+    aneka_product_id: string;
+    aneka_variant_id?: string;
+    aneka_product_name?: string;
+    enabled?: number;
+  }[],
+): Promise<{ inserted: number; skipped: number }> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  let inserted = 0;
+  for (const m of rows) {
+    if (dbMode() === "pg") {
+      const r = await (
+        await pgPool()
+      ).query(
+        toPg(
+          `INSERT INTO blibli_product_map (blibli_sku, seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT (blibli_sku) DO NOTHING`,
+        ),
+        [
+          m.blibli_sku,
+          m.seller_sku ?? "",
+          m.product_name ?? "",
+          m.aneka_product_id,
+          m.aneka_variant_id ?? "",
+          m.aneka_product_name ?? "",
+          m.enabled ?? 1,
+          nowUtc,
+        ],
+      );
+      inserted += r.rowCount ?? 0;
+    } else {
+      const r = (await sqliteDb())
+        .prepare(
+          `INSERT OR IGNORE INTO blibli_product_map (blibli_sku, seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        )
+        .run(
+          m.blibli_sku,
+          m.seller_sku ?? "",
+          m.product_name ?? "",
+          m.aneka_product_id,
+          m.aneka_variant_id ?? "",
+          m.aneka_product_name ?? "",
+          m.enabled ?? 1,
+          nowUtc,
+        );
+      inserted += Number(r.changes) || 0;
+    }
+  }
+  return { inserted, skipped: rows.length - inserted };
 }
 
 // ---------- Eksekusi pesanan Blibli → Aneka (semi-otomatis) ----------

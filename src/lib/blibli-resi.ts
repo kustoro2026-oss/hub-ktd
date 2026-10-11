@@ -38,6 +38,7 @@ import {
 } from "@/lib/blibli-exec";
 import {
   blibliEnv,
+  blibliProductSku,
   fulfillBlibliPackage,
   getBlibliOrderDetail,
   getBlibliShippingLabel,
@@ -513,6 +514,8 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
         qty: number;
         cancelled: boolean;
         customerName: string;
+        /** itemSku dari detail (atau list) — bahan kunci productSku. */
+        blibliSku: string;
       };
       const detItems: DetItem[] = [];
       let detailGagal = false;
@@ -530,6 +533,9 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
           qty: Number(d.data.quantity) > 0 ? Number(d.data.quantity) : 0,
           cancelled: st === "X" || /cancel/i.test(st),
           customerName: String(d.data.recipient?.name ?? x.order.customerFullName ?? ""),
+          blibliSku: String(
+            d.data.product?.blibliSku ?? x.product.blibliSku ?? "",
+          ),
         });
       }
       if (detailGagal) {
@@ -571,6 +577,8 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
       // item dibatalkan sebagian TIDAK dieksekusi otomatis (isi paket tidak
       // bisa dipastikan cocok dengan keranjang Aneka) — proses manual.
       const srcItems: BlibliExecSourceItem[] = aktif.map((d) => ({
+        // Kunci pemetaan = productSku (dari itemSku); fallback sellerSku.
+        blibli_sku: blibliProductSku(d.blibliSku || d.item.product.sellerSku),
         seller_sku: d.item.product.sellerSku,
         item_name: d.item.product.itemName,
         variant_name: d.variantName,

@@ -38,6 +38,19 @@ export function blibliEnv(): {
 
 // ---------- Tipe data pesanan ----------
 
+/** Ambil productSku ("KTS-70007-00811") dari itemSku Blibli
+ *  ("KTS-70007-00811-00001" = productSku + indeks varian). Dipakai sebagai
+ *  kunci pemetaan — tingkat produk seperti product_id TikTok, sehingga SATU
+ *  baris pemetaan menaungi semua varian (warna/ukuran) produk itu. Bila
+ *  format tidak dikenali, kembalikan apa adanya. */
+export function blibliProductSku(blibliSku: string): string {
+  const s = String(blibliSku ?? "").trim();
+  // Hanya buang akhiran -XXXXX bila sisanya tetap berbentuk productSku
+  // (merchantCode-productCode), mis. KTS-70007-00811-00001 → KTS-70007-00811.
+  const m = /^(KTS-\d{5}-\d{5})-\d{5}$/.exec(s);
+  return m ? m[1] : s;
+}
+
 /** Status item pesanan Blibli:
  *  C = dibuat/bayar, FP = Fraud Pass (pesanan baru utk seller),
  *  PU = Picked Up (menunggu kurir), PF = partial fulfilled,

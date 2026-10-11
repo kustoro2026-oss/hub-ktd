@@ -7,6 +7,7 @@ import {
   getSeenBlibliProducts,
 } from "@/lib/aneka-map";
 import BlibliMapClient from "@/components/blibli-map-client";
+import seedData from "@/lib/blibli-map-seed.json";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pemetaan Produk Aneka" };
@@ -17,6 +18,13 @@ export default async function BlibliPemetaanPage() {
     getSeenBlibliProducts(),
   ]);
 
+  // productSku Blibli yang tercakup seed pemetaan awal (untuk tombol impor).
+  const seedIds = (
+    (seedData as { rows?: { blibli_sku?: string }[] }).rows ?? []
+  )
+    .map((r) => r.blibli_sku ?? "")
+    .filter(Boolean);
+
   return (
     <BlibliMapClient
       initialMaps={maps}
@@ -24,6 +32,7 @@ export default async function BlibliPemetaanPage() {
       seenDetail={seen.ok ? "" : seen.detail}
       catalogAt={anekaCatalogGeneratedAt()}
       catalogCount={766}
+      seedIds={seedIds}
     />
   );
 }
