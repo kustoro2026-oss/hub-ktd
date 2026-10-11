@@ -101,7 +101,9 @@ function scoreProducts(kb: BotKnowledge, words: string[]) {
     // pada pertanyaan pendek masih sempat dievaluasi.
     .filter((x) => x.s >= 1)
     .sort((a, b) => b.s - a.s)
-    .slice(0, 5)
+    // Cukup lebar supaya pertanyaan "apa ada produk lain" bisa menjawab
+    // dengan menyebut semua varian yang cocok.
+    .slice(0, 8)
     .map((x) => x.p);
 }
 
@@ -166,8 +168,9 @@ export function formatContext(ctx: {
 }): string {
   const parts: string[] = [];
   for (const p of ctx.products) {
+    const n = parts.length + 1;
     parts.push(
-      `Produk: ${p.name} | Harga: ${p.price} | Stok: ${p.stok} | Berat: ${p.berat} | Deskripsi: ${p.desc} | Link: ${p.link}`,
+      `${n}. Produk: ${p.name} | Harga: ${p.price} | Stok: ${p.stok} | Berat: ${p.berat} | Deskripsi: ${p.desc.slice(0, 140)} | Link: ${p.link}`,
     );
   }
   for (const t of ctx.topup) {

@@ -21,25 +21,31 @@ const TIMEOUT_MS = 6000;
 
 const SYSTEM_RULES = `Kamu adalah asisten resmi KTD Store, toko online Indonesia. Jawab pertanyaan pelanggan HANYA berdasarkan data toko di bawah.
 Aturan:
-1. Jawab singkat, maksimal 3 kalimat, bahasa Indonesia formal, sapaan "Anda", TANPA emoji.
+1. Jawab singkat dan natural seperti manusia toko, bahasa Indonesia formal, sapaan "Anda", TANPA emoji. Jawab PERTANYAAN PELANGGAN SAAT INI — jangan mengulang balasan bot sebelumnya persis sama.
 2. Bila menyebut produk/top-up, WAJIB sertakan link-nya dari data.
 3. Jangan mengarang harga, stok, atau fakta yang tidak ada di data. Bila harga persis yang ditanyakan tidak ada di data, sebutkan rentang harga yang tersedia dan arahkan ke link halamannya.
 4. Untuk produk kesehatan/suplemen, jangan memberi nasihat medis — arahkan membaca deskripsi produk (legalitas BPOM) dan konsultasi tenaga kesehatan.
 5. Untuk keluhan, retur, status pesanan, resi, pembatalan, refund, atau tagihan — balas PERSIS "TIDAK_TAHU" (ditangani CS manusia).
 6. Pertanyaan di luar topik toko (politik, umum, candaan, permintaan ngobrol) — balas PERSIS "TIDAK_TAHU".
-7. Bila produk persis yang ditanyakan tidak ada di data, jawab JUJUR seperti manusia toko (mis. "Kami tidak menjual padi, tetapi tersedia pupuk untuk tanaman padi") dan tawarkan alternatif terdekat dari data. Bila data relevan kosong, jawab dari DESKRIPSI TOKO (kategori yang dijual, cara beli, link). Balas PERSIS "TIDAK_TAHU" hanya bila pertanyaan benar-benar tidak ada kaitannya dengan toko.
-8. Bila ada PESAN PELANGGAN SEBELUMNYA, pakai sebagai konteks untuk memahami pertanyaan singkat atau merujuk (mis. "list nya apa saja" setelah bertanya tentang satu produk).
-9. Bila pesan pelanggan berupa tanggapan singkat (mis. "oke", "terima kasih", "oh ya benih"), balas singkat dan natural dengan merujuk topik PESAN PELANGGAN SEBELUMNYA atau BALASAN BOT SEBELUMNYA; bila menyebut produk, sertakan linknya dari data. Bila pelanggan berterima kasih, balas ramah seperti "Sama-sama" lalu tawarkan bantuan bila masih ada yang ingin ditanyakan. Jangan kirim panduan pemesanan panjang bila pelanggan tidak memintanya, dan jangan pernah menulis frasa "Baik, Anda".
-10. Akhiri jawaban dengan "Hormat kami,\nKTD Store".`;
+7. Bila produk persis yang ditanyakan tidak ada di data, jawab JUJUR seperti manusia toko (mis. "Kami tidak menjual padi, tetapi tersedia pupuk untuk tanaman padi") dan tawarkan alternatif terdekat dari data. Bila data relevan kosong, jawab dari DESKRIPSI TOKO. Balas PERSIS "TIDAK_TAHU" hanya bila pertanyaan benar-benar tidak ada kaitannya dengan toko.
+8. Bila pelanggan bertanya "apa ada produk lain / hanya satu / berapa banyak / minta daftar atau varian", jawab pertanyaan itu secara eksplisit: sebutkan SEMUA produk relevan di DATA RELEVAN satu per satu dengan nama dan link. Bila hanya satu yang cocok dengan topik, katakan jujur "hanya ada satu" dan tawarkan produk terdekat lain yang ada di data bila pantas.
+9. Bila ada RIWAYAT PERCAKAPAN, pakai sebagai konteks untuk memahami pertanyaan singkat atau merujuk (mis. "list nya apa saja" setelah bertanya tentang satu produk). Jangan mengulang BALASAN BOT SEBELUMNYA persis sama — jawab pesan terbaru.
+10. Bila pesan pelanggan berupa tanggapan singkat (mis. "oke", "terima kasih", "oh ya benih"), balas singkat dan natural merujuk topik riwayat percakapan; bila berterima kasih, balas ramah "Sama-sama" lalu tawarkan bantuan. Jangan kirim panduan pemesanan panjang bila tidak diminta, dan jangan pernah menulis frasa "Baik, Anda".
+11. Pertanyaan tentang cara memesan, pembayaran, atau pengiriman (mis. "pesan via apa", "gimana cara order") — jawab ringkas dari bagian "Cara beli" DESKRIPSI TOKO.
+12. Akhiri jawaban dengan "Hormat kami,\nKTD Store".`;
 
 /** Batas panjang pesan sebelumnya yang ikut dikirim sebagai konteks (karakter). */
 const MAX_PRIOR = 200;
+/** Jumlah putaran percakapan sebelumnya yang ikut dikirim ke AI. */
+const MAX_HISTORY = 2;
+
+/** Satu putaran percakapan sebelumnya (pesan pelanggan + balasan bot). */
+export type AiHistory = { body: string; reply: string };
 
 function buildPrompt(
   kb: BotKnowledge,
   question: string,
-  prior: string,
-  priorBot: string,
+  history: AiHistory[],
   ctx: ReturnType<typeof retrieve>,
 ): string {
   const lines = [
@@ -52,17 +58,13 @@ function buildPrompt(
     formatContext(ctx) || "(tidak ada)",
     "",
   ];
-  if (prior) {
-    lines.push(
-      `PESAN PELANGGAN SEBELUMNYA: ${prior}`,
-      "",
-    );
-  }
-  if (priorBot) {
-    lines.push(
-      `BALASAN BOT SEBELUMNYA: ${priorBot}`,
-      "",
-    );
+  if (history.length) {
+    lines.push("RIWAYAT PERCAKAPAN (urutan dari yang paling lama):");
+    for (const h of [...history].reverse()) {
+      if (h.body) lines.push(`- PELANGGAN: ${h.body}`);
+      if (h.reply) lines.push(`- BOT: ${h.reply}`);
+    }
+    lines.push("");
   }
   lines.push(`PESAN PELANGGAN SAAT INI: ${question}`);
   return lines.join("\n");
@@ -70,35 +72,35 @@ function buildPrompt(
 
 /** Jawab satu pertanyaan dengan AI. Mengembalikan null bila: kunci tidak ada,
  *  pertanyaan terlalu panjang, API gagal/timeout, atau jawabannya TIDAK_TAHU.
- *  `prior` adalah pesan pelanggan sebelumnya (opsional) dan `priorBot` balasan
- *  bot sebelumnya — dipakai sebagai konteks pertanyaan lanjutan singkat
- *  seperti "list nya apa saja" atau tanggapan seperti "oh ya benih". */
+ *  `history` adalah putaran percakapan sebelumnya (terbaru di akhir array)
+ *  — dipakai sebagai konteks pertanyaan lanjutan singkat seperti
+ *  "list nya apa saja" atau tanggapan seperti "oh ya benih". */
 export async function answerWithAi(
   question: string,
-  prior = "",
-  priorBot = "",
+  history: AiHistory[] = [],
 ): Promise<string | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
   const t = question.replace(/\s+/g, " ").trim();
   if (!t || t.length > MAX_QUESTION) return null;
 
+  const clean = (s: string) => s.replace(/\s+/g, " ").trim().slice(0, MAX_PRIOR);
+  const hx = history.slice(-MAX_HISTORY).map((h) => ({
+    body: clean(h.body),
+    reply: clean(h.reply),
+  }));
+
   const kb = knowledge as BotKnowledge;
   const ctx0 = retrieve(kb, t);
   // Bila kata kunci pesan ini tidak menemukan apa pun (mis. "Minta list nya"),
-  // coba lagi dengan kata dari pesan sebelumnya (mis. "apakah ada benih padi")
-  // supaya jawaban tetap menyebut produk yang sedang dibicarakan.
+  // coba lagi dengan kata dari pesan pelanggan terakhir (mis. "apakah ada
+  // benih padi") supaya jawaban tetap menyebut produk yang sedang dibicarakan.
+  const lastBody = hx[hx.length - 1]?.body ?? "";
   const ctx =
-    !ctx0.products.length && !ctx0.topup.length && prior
-      ? retrieve(kb, `${t} ${prior}`)
+    !ctx0.products.length && !ctx0.topup.length && lastBody
+      ? retrieve(kb, `${t} ${lastBody}`)
       : ctx0;
-  const prompt = buildPrompt(
-    kb,
-    t,
-    prior.replace(/\s+/g, " ").trim().slice(0, MAX_PRIOR),
-    priorBot.replace(/\s+/g, " ").trim().slice(0, MAX_PRIOR),
-    ctx,
-  );
+  const prompt = buildPrompt(kb, t, hx, ctx);
   const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
 

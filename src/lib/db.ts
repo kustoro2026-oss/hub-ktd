@@ -1087,6 +1087,18 @@ export async function getLatestInMessage(
   );
 }
 
+/** Ambil beberapa pesan masuk terakhir (lengkap dengan balasannya)
+ *  untuk konteks percakapan AI — pesan pertama = paling baru. */
+export async function getLatestInMessages(
+  waFrom: string,
+  limit = 3,
+): Promise<InboundMessage[]> {
+  return queryAll<InboundMessage>(
+    "SELECT * FROM messages WHERE wa_from = ? AND direction = 'in' ORDER BY created_at DESC, id DESC LIMIT ?",
+    [waFrom, limit],
+  );
+}
+
 /** Tandai semua pesan masuk nomor ini sebagai sudah dibaca. */
 export async function markConversationRead(waFrom: string): Promise<void> {
   await queryRun(

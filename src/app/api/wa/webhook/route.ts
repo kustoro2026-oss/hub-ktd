@@ -9,7 +9,7 @@
 // ini; endpoint lama di situs toko tetap dibiarkan sebagai cadangan.
 import {
   applyBroadcastDeliveryStatus,
-  getLatestInMessage,
+  getLatestInMessages,
   getLatestOutMessage,
   insertMessage,
   messageExists,
@@ -100,12 +100,13 @@ export async function POST(request: Request) {
           // Pesan masuk terakhir dari nomor ini — dipakai sebagai konteks
           // jawaban AI (pertanyaan lanjutan singkat) dan pengecekan bukti
           // transfer di bawah.
-          const lastIn = await getLatestInMessage(m.from);
+          const lastInMsgs = await getLatestInMessages(m.from, 3);
+          const lastIn = lastInMsgs[0];
 
           // Cabang AI: pertanyaan yang tidak terjawab FAQ — dan tanggapan
           // singkat pelanggan (mis. "oh ya benih", "oke", "terima kasih") yang
           // biasanya jatuh ke balasan katalog umum — dijawab dengan basis
-          // pengetahuan toko via Gemini, memakai pesan + balasan bot
+          // pengetahuan toko via Gemini, memakai riwayat percakapan
           // sebelumnya sebagai konteks. Gagal, timeout, atau di luar data →
           // tetap pakai balasan baku (ajakan hubungi CS / katalog).
           const isShortGeneral =
@@ -120,8 +121,7 @@ export async function POST(request: Request) {
             try {
               const aiReply = await answerWithAi(
                 body,
-                lastIn?.body ?? "",
-                lastIn?.reply ?? "",
+                lastInMsgs.map((h) => ({ body: h.body, reply: h.reply })),
               );
               if (aiReply) {
                 kind = "ai";
