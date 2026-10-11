@@ -102,17 +102,27 @@ export async function POST(request: Request) {
           // transfer di bawah.
           const lastIn = await getLatestInMessage(m.from);
 
-          // Cabang AI: pertanyaan yang tidak terjawab FAQ dijawab dengan
-          // basis pengetahuan toko (produk + top-up) via Gemini. Gagal,
-          // timeout, atau di luar data → tetap pakai ajakan hubungi CS.
+          // Cabang AI: pertanyaan yang tidak terjawab FAQ — dan tanggapan
+          // singkat pelanggan (mis. "oh ya benih", "oke", "terima kasih") yang
+          // biasanya jatuh ke balasan katalog umum — dijawab dengan basis
+          // pengetahuan toko via Gemini, memakai pesan + balasan bot
+          // sebelumnya sebagai konteks. Gagal, timeout, atau di luar data →
+          // tetap pakai balasan baku (ajakan hubungi CS / katalog).
+          const isShortGeneral =
+            kind === "general" && body.trim().length <= 120;
           if (
             isText &&
-            kind === "question" &&
+            (kind === "question" || isShortGeneral) &&
             !handover &&
+            !isProofOfTransfer(m) &&
             process.env.GEMINI_API_KEY
           ) {
             try {
-              const aiReply = await answerWithAi(body, lastIn?.body ?? "");
+              const aiReply = await answerWithAi(
+                body,
+                lastIn?.body ?? "",
+                lastIn?.reply ?? "",
+              );
               if (aiReply) {
                 kind = "ai";
                 reply = aiReply;

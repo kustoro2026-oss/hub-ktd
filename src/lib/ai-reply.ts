@@ -29,12 +29,18 @@ Aturan:
 6. Pertanyaan di luar topik toko (politik, umum, candaan, permintaan ngobrol) — balas PERSIS "TIDAK_TAHU".
 7. Bila produk persis yang ditanyakan tidak ada di data, jawab JUJUR seperti manusia toko (mis. "Kami tidak menjual padi, tetapi tersedia pupuk untuk tanaman padi") dan tawarkan alternatif terdekat dari data. Bila data relevan kosong, jawab dari DESKRIPSI TOKO (kategori yang dijual, cara beli, link). Balas PERSIS "TIDAK_TAHU" hanya bila pertanyaan benar-benar tidak ada kaitannya dengan toko.
 8. Bila ada PESAN PELANGGAN SEBELUMNYA, pakai sebagai konteks untuk memahami pertanyaan singkat atau merujuk (mis. "list nya apa saja" setelah bertanya tentang satu produk).
-9. Akhiri jawaban dengan "Hormat kami,\nKTD Store".`;
+9. Bila pesan pelanggan berupa tanggapan singkat (mis. "oke", "terima kasih", "oh ya benih"), balas singkat dan natural dengan merujuk topik PESAN PELANGGAN SEBELUMNYA atau BALASAN BOT SEBELUMNYA; bila menyebut produk, sertakan linknya dari data. Bila pelanggan berterima kasih, balas ramah seperti "Sama-sama" lalu tawarkan bantuan bila masih ada yang ingin ditanyakan. Jangan kirim panduan pemesanan panjang bila pelanggan tidak memintanya, dan jangan pernah menulis frasa "Baik, Anda".
+10. Akhiri jawaban dengan "Hormat kami,\nKTD Store".`;
 
 /** Batas panjang pesan sebelumnya yang ikut dikirim sebagai konteks (karakter). */
 const MAX_PRIOR = 200;
 
-function buildPrompt(kb: BotKnowledge, question: string, prior: string): string {
+function buildPrompt(
+  kb: BotKnowledge,
+  question: string,
+  prior: string,
+  priorBot: string,
+): string {
   const ctx = retrieve(kb, question);
   const lines = [
     SYSTEM_RULES,
@@ -52,17 +58,25 @@ function buildPrompt(kb: BotKnowledge, question: string, prior: string): string 
       "",
     );
   }
-  lines.push(`PERTANYAAN PELANGGAN: ${question}`);
+  if (priorBot) {
+    lines.push(
+      `BALASAN BOT SEBELUMNYA: ${priorBot}`,
+      "",
+    );
+  }
+  lines.push(`PESAN PELANGGAN SAAT INI: ${question}`);
   return lines.join("\n");
 }
 
 /** Jawab satu pertanyaan dengan AI. Mengembalikan null bila: kunci tidak ada,
  *  pertanyaan terlalu panjang, API gagal/timeout, atau jawabannya TIDAK_TAHU.
- *  `prior` adalah pesan pelanggan sebelumnya (opsional) untuk konteks
- *  pertanyaan lanjutan singkat seperti "list nya apa saja". */
+ *  `prior` adalah pesan pelanggan sebelumnya (opsional) dan `priorBot` balasan
+ *  bot sebelumnya — dipakai sebagai konteks pertanyaan lanjutan singkat
+ *  seperti "list nya apa saja" atau tanggapan seperti "oh ya benih". */
 export async function answerWithAi(
   question: string,
   prior = "",
+  priorBot = "",
 ): Promise<string | null> {
   const key = process.env.GEMINI_API_KEY;
   if (!key) return null;
@@ -74,6 +88,7 @@ export async function answerWithAi(
     kb,
     t,
     prior.replace(/\s+/g, " ").trim().slice(0, MAX_PRIOR),
+    priorBot.replace(/\s+/g, " ").trim().slice(0, MAX_PRIOR),
   );
   const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
