@@ -64,6 +64,13 @@ ${SIGN}`,
       /\b(gimana|gmn) (caranya )?(pesan|order|beli)(nya)?\b/,
       /\b(pesan|order|beli)(nya)? gimana\b|\bcaranya (pesan|order|beli)\b/,
       /\blangkah (pesan|order|beli)\b/,
+      // "pesan via apa" / "order lewat mana" / "beli di mana" — pertanyaan
+      // saluran pemesanan yang sering lolos dari pola di atas. Pola "via apa"
+      // telanjang sengaja tidak dipakai supaya "pembayaran via apa" tetap
+      // jatuh ke kategori pembayaran.
+      /\b(pesan|order|beli|checkout) (via|lewat|melalui) (apa|mana|siapa)\b/,
+      /\b(pesan|order|beli)(nya)? (ke|di|dari) mana\b/,
+      /\bgimana (cara )?(memesan|membeli|order|belanja)\b/,
     ],
     answer: `Cara pemesanan di KTD Store:
 1. Buka katalog: ${CATALOG_URL}
@@ -148,7 +155,7 @@ ${SIGN}`,
   {
     id: "pembayaran",
     patterns: [
-      /\bpembayaran\b|\bcara bayar\b|\bbayarnya gimana\b|\bbayar gimana\b|\bbayar lewat apa\b/,
+      /\bpembayaran\b|\bcara bayar\b|\bbayarnya gimana\b|\bbayar gimana\b|\bbayar lewat apa\b|\bbayar via apa\b/,
       /\btransfer\b|\brekening\b|\bno rek\b|\bnomor rekening\b/,
       /\bqris\b|\be-?wallet\b|\bdana\b|\bovo\b|\bgopay\b|\bshopee ?pay\b/,
       /\bmetode (bayar|pembayaran)\b/,
