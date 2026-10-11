@@ -22,7 +22,7 @@ const TIMEOUT_MS = 6000;
 const SYSTEM_RULES = `Kamu adalah asisten resmi KTD Store, toko online Indonesia. Jawab pertanyaan pelanggan HANYA berdasarkan data toko di bawah.
 Aturan:
 1. Jawab singkat, maksimal 3 kalimat, bahasa Indonesia formal, sapaan "Anda", TANPA emoji.
-2. Bila menyebut produk/top-up, sertakan link-nya dari data.
+2. Bila menyebut produk/top-up, WAJIB sertakan link-nya dari data.
 3. Jangan mengarang harga, stok, atau fakta yang tidak ada di data. Bila harga persis yang ditanyakan tidak ada di data, sebutkan rentang harga yang tersedia dan arahkan ke link halamannya.
 4. Untuk produk kesehatan/suplemen, jangan memberi nasihat medis — arahkan membaca deskripsi produk (legalitas BPOM) dan konsultasi tenaga kesehatan.
 5. Untuk keluhan, retur, status pesanan, resi, pembatalan, refund, atau tagihan — balas PERSIS "TIDAK_TAHU" (ditangani CS manusia).
@@ -40,8 +40,8 @@ function buildPrompt(
   question: string,
   prior: string,
   priorBot: string,
+  ctx: ReturnType<typeof retrieve>,
 ): string {
-  const ctx = retrieve(kb, question);
   const lines = [
     SYSTEM_RULES,
     "",
@@ -84,11 +84,20 @@ export async function answerWithAi(
   if (!t || t.length > MAX_QUESTION) return null;
 
   const kb = knowledge as BotKnowledge;
+  const ctx0 = retrieve(kb, t);
+  // Bila kata kunci pesan ini tidak menemukan apa pun (mis. "Minta list nya"),
+  // coba lagi dengan kata dari pesan sebelumnya (mis. "apakah ada benih padi")
+  // supaya jawaban tetap menyebut produk yang sedang dibicarakan.
+  const ctx =
+    !ctx0.products.length && !ctx0.topup.length && prior
+      ? retrieve(kb, `${t} ${prior}`)
+      : ctx0;
   const prompt = buildPrompt(
     kb,
     t,
     prior.replace(/\s+/g, " ").trim().slice(0, MAX_PRIOR),
     priorBot.replace(/\s+/g, " ").trim().slice(0, MAX_PRIOR),
+    ctx,
   );
   const model = process.env.GEMINI_MODEL || DEFAULT_MODEL;
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
@@ -119,12 +128,49 @@ export async function answerWithAi(
         .trim() ?? "";
     if (!text) return null;
     if (/\bTIDAK_TAHU\b/i.test(text)) return null;
-    let cleaned = text.slice(0, 600).trim();
+    let cleaned = text
+      // Bersihkan markdown: bold dan tautan [teks](url) → URL polos
+      // supaya rapi dibaca di WhatsApp.
+      .replace(/\*\*/g, "")
+      .replace(/\[([^\]]*)\]\((https?:\/\/[^)]+)\)/g, "$2")
+      .slice(0, 600)
+      .trim();
     // Pastikan ada tanda tangan formal khas proyek. Bila AI sudah menulis
     // salam "Hormat kami," tanpa nama toko, buang dulu supaya tidak dobel.
     if (!cleaned.includes("KTD Store")) {
       cleaned = cleaned.replace(/Hormat kami,?\s*$/i, "").trim();
       cleaned += "\n\nHormat kami,\nKTD Store";
+    }
+    // Pengaman deterministik: bila jawaban MENYEBUT produk/top-up dari
+    // konteks dan lupa menyertakan link, sisipkan link teratas sebelum
+    // tanda tangan — pelanggan tidak perlu bertanya "linknya mana" lagi.
+    // Ucapan terima kasih/sapaan tanpa menyebut produk tidak diberi link.
+    const mentionsProduct = (txt: string): boolean => {
+      const tl = txt.toLowerCase();
+      const toks = (s: string) =>
+        s
+          .toLowerCase()
+          .replace(/[^a-z0-9\s]/g, " ")
+          .split(/\s+/)
+          .filter((w) => w.length >= 4);
+      for (const p of ctx.products) {
+        if (toks(p.name).some((tok) => tl.includes(tok))) return true;
+      }
+      for (const t of ctx.topup) {
+        if (toks(`${t.label} ${t.brand}`).some((tok) => tl.includes(tok))) return true;
+      }
+      return false;
+    };
+    if (!/toko\.kustoro2026\.com/.test(cleaned) && mentionsProduct(cleaned)) {
+      const first = ctx.products[0]?.link ?? ctx.topup[0]?.link;
+      if (first) {
+        const sig = cleaned.lastIndexOf("Hormat kami");
+        if (sig > -1) {
+          cleaned = `${cleaned.slice(0, sig).trimEnd()}\nLink: ${first}\n\n${cleaned.slice(sig)}`;
+        } else {
+          cleaned += `\n\nLink: ${first}`;
+        }
+      }
     }
     return cleaned;
   } catch (e) {
