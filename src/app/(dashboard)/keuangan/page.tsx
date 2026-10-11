@@ -1,5 +1,5 @@
-// Dashboard Keuangan / Laba Rugi KTD Hub — khusus uang: omset TikTok Shop,
-// pembayaran Aneka, laba kotor, dan saldo wallet Aneka. Default "hari ini"
+// Dashboard Keuangan / Laba Rugi KTD Hub — khusus uang: omset TikTok Shop +
+// Blibli, pembayaran Aneka, laba kotor, dan saldo wallet Aneka. Default "hari ini"
 // (WIB); rentang tanggal bisa dipilih (dari/sampai). Data Aneka di-scrape
 // read-only lalu di-cache 15 menit (tombol Muat Ulang / cron harian).
 // Laba kotor = omset − total bayar Aneka (total Aneka sudah termasuk ongkos
@@ -89,6 +89,19 @@ const STATUS_TIKTOK: Record<string, string> = {
   PARTIALLY_CANCELLED: "Sebagian batal",
 };
 
+const STATUS_BLIBLI: Record<string, string> = {
+  C: "Dibuat",
+  FP: "Pesanan Baru",
+  PU: "Menunggu Jemput",
+  PF: "Sebagian Terpenuhi",
+  CR: "Minta Pembatalan",
+  CX: "Dalam Pengiriman",
+  OS: "Stok Habis",
+  BP: "Siap Diambil",
+  D: "Terkirim",
+  X: "Dibatalkan",
+};
+
 const STATUS_EXEC: Record<string, { label: string; cls: string }> = {
   "": { label: "Belum diproses", cls: "bg-slate-100 text-slate-600" },
   menunggu: { label: "Menunggu setuju", cls: "bg-amber-100 text-amber-800" },
@@ -168,7 +181,7 @@ export default async function KeuanganPage({
             Dashboard Keuangan
           </h1>
           <p className="text-sm text-slate-500">
-            Omset TikTok − pembayaran Aneka = laba kotor · {rentang.label}
+            Omset TikTok + Blibli − pembayaran Aneka = laba kotor · {rentang.label}
           </p>
         </div>
         <KeuanganRefresh />
@@ -238,13 +251,13 @@ export default async function KeuanganPage({
           </span>
         )}
         <span className="text-slate-400">
-          Omset hanya menghitung pesanan berbayar (tanpa UNPAID/Dibatalkan).
+          Omset hanya menghitung pesanan berbayar (tanpa pesanan dibatalkan).
         </span>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Kartu
-          judul="Omset TikTok"
+          judul="Omset Marketplace"
           nilai={fmtRp(data.omset)}
           sub={`${data.jumlahOrder} pesanan masuk`}
           cls="text-emerald-700"
@@ -279,16 +292,17 @@ export default async function KeuanganPage({
         )}
       />
       <KartuPeringatan
-        judul="PERHATIAN — pesanan TikTok dibatalkan padahal sudah dibayar ke Aneka:"
+        judul="PERHATIAN — pesanan dibatalkan padahal sudah dibayar ke Aneka:"
         isi={data.orderBatalTerbayar.map(
-          (b) => `${b.orderId} (${b.produk}) — terbayar ${fmtRp(b.bayarAneka)}`,
+          (b) =>
+            `${b.pasar}: ${b.orderId} (${b.produk}) — terbayar ${fmtRp(b.bayarAneka)}`,
         )}
       />
 
       {data.bayarTanpaOrder.length > 0 ? (
         <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
           <p className="font-semibold">
-            Pembayaran via KTD Hub tanpa pasangan order TikTok pada rentang ini:
+            Pembayaran via KTD Hub tanpa pasangan order marketplace pada rentang ini:
           </p>
           <ul className="mt-1 list-disc space-y-0.5 pl-5">
             {data.bayarTanpaOrder.map((r) => (
@@ -300,7 +314,7 @@ export default async function KeuanganPage({
             ))}
           </ul>
           <p className="mt-1 text-xs text-sky-700">
-            Wajar bila order TikTok-nya dibuat di hari sebelumnya — pilih
+            Wajar bila order pasar-nya dibuat di hari sebelumnya — pilih
             rentang yang lebih luas untuk melihat pasangannya.
           </p>
         </div>
@@ -324,7 +338,7 @@ export default async function KeuanganPage({
                 <th className="px-4 py-2.5">Kode / Payment</th>
                 <th className="px-4 py-2.5 text-right">Total</th>
                 <th className="px-4 py-2.5">Resi</th>
-                <th className="px-4 py-2.5">Pasangan Order TikTok</th>
+                <th className="px-4 py-2.5">Pasangan Order</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -407,13 +421,14 @@ export default async function KeuanganPage({
 
       <section className="space-y-3">
         <h2 className="text-sm font-semibold text-slate-900">
-          Rincian pesanan TikTok ({data.baris.length})
+          Rincian pesanan ({data.baris.length})
         </h2>
         <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
           <table className="w-full min-w-[760px] text-left text-sm">
             <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
                 <th className="px-4 py-2.5">Waktu</th>
+                <th className="px-4 py-2.5">Pasar</th>
                 <th className="px-4 py-2.5">Pesanan / Produk</th>
                 <th className="px-4 py-2.5 text-right">Qty</th>
                 <th className="px-4 py-2.5 text-right">Omset</th>
@@ -427,25 +442,37 @@ export default async function KeuanganPage({
               {data.baris.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={8}
+                    colSpan={9}
                     className="px-4 py-6 text-center text-slate-400"
                   >
-                    Belum ada pesanan TikTok pada rentang ini (atau belum ada
+                    Belum ada pesanan pada rentang ini (atau belum ada
                     toko terotorisasi).
                   </td>
                 </tr>
               ) : (
                 data.baris.map((b) => {
                   const se = STATUS_EXEC[b.statusExec] ?? STATUS_EXEC[""];
+                  const batal =
+                    b.statusOrder === "CANCELLED" ||
+                    b.statusOrder.split(",").some((s) => s.trim() === "X");
                   return (
                     <tr
-                      key={b.orderId}
-                      className={
-                        b.statusOrder === "CANCELLED" ? "bg-rose-50/60" : ""
-                      }
+                      key={`${b.pasar}-${b.orderId}`}
+                      className={batal ? "bg-rose-50/60" : ""}
                     >
                       <td className="whitespace-nowrap px-4 py-2.5 text-slate-600">
                         {wibDariMs(b.waktuMs)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-2.5">
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            b.pasar === "Blibli"
+                              ? "bg-blue-100 text-blue-800"
+                              : "bg-slate-800 text-white"
+                          }`}
+                        >
+                          {b.pasar}
+                        </span>
                       </td>
                       <td className="px-4 py-2.5">
                         <p className="font-medium text-slate-900">
@@ -499,7 +526,12 @@ export default async function KeuanganPage({
                       </td>
                       <td className="px-4 py-2.5">
                         <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                          {STATUS_TIKTOK[b.statusOrder] ?? b.statusOrder}
+                          {b.pasar === "Blibli"
+                            ? b.statusOrder
+                                .split(", ")
+                                .map((s) => STATUS_BLIBLI[s] ?? s)
+                                .join(", ")
+                            : (STATUS_TIKTOK[b.statusOrder] ?? b.statusOrder)}
                         </span>
                       </td>
                       <td className="px-4 py-2.5">

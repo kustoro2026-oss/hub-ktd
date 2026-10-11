@@ -1,9 +1,10 @@
-// Dashboard Keuangan KTD Hub — merangkum uang masuk (omset TikTok Shop)
-// dan uang keluar (pembayaran Aneka) untuk rentang tanggal, plus saldo
-// wallet Aneka hasil scrape read-only yang di-cache di database.
+// Dashboard Keuangan KTD Hub — merangkum uang masuk (omset TikTok Shop +
+// Blibli) dan uang keluar (pembayaran Aneka) untuk rentang tanggal, plus
+// saldo wallet Aneka hasil scrape read-only yang di-cache di database.
 //
 // Sumber data:
-// - Omset: API resmi TikTok (detail pesanan — harga jual per baris item).
+// - Omset: API resmi TikTok (detail pesanan — harga jual per baris item)
+//   dan API Seller Blibli (paket pesanan — finalPrice per item).
 // - Pengeluaran + saldo: situs anekadropship.id (halaman /payment-history:
 //   baris pembayaran berisi kode ORDER, total, status, nomor resi — saldo
 //   wallet tampil di header halaman yang sama). Aneka tidak punya API
@@ -17,12 +18,16 @@ import {
   setAnekaFinanceCache,
   listTiktokOrderExecs,
   listTiktokShopTokens,
+  listBlibliOrderExecs,
   type AnekaFinanceCacheRow,
+  type BlibliOrderExec,
   type TiktokOrderExec,
   type TiktokShopToken,
 } from "@/lib/db";
 import { anekaLogin, fetchRetry } from "@/lib/aneka-checkout";
 import { prepareShop, pullTiktokShopOrders } from "@/lib/tiktok-orders";
+import { pullBlibliOrders } from "@/lib/blibli-orders";
+import { type BlibliOrderPackage } from "@/lib/blibli";
 import {
   getTiktokOrderDetail,
   resolveLineQty,
@@ -33,6 +38,7 @@ import {
   checkAnekaExecutable,
   type AnekaExecPayload,
 } from "@/lib/aneka-exec";
+import { type BlibliExecPayload } from "@/lib/blibli-exec";
 
 const BASE = "https://anekadropship.id";
 const CACHE_KEY = "aneka-keuangan-v1";
@@ -66,6 +72,8 @@ export type AnekaSnapshot = {
 
 export type BarisKeuangan = {
   orderId: string;
+  /** Sumber pesanan — TikTok Shop atau Blibli. */
+  pasar: "TikTok" | "Blibli";
   waktuMs: number;
   produk: string;
   qty: number;
@@ -378,6 +386,24 @@ export async function ambilDataKeuangan(
     pageSize: 50,
   });
 
+  // 2b) Paket Blibli — filter statusFPDateRange TIDAK dipatuhi API (teruji
+  //     langsung: rentang apa pun mengembalikan semua paket), jadi semua
+  //     halaman ditarik lalu disaring per createdDate item di sini. Maks
+  //     10 halaman (500 paket) — cukup untuk skala toko saat ini.
+  const blibliPackages: BlibliOrderPackage[] = [];
+  for (let page = 0; page < 10; page++) {
+    const st = (await pullBlibliOrders({ paging: { page, size: 50 } }))[0];
+    if (!st?.ok) break;
+    const pkg = (st.packages ?? []).filter((p) =>
+      p.orderItems.some((i) => {
+        const t = i.createdDate || i.order.date || 0;
+        return t >= dariMs && t < sampaiMs;
+      }),
+    );
+    blibliPackages.push(...pkg);
+    if ((st.packages ?? []).length < 50) break;
+  }
+
   // 3) Detail tiap order (harga jual + qty asli + resi). ID dikumpulkan
   //    per toko supaya satu panggilan detail melayani banyak order.
   const detailByOrder = new Map<string, TiktokOrderDetail>();
@@ -404,22 +430,66 @@ export async function ambilDataKeuangan(
   const execByOrder = new Map<string, TiktokOrderExec>(
     execs.map((e) => [e.order_id, e]),
   );
+  const blibliExecs = await listBlibliOrderExecs();
+  const execByPkg = new Map<string, BlibliOrderExec>(
+    blibliExecs.map((e) => [e.package_id, e]),
+  );
 
   // 4b) Himpunan id pembayaran yang dibuat KTD Hub: kolom aneka_payment_id
-  //     tiap baris eksekusi plus jejak id di log (percobaan lama yang id-nya
-  //     tertimpa di kolom tetap terdeteksi dari baris log). Pembayaran di
-  //     luar himpunan ini = orderan manual (dibuat langsung di Aneka).
+  //     tiap baris eksekusi (TikTok + Blibli) plus jejak id di log (percobaan
+  //     lama yang id-nya tertimpa di kolom tetap terdeteksi dari baris log).
+  //     Pembayaran di luar himpunan ini = orderan manual (dibuat langsung
+  //     di Aneka).
   const hubPaymentIds = new Set<string>();
-  for (const e of execs) {
-    if (e.aneka_payment_id) hubPaymentIds.add(e.aneka_payment_id);
-    const log = e.log ?? "";
-    for (const m of log.matchAll(/payment(?:_id| lama)\s+(\d+)/g)) {
-      hubPaymentIds.add(m[1]);
+  const serapPaymentIds = (rows: { aneka_payment_id: string; log: string }[]) => {
+    for (const e of rows) {
+      if (e.aneka_payment_id) hubPaymentIds.add(e.aneka_payment_id);
+      const log = e.log ?? "";
+      for (const m of log.matchAll(/payment(?:_id| lama)\s+(\d+)/g)) {
+        hubPaymentIds.add(m[1]);
+      }
+      for (const m of log.matchAll(/ID pembayaran Aneka[^\d]*(\d+)/g)) {
+        hubPaymentIds.add(m[1]);
+      }
     }
-    for (const m of log.matchAll(/ID pembayaran Aneka[^\d]*(\d+)/g)) {
-      hubPaymentIds.add(m[1]);
+  };
+  serapPaymentIds(execs);
+  serapPaymentIds(blibliExecs);
+
+  /** Pembayaran Aneka Success yang resinya cocok dengan satu resi pasar. */
+  const biayaAnekaUntuk = (resi: string) => {
+    const bayar = snapRows.filter(
+      (r) => r.resi && resi && r.resi.trim() === resi.trim(),
+    );
+    const bayarSukses = bayar.filter((r) => r.status === "Success");
+    return {
+      bayarAneka: bayarSukses.reduce((a, r) => a + r.total, 0),
+      bayarIds: bayarSukses.map((r) => r.paymentId),
+      bayarManualAneka: bayarSukses
+        .filter((r) => !hubPaymentIds.has(r.paymentId))
+        .reduce((a, r) => a + r.total, 0),
+    };
+  };
+
+  /** Laba satu baris: biaya nyata (bayar) bila ada, selain itu perkiraan
+   *  modal + packing, selain itu omset penuh (proyeksi). */
+  const labaUntuk = (
+    omsetBaris: number,
+    bayarAnekaBaris: number,
+    estimasiModalBaris: number,
+    estimasiPackingBaris: number,
+  ) => {
+    if (bayarAnekaBaris > 0) {
+      return { laba: omsetBaris - bayarAnekaBaris, labaRealisasi: true };
     }
-  }
+    if (estimasiModalBaris > 0) {
+      return {
+        laba: omsetBaris - estimasiModalBaris - estimasiPackingBaris,
+        labaRealisasi: false,
+      };
+    }
+    return { laba: omsetBaris, labaRealisasi: false };
+  };
 
   // 5) Susun baris per order.
   const baris: BarisKeuangan[] = [];
@@ -446,15 +516,7 @@ export async function ambilDataKeuangan(
       const omset = d ? omsetDetail(d) : 0;
 
       // Pembayaran Aneka yang resinya cocok dengan resi order ini.
-      const bayar = snapRows.filter(
-        (r) => r.resi && resi && r.resi.trim() === resi.trim(),
-      );
-      const bayarSukses = bayar.filter((r) => r.status === "Success");
-      const bayarAneka = bayarSukses.reduce((a, r) => a + r.total, 0);
-      const bayarIds = bayarSukses.map((r) => r.paymentId);
-      const bayarManualAneka = bayarSukses
-        .filter((r) => !hubPaymentIds.has(r.paymentId))
-        .reduce((a, r) => a + r.total, 0);
+      const { bayarAneka, bayarIds, bayarManualAneka } = biayaAnekaUntuk(resi);
 
       let estimasiModal = 0;
       let estimasiPacking = 0;
@@ -467,19 +529,16 @@ export async function ambilDataKeuangan(
         exec && ["menunggu", "berjalan", "gagal", "selesai"].includes(exec.status);
       estimasiPacking = akanDieksekusi ? ONGKOS_PACKING : 0;
 
-      let laba: number;
-      let labaRealisasi = false;
-      if (bayarAneka > 0) {
-        laba = omset - bayarAneka;
-        labaRealisasi = true;
-      } else if (estimasiModal > 0) {
-        laba = omset - estimasiModal - estimasiPacking;
-      } else {
-        laba = omset;
-      }
+      const { laba, labaRealisasi } = labaUntuk(
+        omset,
+        bayarAneka,
+        estimasiModal,
+        estimasiPacking,
+      );
 
       baris.push({
         orderId: o.order_id,
+        pasar: "TikTok",
         waktuMs: o.create_time * 1000,
         produk,
         qty,
@@ -498,11 +557,85 @@ export async function ambilDataKeuangan(
     }
   }
 
+  // 5b) Baris per paket Blibli (kunci package_id — satu paket = satu label
+  //     = satu slot resi Aneka). Omset = finalPrice × qty per item.
+  for (const p of blibliPackages) {
+    const exec = execByPkg.get(p.packageId);
+    let payload: BlibliExecPayload | null = null;
+    try {
+      payload = exec?.payload
+        ? (JSON.parse(exec.payload) as BlibliExecPayload)
+        : null;
+    } catch {
+      payload = null;
+    }
+    const resi =
+      payload?.awb_number ||
+      p.orderItems.map((i) => i.logistic?.awbNumber ?? "").find(Boolean) ||
+      "";
+    const produk = p.orderItems.map((i) => i.product.itemName).join(", ");
+    const qty = p.orderItems.reduce(
+      (a, i) => a + (i.order.quantity || 0),
+      0,
+    );
+    const omset = p.orderItems.reduce(
+      (a, i) =>
+        a +
+        (i.product.finalPrice || i.product.price || 0) *
+          (i.order.quantity || 0),
+      0,
+    );
+    const statusOrder = Array.from(
+      new Set(p.orderItems.map((i) => i.order.itemStatus)),
+    ).join(", ");
+    const waktuMs = p.orderItems.reduce(
+      (a, i) => Math.min(a, i.createdDate || i.order.date || a),
+      Number.MAX_SAFE_INTEGER,
+    );
+
+    const { bayarAneka, bayarIds, bayarManualAneka } = biayaAnekaUntuk(resi);
+
+    const estimasiModal = payload?.total_modal ?? 0;
+    const akanDieksekusi =
+      exec && ["menunggu", "berjalan", "gagal", "selesai"].includes(exec.status);
+    const estimasiPacking = akanDieksekusi ? ONGKOS_PACKING : 0;
+
+    const { laba, labaRealisasi } = labaUntuk(
+      omset,
+      bayarAneka,
+      estimasiModal,
+      estimasiPacking,
+    );
+
+    baris.push({
+      orderId: p.packageId,
+      pasar: "Blibli",
+      waktuMs: waktuMs === Number.MAX_SAFE_INTEGER ? 0 : waktuMs,
+      produk,
+      qty,
+      omset,
+      statusOrder,
+      statusExec: exec?.status ?? "",
+      resi,
+      bayarIds,
+      bayarAneka,
+      bayarManualAneka,
+      estimasiModal,
+      estimasiPacking,
+      laba,
+      labaRealisasi,
+    });
+  }
+
   // 6) Ringkasan.
   const dibatalkanStatus = new Set(["UNPAID", "CANCELLED"]);
-  const barisBeromset = baris.filter(
-    (b) => !dibatalkanStatus.has(b.statusOrder),
-  );
+  /** Batal = status batal TikTok, atau itemStatus X (Blibli) — paket Blibli
+   *  bisa berstatus campur ("X, D"). */
+  const isBatal = (b: BarisKeuangan) =>
+    b.pasar === "Blibli"
+      ? b.statusOrder.split(",").some((s) => s.trim() === "X")
+      : dibatalkanStatus.has(b.statusOrder);
+  const barisBeromset = baris.filter((b) => !isBatal(b));
   const omset = barisBeromset.reduce((a, b) => a + b.omset, 0);
 
   const dalamRentang = (r: AnekaPaymentRow) =>
@@ -513,8 +646,8 @@ export async function ambilDataKeuangan(
   const bayarAneka = bayarSukses.reduce((a, r) => a + r.total, 0);
 
   const resiOrderRentang = new Set(baris.map((b) => b.resi.trim()).filter(Boolean));
-  // Pembayaran via Hub yang resinya tidak cocok dengan order TikTok pada
-  // rentang ini (mis. order dibuat hari sebelumnya) — pembayaran manual
+  // Pembayaran via Hub yang resinya tidak cocok dengan order marketplace
+  // pada rentang ini (mis. order dibuat hari sebelumnya) — pembayaran manual
   // ditampilkan terpisah sebagai "Orderan Manual".
   const bayarTanpaOrder = bayarSukses.filter(
     (r) =>
@@ -523,8 +656,8 @@ export async function ambilDataKeuangan(
   );
 
   // Orderan manual: pembayaran Success di luar Hub, dipasangkan dengan
-  // order TikTok bila resinya cocok — biasanya order marketplace lain
-  // atau pesanan WhatsApp.
+  // order marketplace (TikTok/Blibli) bila resinya cocok — biasanya order
+  // dari marketplace lain atau pesanan WhatsApp.
   const orderIdByResi = new Map<string, string>();
   for (const b of baris) {
     if (b.resi && !orderIdByResi.has(b.resi.trim()))
@@ -550,7 +683,7 @@ export async function ambilDataKeuangan(
     .map(([resi, jumlah]) => ({ resi, jumlah }));
 
   const orderBatalTerbayar = baris.filter(
-    (b) => b.statusOrder === "CANCELLED" && b.bayarAneka > 0,
+    (b) => isBatal(b) && b.bayarAneka > 0,
   );
 
   // 7) Perkiraan top-up: saldo di awal rentang vs (saldo akhir + bayar).

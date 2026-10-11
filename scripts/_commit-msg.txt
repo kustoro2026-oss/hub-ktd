@@ -1,9 +1,14 @@
-feat: deteksi paket Blibli dikembalikan/gagal antar lewat riwayat detail API
+feat: dashboard keuangan hitung omset Blibli + pembayaran Blibli terdaftar sebagai Hub
 
-- blibli-resi.ts: item SUDAH diproses (notify ok/eksekusi) berstatus PU/PF/CX
-  dicek Order Detail V2 tiap 30 menit per item — riwayat histories yang memuat
-  kata return/retur/dikembalikan/gagal antar memicu notif WA minta refund Aneka
-  (dengan ID pembayaran + total modal), lalu notify jadi terminal "refund:"
-- jeda 30 menit memakai last_attempt_at sebagai penanda cek terakhir supaya
-  kuota API Blibli 100 req/30 menit tidak habis oleh tick tiap menit
-- db.ts: touchBlibliOrderSeen menyentuh last_attempt_at tanpa mengubah notify
+- keuangan.ts: paket Blibli ditarik semua halaman lalu disaring per createdDate
+  item (filter statusFPDateRange terbukti diabaikan API — teruji langsung dengan
+  3 rentang), baris per paket: omset = finalPrice × qty, resi = AWB, kunci
+  package_id, status gabungan itemStatus
+- hubPaymentIds kini gabungan tiktok_order_exec + blibli_order_exec (kolom
+  aneka_payment_id + jejak id di log) — pembayaran Aneka dari eksekusi Blibli
+  tidak lagi salah diklasifikasikan sebagai "Orderan Manual"
+- guard anti-dobel (bayarTanpaOrder, orderBatalTerbayar, pasangan bayarManual)
+  kini mencakup resi AWB Blibli; isBatal mengenali itemStatus X (termasuk paket
+  berstatus campur "X, D")
+- halaman: kartu "Omset Marketplace", kolom Pasar di tabel pesanan, label status
+  Blibli (X = Dibatalkan, D = Terkirim, dst.), teks dinetralkan dari "TikTok"
