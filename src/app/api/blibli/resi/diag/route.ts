@@ -147,7 +147,9 @@ export async function GET(request: Request) {
       package_id: p.packageId,
       lines: p.orderItems.length,
       items: p.orderItems.map((it) => ({
-        order_item_id: it.order.id,
+        // Kunci baris seen & path detail = order.itemId (Order item number).
+        order_item_id: it.order.itemId,
+        order_id: it.order.id,
         item_status: it.order.itemStatus,
         item_name: it.product.itemName,
         seller_sku: it.product.sellerSku,
@@ -242,7 +244,9 @@ export async function GET(request: Request) {
   }
   const fallback = list.data.packages
     .flatMap((p) => p.orderItems)
-    .find((x) => x.order.id === orderItemId);
+    .find(
+      (x) => x.order.id === orderItemId || x.order.itemId === orderItemId,
+    );
   const det = await detToSource(
     orderItemId,
     fallback?.product.itemName ?? "",

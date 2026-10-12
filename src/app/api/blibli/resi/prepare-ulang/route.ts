@@ -91,7 +91,7 @@ export async function POST(request: Request) {
             "Paket tidak ditemukan di antrean eksekusi maupun pesanan 30 hari terakhir — tidak ada yang diubah.",
         });
       }
-      itemIds = pkg.orderItems.map((x) => x.order.id);
+      itemIds = pkg.orderItems.map((x) => x.order.itemId);
       sumber = `daftar pesanan ${packageId}`;
     }
   }

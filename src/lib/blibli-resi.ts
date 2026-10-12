@@ -294,7 +294,7 @@ export async function sendResiForBlibliPackage(
     const found = await findBlibliPackage(packageId);
     if (found.ok) {
       for (const it of found.pkg.orderItems) {
-        await markBlibliOrderSeen(it.order.id, blibliEnv().storeCode, result);
+        await markBlibliOrderSeen(it.order.itemId, blibliEnv().storeCode, result);
       }
     }
   }
@@ -417,8 +417,12 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
 
   for (const p of packages) {
     for (const it of p.orderItems) {
-      const itemId = it.order.id;
-      const prev = seen.get(itemId);
+      // Kunci deteksi = order ITEM id Blibli (order.itemId) — nilai yang
+      // dipakai path API detail/pembatalan. Baris seen lama (sebelum
+      // perbaikan 12 Okt 2026) berkunci order.id — tetap dikenali lewat
+      // fallback supaya tidak ada notif/penantian ganda.
+      const itemId = it.order.itemId;
+      const prev = seen.get(itemId) ?? seen.get(it.order.id);
       const cancelled = it.order.itemStatus === "X";
       const isNew = it.order.itemStatus === "FP";
 
@@ -633,7 +637,7 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
       const detItems: DetItem[] = [];
       let detailGagal = false;
       for (const x of items) {
-        const d = await getBlibliOrderDetail(x.order.id);
+        const d = await getBlibliOrderDetail(x.order.itemId);
         if (!d.ok) {
           detailGagal = true;
           errors.push(`${p.packageId}: detail item ${x.order.id}: ${d.detail}`);
@@ -671,7 +675,7 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
         );
         for (const d of detItems) {
           await markSeen(
-            d.item.order.id,
+            d.item.order.itemId,
             res.startsWith("ok") ? `batal: ${res}` : "batal (tanpa kirim)",
           );
         }
@@ -727,7 +731,7 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
         const prep = await prepareBlibliExec(
           {
             package_id: p.packageId,
-            order_item_ids: items.map((x) => x.order.id),
+            order_item_ids: items.map((x) => x.order.itemId),
             store_name: BLIBLI_STORE_NAME,
             customer_name: detItems[0]?.customerName ?? "",
             items: srcItems,
@@ -739,7 +743,7 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
         );
         if (prep.ok) {
           for (const d of detItems) {
-            await markSeen(d.item.order.id, "eksekusi:menunggu");
+            await markSeen(d.item.order.itemId, "eksekusi:menunggu");
           }
           sent.push(
             `${BLIBLI_STORE_NAME} ${p.packageId} → menunggu persetujuan Aneka`,
@@ -773,7 +777,7 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
       });
       if (result.startsWith("ok")) {
         for (const d of detItems) {
-          await markSeen(d.item.order.id, result);
+          await markSeen(d.item.order.itemId, result);
         }
         sent.push(`${BLIBLI_STORE_NAME} ${p.packageId} → ${result}`);
         // Jelaskan KENAPA tidak dieksekusi otomatis — jangan biarkan

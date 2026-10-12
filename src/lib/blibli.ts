@@ -71,8 +71,14 @@ export type BlibliItemStatus =
 export type BlibliOrderItem = {
   createdDate: number; // epoch ms
   order: {
-    itemId: string; // id listing item
-    id: string; // id order item — kunci unik utk detail & pembatalan
+    /** Id ORDER Blibli — satu nomor per pembayaran, SAMA untuk semua item
+     *  dalam satu checkout. BUKAN kunci path API detail/pembatalan. */
+    id: string;
+    /** Id ORDER ITEM Blibli ("Order item number") — unik per baris item;
+     *  inilah nilai yang dipakai path API Order Detail V2 & pembatalan.
+     *  Terbukti 12 Okt 2026: detail dengan order.id → 500 ERR-PA500023,
+     *  dengan order.itemId → 200. */
+    itemId: string;
     customerFullName: string;
     type: string; // B2C_RETAIL, OFF2ON, dll.
     quantity: number;
@@ -281,7 +287,9 @@ export async function listBlibliOrders(
 }
 
 /** Order Detail V2 — GET /proxy/seller/v1/orders/items/{order-item-id}.
- *  Per order item; menyertakan variantName, alamat penerima, riwayat status. */
+ *  Path memakai order.itemId (Order item number), BUKAN order.id. Per
+ *  order item; menyertakan variantName, alamat penerima, riwayat status.
+ *  Berlaku untuk SEMUA status (FP, PU, PF, CX, D, X). */
 export async function getBlibliOrderDetail(
   orderItemId: string,
 ): Promise<BlibliResult<BlibliOrderDetail>> {
