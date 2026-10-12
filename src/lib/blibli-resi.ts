@@ -554,8 +554,12 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
       // notify "gagal" — mis. label tak terunduh sesaat setelah pengiriman
       // dikonfirmasi) boleh diulang; fulfill TIDAK diulang karena
       // getOfficialResiForPackage hanya fulfill saat FP — tinggal label.
+      // Begitu pula paket PU/PF/CX yang direset lewat "Siapkan ulang"
+      // (notify "menunggu" dengan epoch lama) — persiapan ulang TIDAK
+      // menyentuh status pesanan, hanya antrean eksekusi.
       const bisaUlangLabel =
-        prev?.notify.startsWith("gagal") &&
+        (prev?.notify.startsWith("gagal") ||
+          prev?.notify.startsWith("menunggu")) &&
         (it.order.itemStatus === "PU" ||
           it.order.itemStatus === "PF" ||
           it.order.itemStatus === "CX");
