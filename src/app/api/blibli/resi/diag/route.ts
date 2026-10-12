@@ -247,8 +247,11 @@ export async function GET(request: Request) {
     .find(
       (x) => x.order.id === orderItemId || x.order.itemId === orderItemId,
     );
+  // Bila yang diberikan adalah order.id (kunci lama sebelum perbaikan),
+  // detail tetap dipanggil dengan order.itemId — path API memakai itemId.
+  const detId = fallback?.order.itemId ?? orderItemId;
   const det = await detToSource(
-    orderItemId,
+    detId,
     fallback?.product.itemName ?? "",
     fallback?.product.sellerSku ?? "",
   );
