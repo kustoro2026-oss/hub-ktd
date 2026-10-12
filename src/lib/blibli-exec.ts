@@ -24,7 +24,7 @@ import {
   anekaCreatePayment,
   anekaFindOrderByPayment,
   anekaLogin,
-  anekaPaymentListed,
+  anekaPaymentEvidence,
   anekaProcessPayment,
   anekaResolveVariant,
   anekaVariantSave,
@@ -456,20 +456,27 @@ async function cariBuktiTerbayar(
     }
   }
   for (const id of kandidat) {
-    if (await anekaPaymentListed(session, id)) {
+    // "Terdaftar di riwayat" BUKAN bukti bayar sejak 2026-10 — payment
+    // Pending (belum dibayar) juga tampil di /payment-history. Bukti (b)
+    // hanya sah bila status barisnya non-Pending.
+    const ev = await anekaPaymentEvidence(session, id);
+    if (ev.found && !ev.pending) {
       return {
         paymentId: id,
         orderCode: "",
-        keterangan: `payment ${id} terdaftar di riwayat pembayaran`,
+        keterangan: `payment ${id} terdaftar di riwayat pembayaran (status ${ev.status || "non-pending"})`,
       };
     }
   }
-  if (resi && (await anekaPaymentListed(session, resi))) {
-    return {
-      paymentId: "",
-      orderCode: "",
-      keterangan: `nomor resi ${resi} sudah muncul di riwayat pembayaran`,
-    };
+  if (resi) {
+    const ev = await anekaPaymentEvidence(session, resi);
+    if (ev.found && !ev.pending) {
+      return {
+        paymentId: "",
+        orderCode: "",
+        keterangan: `nomor resi ${resi} sudah muncul di riwayat pembayaran (status ${ev.status || "non-pending"})`,
+      };
+    }
   }
   return null;
 }

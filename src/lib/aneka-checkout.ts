@@ -588,8 +588,11 @@ export async function anekaProcessPayment(
     // keranjang), jadi "200 + ada kode" TIDAK lagi cukup sebagai bukti
     // pesanan terbayar. Dua bukti yang bisa dipercaya: (a) kode numerik
     // ORDER-{payment_id}-{ts} yang memuat payment_id ini, atau (b) payment
-    // sudah terdaftar di /payment-history (yang belum dibayar tidak
-    // pernah terdaftar).
+    // sudah terdaftar di /payment-history DENGAN STATUS NON-PENDING.
+    // PERUBAHAN SITUS (terbukti 12 Okt 2026): payment yang BELUM dibayar
+    // (status Pending, tautan .../pembayaran/unfinish?status=pending) kini
+    // JUGA tampil di daftar riwayat — jadi sekadar "terdaftar" bukan bukti
+    // bayar; statusnya harus diperiksa.
     const found = await anekaFindOrderByPayment(s, paymentId);
     if (
       found.ok &&
@@ -598,8 +601,8 @@ export async function anekaProcessPayment(
     ) {
       return { ok: true };
     }
-    const listed = await anekaPaymentListed(s, paymentId);
-    if (listed) return { ok: true };
+    const ev = await anekaPaymentEvidence(s, paymentId);
+    if (ev.found && !ev.pending) return { ok: true };
     return {
       ok: false,
       detail: `Respons pembayaran tak dikenali dan payment ${paymentId} belum terbukti terbayar di riwayat — periksa manual sebelum mencoba lagi`,
@@ -653,18 +656,24 @@ export async function anekaFindOrderByPayment(
   }
 }
 
-/** Apakah needle (payment_id ATAU nomor resi) sudah terdaftar di daftar
- *  riwayat pembayaran resmi (/payment-history) — discan beberapa halaman
- *  pertama. Payment yang BELUM dibayar TIDAK pernah muncul di daftar ini
- *  meskipun halaman finish-nya menampilkan kode ORDER alfanumerik — jadi
- *  kehadiran di daftar adalah bukti pesanan benar-benar terbayar (dipakai
- *  cabang respons pembayaran yang tak dikenali dan pengaman anti-dobel). */
-export async function anekaPaymentListed(
+/** Bukti pembayaran di daftar /payment-history: apakah needle (payment_id
+ *  ATAU nomor resi) muncul, dan status barisnya. PERUBAHAN SITUS (terbukti
+ *  12 Okt 2026): payment yang BELUM dibayar — status Pending, tautan
+ *  .../pembayaran/unfinish?status=pending — kini JUGA tampil di daftar
+ *  ini, jadi kehadiran di daftar BUKAN lagi bukti terbayar; status harus
+ *  non-Pending (kasus: payment 237439 Pending dibaca terbayar oleh logika
+ *  lama, paket Blibli ditandai selesai padahal belum dibayar). */
+export type AnekaPaymentEvidence = {
+  found: boolean;
+  pending: boolean;
+  status: string;
+};
+export async function anekaPaymentEvidence(
   s: AnekaSession,
   needle: string,
   pages = 3,
-): Promise<boolean> {
-  if (!needle) return false;
+): Promise<AnekaPaymentEvidence> {
+  if (!needle) return { found: false, pending: false, status: "" };
   try {
     for (let page = 1; page <= pages; page++) {
       const res = await fetchRetry(
@@ -677,17 +686,26 @@ export async function anekaPaymentListed(
       // supaya id "236133" tidak tertabrak id lain yang memuatnya sebagai
       // substring (mis. "1236133"); needle non-angka (nomor resi) dicocokkan
       // sebagai teks biasa.
-      if (/^\d+$/.test(needle)) {
-        if (html.includes(`payment_id=${needle}`)) return true;
-      } else if (html.includes(needle)) {
-        return true;
+      const idx = /^\d+$/.test(needle)
+        ? html.indexOf(`payment_id=${needle}`)
+        : html.indexOf(needle);
+      if (idx < 0) {
+        // Halaman terakhir habis (404) → berhenti; galat sementara → lanjut.
+        if (res.status === 404) break;
+        continue;
       }
-      // Halaman terakhir habis (404) → berhenti; galat sementara → lanjut.
-      if (res.status === 404) break;
+      // Status barisnya: tautan detail memuat status=... (pending/success)
+      // dan badge status tertera setelahnya di baris yang sama.
+      const after = html.slice(idx, idx + 2000);
+      const stM = /status=(\w+)/.exec(after);
+      const status = stM?.[1] ?? "";
+      const pending =
+        /pending/i.test(status) || />\s*Pending\s*</.test(after);
+      return { found: true, pending, status };
     }
-    return false;
+    return { found: false, pending: false, status: "" };
   } catch {
-    return false;
+    return { found: false, pending: false, status: "" };
   }
 }
 
