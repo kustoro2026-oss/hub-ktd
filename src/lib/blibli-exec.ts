@@ -289,7 +289,7 @@ function parseUtcMs(s: string): number {
  *  menunda daripada membayar paket yang mungkin sudah batal). */
 async function blibliOrderStillActive(
   orderItemIds: string[],
-): Promise<{ ok: boolean; detail: string }> {
+): Promise<{ ok: boolean; detail: string; awbNumber?: string }> {
   if (orderItemIds.length === 0) {
     return {
       ok: false,
@@ -300,6 +300,10 @@ async function blibliOrderStillActive(
   let gagal: string | null = null;
   let batal = 0;
   let statusTerakhir = "";
+  // AWB riil dari detail (shipment.airwayBill) — untuk paket PICKUP baru
+  // tersedia setelah fulfill; dipakai sebagai pengganti payload.awb_number
+  // yang mungkin kosong (diambil dari daftar SEBELUM fulfill).
+  let awbNumber = "";
   for (const id of orderItemIds) {
     const d = await getBlibliOrderDetail(id);
     if (!d.ok) {
@@ -311,6 +315,12 @@ async function blibliOrderStillActive(
       batal++;
     } else {
       statusTerakhir = st;
+    }
+    if (!awbNumber) {
+      const shipment = d.data.shipment as
+        | { airwayBill?: { number?: string | number } }
+        | undefined;
+      awbNumber = String(shipment?.airwayBill?.number ?? "").trim();
     }
   }
   if (gagal) {
@@ -332,7 +342,7 @@ async function blibliOrderStillActive(
         "Sebagian item pesanan dibatalkan pembeli — eksekusi dihentikan demi keamanan (proses manual)",
     };
   }
-  return { ok: true, detail: statusTerakhir || "aktif" };
+  return { ok: true, detail: statusTerakhir || "aktif", awbNumber };
 }
 
 /** Nomor resi dari payload baris eksekusi (tahan payload rusak). */
@@ -694,6 +704,21 @@ export async function executeBlibliOrder(
   }
   await logStep("cek-pesanan", `pesanan masih aktif (status ${aktif.detail})`);
 
+  // Nomor resi paket PICKUP baru tersedia setelah fulfill — payload.awb_number
+  // bisa kosong (diambil dari daftar sebelum fulfill). Pakai AWB terbaru dari
+  // detail dan simpan ke payload supaya langkah pembayaran, anti-dobel, dan
+  // percobaan berikutnya memakai nomor yang benar.
+  const awbFinal = (payload.awb_number ?? "").trim() || (aktif.awbNumber ?? "");
+  if (awbFinal && awbFinal !== (payload.awb_number ?? "").trim()) {
+    payload = { ...payload, awb_number: awbFinal };
+    await saveBlibliOrderExec({
+      package_id: packageId,
+      status: "berjalan",
+      payload: JSON.stringify(payload),
+    });
+    await logStep("cek-pesanan", `nomor resi diambil dari detail Blibli — ${awbFinal}`);
+  }
+
   // PENGAMAN ANTI-DOBEL: sebelum membayar, pastikan percobaan-percobaan
   // sebelumnya belum benar-benar membayar paket ini di Aneka — cek riwayat
   // berdasarkan payment_id tersimpan/tercatat dan nomor resi (unik per
@@ -724,7 +749,7 @@ export async function executeBlibliOrder(
           loginG.session,
           row.aneka_payment_id,
           row.log,
-          payload.awb_number,
+          awbFinal,
         );
         if (bukti) {
           await logStep(
@@ -860,7 +885,7 @@ export async function executeBlibliOrder(
     tok.token,
     tok.itemResiIds,
     {
-      number: payload.awb_number,
+      number: awbFinal,
       pdf: Buffer.from(payload.label_pdf_base64, "base64"),
     },
   );
@@ -870,7 +895,7 @@ export async function executeBlibliOrder(
   }
   await logStep(
     "pembayaran/process",
-    `berhasil — bayar saldo wallet + upload label ${payload.awb_number}`,
+    `berhasil — bayar saldo wallet + upload label ${awbFinal}`,
   );
 
   // 4. Konfirmasi lewat halaman detail riwayat pembayaran Aneka (kunci
@@ -889,7 +914,10 @@ export async function executeBlibliOrder(
   await saveBlibliOrderExec({
     package_id: packageId,
     status: "selesai",
-    payload: row.payload,
+    // Payload terkini (varian ter-resolve + awb_number yang diperkaya dari
+    // detail) — bukan payload awal, supaya baris selesai menampilkan resi
+    // dan varian yang benar-benar dipakai.
+    payload: JSON.stringify(payload),
     aneka_payment_id: pay.paymentId,
     aneka_order_id: anekaId,
     detail: "",

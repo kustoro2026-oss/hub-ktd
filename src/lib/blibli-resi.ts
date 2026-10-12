@@ -550,7 +550,16 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
       // Gerbang status: hanya item FP (pesanan baru penjual) yang diproses.
       // C belum lolos Fraud Pass (nanti berubah jadi FP), PU/PF/CX sudah
       // dikirim, D selesai, OS/BP/CR bukan alur pengiriman biasa.
-      if (!isNew) continue;
+      // PENGECUALIAN: paket yang gagal SETELAH fulfill (status PU/PF/CX dan
+      // notify "gagal" — mis. label tak terunduh sesaat setelah pengiriman
+      // dikonfirmasi) boleh diulang; fulfill TIDAK diulang karena
+      // getOfficialResiForPackage hanya fulfill saat FP — tinggal label.
+      const bisaUlangLabel =
+        prev?.notify.startsWith("gagal") &&
+        (it.order.itemStatus === "PU" ||
+          it.order.itemStatus === "PF" ||
+          it.order.itemStatus === "CX");
+      if (!isNew && !bisaUlangLabel) continue;
 
       // Mode baseline: tandai saja item lama, jangan kirim resi.
       if (!prev && baseline) {
@@ -633,6 +642,9 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
         customerName: string;
         /** itemSku dari detail (atau list) — bahan kunci productSku. */
         blibliSku: string;
+        /** Nomor resi riil dari detail (shipment.airwayBill) — untuk paket
+         *  PICKUP baru muncul setelah fulfill, jadi daftar tidak memuatnya. */
+        awb: string;
       };
       const detItems: DetItem[] = [];
       let detailGagal = false;
@@ -644,6 +656,9 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
           break;
         }
         const st = String(d.data.status ?? "");
+        const shipment = d.data.shipment as
+          | { airwayBill?: { number?: string | number } }
+          | undefined;
         detItems.push({
           item: x,
           variantName: String(d.data.product?.variantName ?? ""),
@@ -653,6 +668,7 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
           blibliSku: String(
             d.data.product?.blibliSku ?? x.product.blibliSku ?? "",
           ),
+          awb: String(shipment?.airwayBill?.number ?? "").trim(),
         });
       }
       if (detailGagal) {
@@ -710,9 +726,13 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
         : await checkBlibliExecutable(srcItems);
 
       const first = aktif[0]?.item ?? items[0];
+      // AWB dari detail (shipment.airwayBill) lebih akurat daripada logistic
+      // di daftar — paket PICKUP baru mendapat nomor resi setelah fulfill,
+      // jadi detail yang diambil saat status PU memuatnya, daftar tidak.
+      const awbDetail = detItems.map((d) => d.awb).find((a) => a !== "") ?? "";
       const pkgInfo: BlibliPackageInfo = {
         itemStatus: first?.order.itemStatus,
-        awbNumber: first?.logistic?.awbNumber,
+        awbNumber: awbDetail || first?.logistic?.awbNumber,
         cashlessHandover: first?.flag?.cashlessHandover,
         sellerDeliveryType: first?.sellerDeliveryType,
       };
