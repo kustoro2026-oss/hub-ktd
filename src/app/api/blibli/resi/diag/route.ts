@@ -22,6 +22,7 @@ import { blibliEnv, blibliProductSku, getBlibliOrderDetail, listBlibliOrders } f
 import { checkBlibliExecutable, type BlibliExecSourceItem } from "@/lib/blibli-exec";
 import {
   getBlibliOrderExec,
+  listBlibliOrderExecs,
   listBlibliProductMaps,
   listSeenBlibliOrders,
 } from "@/lib/db";
@@ -224,6 +225,35 @@ export async function GET(request: Request) {
     out.paket_diaudit = hasil.length;
     out.hasil = hasil;
     out.ringkasan = { bisa_otomatis: bisa, manual };
+    return Response.json(out);
+  }
+
+  // Mode antrean: baris eksekusi dari DATABASE saja — TANPA panggilan API
+  // Blibli (aman dipakai saat kuota detail habis).
+  if (mode === "queue") {
+    const pkg = url.searchParams.get("package_id") ?? "";
+    const rows = await listBlibliOrderExecs();
+    out.antrean = rows
+      .filter((r) => !pkg || r.package_id === pkg)
+      .map((r) => {
+        let payloadAwb = "";
+        try {
+          const pl = JSON.parse(r.payload) as { awb_number?: string };
+          payloadAwb = pl.awb_number ?? "";
+        } catch {
+          payloadAwb = "(payload rusak)";
+        }
+        return {
+          package_id: r.package_id,
+          status: r.status,
+          detail: r.detail,
+          aneka_payment_id: r.aneka_payment_id,
+          aneka_order_id: r.aneka_order_id,
+          executed_at: r.executed_at,
+          payload_awb: payloadAwb,
+          log: r.log.split("\n").slice(-40).join("\n"),
+        };
+      });
     return Response.json(out);
   }
 

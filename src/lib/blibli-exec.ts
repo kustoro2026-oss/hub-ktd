@@ -286,13 +286,17 @@ function parseUtcMs(s: string): number {
 /** Pastikan SEMUA item paket belum dibatalkan pembeli — dipanggil TEPAT
  *  sebelum rantai pembayaran supaya saldo Aneka tidak terpakai untuk paket
  *  yang batal di tengah antrean. Verifikasi gagal = hentikan (lebih aman
- *  menunda daripada membayar paket yang mungkin sudah batal). */
+ *  menunda daripada membayar paket yang mungkin sudah batal).
+ *  batal=true hanya untuk pembatalan SUNGGAHAN (dari pihak pembeli) —
+ *  kegagalan teknis (kuota API habis, jaringan) batal=false supaya baris
+ *  antrean TIDAK ditutup, cukup dicoba lagi nanti. */
 async function blibliOrderStillActive(
   orderItemIds: string[],
-): Promise<{ ok: boolean; detail: string; awbNumber?: string }> {
+): Promise<{ ok: boolean; detail: string; awbNumber?: string; batal?: boolean }> {
   if (orderItemIds.length === 0) {
     return {
       ok: false,
+      batal: false,
       detail:
         "Daftar item paket kosong — status pesanan tidak bisa diverifikasi, eksekusi dihentikan",
     };
@@ -324,20 +328,34 @@ async function blibliOrderStillActive(
     }
   }
   if (gagal) {
+    // Bila penyebabnya kuota habis (LIMIT_EXCEEDED), sertakan perkiraan
+    // waktu WIB kapan boleh dicoba lagi — pesan API memuat detik tersisa.
+    const tunggu = /Try again after (\d+) seconds/.exec(gagal);
+    const petunjuk = tunggu
+      ? `\nKira-kira bisa dicoba lagi pukul ${utcKeWibJam(
+          new Date(Date.now() + Number(tunggu[1]) * 1000)
+            .toISOString()
+            .slice(0, 19)
+            .replace("T", " "),
+        )} WIB.`
+      : "";
     return {
       ok: false,
-      detail: `Status pesanan Blibli tidak bisa diverifikasi (${gagal}) — eksekusi dihentikan demi keamanan, coba lagi nanti`,
+      batal: false,
+      detail: `Status pesanan Blibli tidak bisa diverifikasi (${gagal}) — eksekusi dihentikan demi keamanan, coba lagi nanti${petunjuk}`,
     };
   }
   if (batal === orderItemIds.length) {
     return {
       ok: false,
+      batal: true,
       detail: "Pesanan dibatalkan pembeli — eksekusi dihentikan",
     };
   }
   if (batal > 0) {
     return {
       ok: false,
+      batal: true,
       detail:
         "Sebagian item pesanan dibatalkan pembeli — eksekusi dihentikan demi keamanan (proses manual)",
     };
@@ -697,6 +715,21 @@ export async function executeBlibliOrder(
   if (!aktif.ok) {
     await logStep("cek-pesanan", `GAGAL — ${aktif.detail}`);
     const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+    if (!aktif.batal) {
+      // Kegagalan TEKNIS (kuota API habis, jaringan, dll.) — bukan
+      // pembatalan. Baris jangan ditutup: kembalikan ke "gagal" supaya
+      // pemilik bisa menekan Setuju lagi saat gangguan lewat.
+      await saveBlibliOrderExec({
+        package_id: packageId,
+        status: "gagal",
+        payload: row.payload,
+        detail: aktif.detail,
+      });
+      await sendExecNotice(
+        `Eksekusi Aneka DITUNDA untuk paket Blibli ${packageId}: ${aktif.detail}\nCoba lagi: ${EKSEKUSI_URL}?order=${packageId}`,
+      );
+      return { ok: false, detail: aktif.detail };
+    }
     await saveBlibliOrderExec({
       package_id: packageId,
       status: "batal",
