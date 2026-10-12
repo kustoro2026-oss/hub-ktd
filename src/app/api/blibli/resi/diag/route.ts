@@ -174,7 +174,7 @@ export async function GET(request: Request) {
     for (const p of list.data.packages.slice(0, 30)) {
       const dets = await Promise.all(
         p.orderItems.map((x) =>
-          detToSource(x.order.id, x.product.itemName, x.product.sellerSku),
+          detToSource(x.order.itemId, x.product.itemName, x.product.sellerSku),
         ),
       );
       const gagal = dets.filter(
