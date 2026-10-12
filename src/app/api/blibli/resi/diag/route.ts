@@ -275,11 +275,22 @@ export async function GET(request: Request) {
   if (det.packageId) {
     const row = await getBlibliOrderExec(det.packageId);
     if (row) {
+      let payloadAwb = "";
+      try {
+        const pl = JSON.parse(row.payload) as { awb_number?: string };
+        payloadAwb = pl.awb_number ?? "";
+      } catch {
+        payloadAwb = "(payload rusak)";
+      }
       out.exec_row = {
         status: row.status,
         detail: row.detail,
         aneka_payment_id: row.aneka_payment_id,
         aneka_order_id: row.aneka_order_id,
+        executed_at: row.executed_at,
+        payload_awb: payloadAwb,
+        // Jejak langkah eksekusi — potongan terakhir cukup untuk diagnosa.
+        log: row.log.split("\n").slice(-40).join("\n"),
       };
     }
   }
