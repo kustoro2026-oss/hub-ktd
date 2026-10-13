@@ -65,6 +65,7 @@ export type InboundMessage = {
   kind:
     | "general"
     | "order"
+    | "topup"
     | "ad"
     | "faq"
     | "question"

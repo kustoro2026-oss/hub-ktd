@@ -18,14 +18,15 @@ export const SPAM_MAX_MESSAGES = 8;
  *  - "spam"   : nomor membanjiri pesan → bot tidak membalas, AI tidak
  *               dipanggil (menghemat kredit).
  *  - null     : jawab normal.
- *  Pesanan (kind "order") selalu lolos supaya orderan asli tidak pernah
- *  terlewat. */
+ *  Pesanan (kind "order") dan cek status top-up (kind "topup") selalu
+ *  lolos supaya orderan asli tidak pernah terlewat. */
 export function spamDecision(
   kind: string,
   blocked: boolean,
   recentCount: number,
 ): "blocked" | "spam" | null {
   if (blocked) return "blocked";
-  if (kind !== "order" && recentCount >= SPAM_MAX_MESSAGES) return "spam";
+  if (kind !== "order" && kind !== "topup" && recentCount >= SPAM_MAX_MESSAGES)
+    return "spam";
   return null;
 }

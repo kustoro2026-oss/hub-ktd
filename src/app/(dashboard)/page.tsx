@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 const KIND_LABELS: Record<string, string> = {
   general: "Umum",
   order: "Pesanan",
+  topup: "Top Up",
   ad: "Iklan",
   faq: "FAQ",
   question: "Pertanyaan",

@@ -26,6 +26,7 @@ import {
   type WaMessage,
 } from "@/lib/replies";
 import { notifyOrderOwner, sendText } from "@/lib/wa";
+import { extractTopupOrderId, replyForTopupOrder } from "@/lib/topup-reply";
 import { answerWithAi } from "@/lib/ai-reply";
 import { SPAM_WINDOW_MINUTES, spamDecision } from "@/lib/spam";
 import { runDueScheduledBroadcasts } from "@/lib/broadcast-send";
@@ -88,7 +89,19 @@ export async function POST(request: Request) {
           let kind: ReplyKind;
           let reply: string;
           if (isText) {
-            ({ kind, reply } = pickReply(m));
+            // Pesan yang menyebut No. Pesanan top-up (KTD-xxx) → balas
+            // status pesanan GRATIS (window 24 jam dari pesan masuk).
+            // Tidak cocok / bukan top-up → klasifikasi biasa.
+            const topupId = extractTopupOrderId(body);
+            const topupReply = topupId
+              ? await replyForTopupOrder(topupId, m.from)
+              : null;
+            if (topupReply) {
+              kind = "topup";
+              reply = topupReply;
+            } else {
+              ({ kind, reply } = pickReply(m));
+            }
           } else {
             // Foto/dokumen: dicatat tanpa balasan otomatis, kecuali dianggap
             // bukti transfer (lihat pengecekan di bawah).

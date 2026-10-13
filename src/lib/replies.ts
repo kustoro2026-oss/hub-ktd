@@ -144,6 +144,7 @@ export function isProofOfTransfer(m: WaMessage): boolean {
 export type ReplyKind =
   | "general"
   | "order"
+  | "topup"
   | "ad"
   | "faq"
   | "question"
