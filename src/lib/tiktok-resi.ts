@@ -61,10 +61,18 @@ import {
   sendText,
 } from "@/lib/wa";
 
-/** Batas percobaan kirim ulang untuk pesanan yang resinya gagal terkirim.
+/** Batas percobaan KIRIM CEPAT untuk pesanan yang resinya gagal terkirim.
  *  Dengan jeda RETRY_COOLDOWN_MS antar percobaan, batas ini mencakup
- *  sekitar 6 jam pemulihan (label belum tersedia, situs sibuk, dll.). */
+ *  sekitar 6 jam pemulihan (label belum tersedia, situs sibuk, dll.).
+ *  Setelah batas ini tercapai pesanan TIDAK berhenti — percobaan berlanjut
+ *  dengan jeda panjang EXHAUSTED_RETRY_MS sampai berhasil. */
 const MAX_SEND_ATTEMPTS = 12;
+
+/** Jeda panjang antar percobaan SETELAH batas percobaan cepat habis —
+ *  pesanan tidak pernah mati senyap: kegagalan sementara (mis. slot
+ *  penjemputan TikTok habis untuk hari ini) pulih sendiri begitu slot
+ *  tersedia lagi. 4 jam ≈ cukup untuk slot hari berikutnya dirilis. */
+const EXHAUSTED_RETRY_MS = 4 * 60 * 60 * 1000;
 
 /** Jeda minimal antar percobaan ulang pesanan yang gagal. Penting karena
  *  pengecekan bisa berjalan tiap menit (tab admin terbuka) — tanpa jeda,
@@ -503,6 +511,25 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
       const cancelled =
         o.order_status === "CANCELLED" || o.order_status === "CANCELED";
 
+      /** Catat kegagalan pemrosesan pesanan + kabari pemilik SEKALI saat
+       *  batas percobaan cepat tercapai — supaya kegagalan berkepanjangan
+       *  tidak berjalan senyap. Percobaan panjang tetap berlanjut. */
+      async function recordFailure(shopName: string, alasan: string) {
+        const akanHabis =
+          prev != null && prev.attempts + 1 === MAX_SEND_ATTEMPTS;
+        await recordTiktokOrderFailure(o.order_id, shop.shop_id, alasan);
+        if (akanHabis) {
+          const notice = await sendOwnerNotice(
+            `Pesanan TikTok Shop ${o.order_id} belum bisa diproses otomatis setelah ${MAX_SEND_ATTEMPTS} percobaan — ${alasan}. Sistem akan terus mencoba ulang setiap ${EXHAUSTED_RETRY_MS / 3600000} jam; untuk mempercepat, silakan atur pengiriman manual di aplikasi TikTok Shop (Pesanan → Atur Pengiriman).`,
+          );
+          if (!notice.startsWith("ok")) {
+            errors.push(
+              `${shopName}: ${o.order_id}: notif eskalasi gagal: ${notice}`,
+            );
+          }
+        }
+      }
+
       // Gerbang status: hanya pesanan berbayar yang belum selesai yang
       // dianggap "baru". UNPAID belum dibayar — bila nanti dibayar,
       // statusnya berubah dan diproses saat itu. COMPLETED adalah pesanan
@@ -681,9 +708,17 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
         continue;
       }
 
-      // Sudah gagal berkali-kali — berhenti mencoba (resi tetap bisa
-      // dibuka manual dari halaman Pesanan).
-      if (prev.attempts >= MAX_SEND_ATTEMPTS) continue;
+      // Sudah gagal berkali-kali — jangan berhenti total: percobaan cepat
+      // habis bukan berarti menyerah. Lanjutkan dengan jeda panjang
+      // EXHAUSTED_RETRY_MS sampai berhasil (mis. slot penjemputan TikTok
+      // habis hari ini → pulih sendiri saat slot hari berikutnya dirilis).
+      if (
+        prev.attempts >= MAX_SEND_ATTEMPTS &&
+        prev.last_attempt_at &&
+        Date.now() - parseUtcMs(prev.last_attempt_at) < EXHAUSTED_RETRY_MS
+      ) {
+        continue;
+      }
 
       // Percobaan ulang diberi jeda — bila pengecekan berjalan tiap menit
       // (tab admin terbuka), tanpa jeda ini kegagalan sementara langsung
@@ -710,7 +745,7 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
       if (!detail.ok) {
         const alasan = `gagal: detail pesanan tidak bisa diambil (${detail.detail}) — paket & qty tidak bisa dipastikan, proses manual`;
         errors.push(`${shop.shop_name}: ${o.order_id}: ${alasan}`);
-        await recordTiktokOrderFailure(o.order_id, shop.shop_id, alasan);
+        await recordFailure(shop.shop_name, alasan);
         continue;
       }
       const det = detail.orders.find((d) => d.id === o.order_id);
@@ -720,7 +755,7 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
       if (pkgs.length > 1) {
         const alasan = `gagal: pesanan multi-paket (${pkgs.length} paket) — eksekusi Aneka hanya satu slot resi, proses manual`;
         errors.push(`${shop.shop_name}: ${o.order_id}: ${alasan}`);
-        await recordTiktokOrderFailure(o.order_id, shop.shop_id, alasan);
+        await recordFailure(shop.shop_name, alasan);
         continue;
       }
       // Bangun ulang item pesanan dari detail (sumber qty/varian resmi).
@@ -747,11 +782,7 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
         const official = await getOfficialResiForCred(cred, o.order_id);
         if (!official.ok) {
           errors.push(`${shop.shop_name}: ${o.order_id}: ${official.detail}`);
-          await recordTiktokOrderFailure(
-            o.order_id,
-            shop.shop_id,
-            `gagal: ${official.detail}`,
-          );
+          await recordFailure(shop.shop_name, `gagal: ${official.detail}`);
           continue;
         }
         const prep = await prepareAnekaExec(
@@ -776,11 +807,7 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
           );
         } else {
           errors.push(`${shop.shop_name}: ${o.order_id}: ${prep.detail}`);
-          await recordTiktokOrderFailure(
-            o.order_id,
-            shop.shop_id,
-            `gagal: ${prep.detail}`,
-          );
+          await recordFailure(shop.shop_name, `gagal: ${prep.detail}`);
         }
         continue;
       }
@@ -789,11 +816,7 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
       const official = await getOfficialResiForCred(cred, o.order_id);
       if (!official.ok) {
         errors.push(`${shop.shop_name}: ${o.order_id}: ${official.detail}`);
-        await recordTiktokOrderFailure(
-          o.order_id,
-          shop.shop_id,
-          `gagal: ${official.detail}`,
-        );
+        await recordFailure(shop.shop_name, `gagal: ${official.detail}`);
         continue;
       }
 
@@ -811,7 +834,7 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
         );
       } else {
         errors.push(`${shop.shop_name}: ${o.order_id}: ${result}`);
-        await recordTiktokOrderFailure(o.order_id, shop.shop_id, result);
+        await recordFailure(shop.shop_name, result);
       }
     }
   }
@@ -855,9 +878,20 @@ async function arrangeShipment(
       .filter((s) => s.available && s.start_time >= now)
       .sort((a, b) => a.start_time - b.start_time)[0];
     if (!slot) {
+      // Sebutkan slot berikutnya (walau belum tersedia/penuh) supaya
+      // alasan kegagalan jelas — pemilik tahu kapan sistem akan mencoba
+      // lagi alih-alih hanya membaca "tidak ada slot".
+      const next = slots.pickup_slots
+        .filter((s) => s.start_time >= now)
+        .sort((a, b) => a.start_time - b.start_time)[0];
       return {
         ok: false,
-        result: "Tidak ada slot penjemputan yang tersedia saat ini",
+        result: next
+          ? `Tidak ada slot penjemputan tersedia saat ini — slot terdekat ${formatSlotWib(
+              next.start_time,
+              next.end_time,
+            )}`
+          : "Tidak ada slot penjemputan yang tersedia saat ini",
       };
     }
     const ship = await shipPackage(cred, packageId, {
