@@ -196,6 +196,59 @@ function plainRows<T>(rows: unknown[]): T[] {
   return rows.map((r) => ({ ...(r as Record<string, unknown>) })) as T[];
 }
 
+// ---------- operasional: backup + kesehatan ----------
+
+/** Daftar nama tabel data di backend aktif — dibaca dari katalog schema
+ *  sehingga otomatis mengikuti tabel baru tanpa perlu diedit manual.
+ *  ops_backups dikecualikan supaya dump tidak membesar rekursif. */
+export async function opsListTables(): Promise<string[]> {
+  if (dbMode() === "pg") {
+    const rows = await queryAll<{ tablename: string }>(
+      "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename",
+    );
+    return rows.map((r) => r.tablename).filter((t) => t !== "ops_backups");
+  }
+  const rows = await queryAll<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
+  );
+  return rows.map((r) => r.name).filter((t) => t !== "ops_backups");
+}
+
+/** Dump isi semua tabel menjadi satu objek JSON (backup mingguan). */
+export async function opsDumpTables(): Promise<{
+  dumpedAt: string;
+  tables: Record<string, unknown[]>;
+}> {
+  const names = await opsListTables();
+  const tables: Record<string, unknown[]> = {};
+  for (const t of names) {
+    try {
+      tables[t] = await queryAll<Record<string, unknown>>(
+        `SELECT * FROM ${t} ORDER BY 1`,
+      );
+    } catch {
+      tables[t] = []; // tabel tak terbaca — tetap lanjut dump tabel lain
+    }
+  }
+  return { dumpedAt: new Date().toISOString(), tables };
+}
+
+/** Simpan snapshot dump ke tabel ops_backups (rotasi: sisakan 4 terakhir). */
+export async function opsStoreBackup(dump: unknown): Promise<void> {
+  await queryRun("INSERT INTO ops_backups (name, data) VALUES (?, ?)", [
+    new Date().toISOString().slice(0, 10),
+    JSON.stringify(dump),
+  ]);
+  await queryRun(
+    "DELETE FROM ops_backups WHERE id NOT IN (SELECT id FROM ops_backups ORDER BY id DESC LIMIT 4)",
+  );
+}
+
+/** Uji koneksi DB sederhana (dipakai pemantauan kesehatan). */
+export async function opsHealthCheck(): Promise<void> {
+  await queryRun("SELECT 1");
+}
+
 // ---------- migrasi ----------
 
 function migrateSqlite(db: DatabaseSync) {
@@ -379,6 +432,13 @@ function migrateSqlite(db: DatabaseSync) {
     );
     CREATE INDEX IF NOT EXISTS idx_topup_orders_created
       ON topup_orders (created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS ops_backups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL DEFAULT '',
+      data TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
   `);
 
   // Migrasi DB lama: kolom shop_cipher untuk panggilan API pesanan.
@@ -714,6 +774,13 @@ async function migratePg(pool: Pool) {
     );
     CREATE INDEX IF NOT EXISTS idx_topup_orders_created
       ON topup_orders (created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS ops_backups (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL DEFAULT '',
+      data TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
   `);
 
   // Migrasi skema awal blibli_order_exec (kunci order_item_id → package_id),

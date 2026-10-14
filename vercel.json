@@ -19,6 +19,14 @@
     {
       "path": "/api/keuangan/refresh",
       "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/ops/health",
+      "schedule": "0 1 * * *"
+    },
+    {
+      "path": "/api/ops/backup",
+      "schedule": "0 2 * * 0"
     }
   ]
 }
