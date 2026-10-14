@@ -1,9 +1,20 @@
 // Login admin KTD Hub — bandingkan password dengan AUTH_PASSWORD, lalu set
 // cookie sesi bertanda tangan HMAC (AUTH_SECRET) selama 7 hari.
+//
+// Brute-force guard: maks 15 percobaan / 15 menit per IP (in-memory per
+// instance, lihat lib/rate-limit.ts).
 import { cookies } from "next/headers";
 import { buildSessionValue, SESSION_COOKIE } from "@/lib/auth";
+import { clientIp, rateLimitHit } from "@/lib/rate-limit";
 
 export async function POST(request: Request) {
+  if (rateLimitHit(`login:${clientIp(request)}`, 15 * 60_000, 15)) {
+    return Response.json(
+      { ok: false, error: "Terlalu banyak percobaan login. Coba lagi nanti." },
+      { status: 429 },
+    );
+  }
+
   let body: { password?: string } = {};
   try {
     body = (await request.json()) as { password?: string };
