@@ -16,19 +16,27 @@
 //    → audit menyeluruh: semua pesanan terbaru diperiksa dengan logika
 //      produksi yang sama (resolveLineQty + checkAnekaExecutable) — hasil
 //      per pesanan: bisa eksekusi otomatis atau TIDAK + alasannya.
+// 5. GET /api/tiktok/resi/diag?secret=...&mode=seen
+//    → dump tabel tiktok_order_seen (status notif tiap pesanan + percobaan).
+// 6. GET /api/tiktok/resi/diag?order_id=...&secret=...&mode=slots
+//    → slot penjemputan/drop-off paket pesanan (read-only) — untuk memeriksa
+//      kenapa label resmi belum tersedia.
 import { checkAnekaExecutable } from "@/lib/aneka-exec";
 import { findAnekaCatalogById } from "@/lib/aneka-map";
 import {
   getTiktokOrderExec,
   listAnekaProductMaps,
+  listSeenTiktokOrders,
   listTiktokShopTokens,
 } from "@/lib/db";
 import {
+  getPackageHandoverTimeSlots,
   getTiktokOrderDetail,
   getTiktokOrders,
   resolveLineQty,
   type TiktokOrderSummary,
 } from "@/lib/tiktok";
+import { formatSlotWib } from "@/lib/tiktok-label";
 import { prepareShop } from "@/lib/tiktok-orders";
 
 export const dynamic = "force-dynamic";
@@ -104,6 +112,20 @@ export async function GET(request: Request) {
                 : "",
       };
     });
+    return Response.json(out);
+  }
+
+  // Mode seen: dump tabel tiktok_order_seen — status notif tiap pesanan.
+  if (mode === "seen") {
+    const rows = await listSeenTiktokOrders();
+    out.total = rows.length;
+    out.seen = rows.map((s) => ({
+      order_id: s.order_id,
+      shop_id: s.shop_id,
+      notify: s.notify,
+      attempts: Number(s.attempts ?? 0),
+      last_attempt_at: s.last_attempt_at,
+    }));
     return Response.json(out);
   }
 
@@ -195,6 +217,37 @@ export async function GET(request: Request) {
     }
     out.status = d.status;
     out.packages = (d.package_list ?? []).length;
+    // Mode slots: daftar slot penjemputan paket (read-only) — sumber utama
+    // alasan "label belum tersedia" saat slot TikTok habis.
+    if (mode === "slots") {
+      const pkgId = (d.package_list ?? [])[0]?.id;
+      if (!pkgId) {
+        out.slots_error = "pesanan tanpa paket";
+        break;
+      }
+      const slots = await getPackageHandoverTimeSlots(cred, pkgId);
+      if (!slots.ok) {
+        out.slots_error = slots.detail;
+        break;
+      }
+      const now = Math.floor(Date.now() / 1000);
+      const ringkas = (s: { start_time: number; end_time: number }) => ({
+        start: s.start_time,
+        end: s.end_time,
+        label: formatSlotWib(s.start_time, s.end_time),
+      });
+      out.can_pickup = slots.can_pickup;
+      out.can_drop_off = slots.can_drop_off;
+      out.slot_tersedia = slots.pickup_slots
+        .filter((s) => s.available && s.start_time >= now)
+        .map(ringkas);
+      out.slot_berikutnya = slots.pickup_slots
+        .filter((s) => s.start_time >= now)
+        .sort((a, b) => a.start_time - b.start_time)
+        .slice(0, 3)
+        .map(ringkas);
+      break;
+    }
     out.line_items = ringkasLineItems(d.line_items);
     // Dump mentah: hanya line_items & packages dari respons TikTok (bukan
     // data pembeli) — untuk melihat field qty yang sebenarnya dikirim.

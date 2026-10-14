@@ -37,6 +37,7 @@ import {
 } from "@/lib/db";
 import { getTiktokOrderDetail, type TiktokOrderSummary } from "@/lib/tiktok";
 import { prepareShop } from "@/lib/tiktok-orders";
+import { getOfficialResiForOrder } from "@/lib/tiktok-label";
 import {
   NOTIF_TEMPLATE,
   ownerNumber,
@@ -181,7 +182,7 @@ export async function checkAnekaExecutable(
 export async function prepareAnekaExec(
   shop: { shop_id: string; shop_name: string },
   order: TiktokOrderSummary,
-  official: AnekaExecOfficial,
+  official: AnekaExecOfficial | null,
   opts: { resendNotice?: boolean } = {},
 ): Promise<{ ok: boolean; detail: string }> {
   const existing = await getTiktokOrderExec(order.order_id);
@@ -197,8 +198,8 @@ export async function prepareAnekaExec(
     order_id: order.order_id,
     shop_id: shop.shop_id,
     shop_name: shop.shop_name,
-    tracking_number: official.tracking_number,
-    label_pdf_base64: official.pdf.toString("base64"),
+    tracking_number: official?.tracking_number ?? "",
+    label_pdf_base64: official ? official.pdf.toString("base64") : "",
     items: check.items,
     total_modal: total,
   };
@@ -221,7 +222,7 @@ export async function prepareAnekaExec(
     .map((it) => `- ${it.qty}x ${it.product_name} (${fmtRp(it.subtotal)})`)
     .join("\n");
   const notice = await sendExecNotice(
-    `Pesanan TikTok ${order.order_id} siap dieksekusi ke Aneka (${shop.shop_name}).\n${baris}\nTotal modal ${fmtRp(total)}. No resi ${official.tracking_number}.\nSetuju/batalkan: ${EKSEKUSI_URL}?order=${order.order_id}`,
+    `Pesanan TikTok ${order.order_id} siap dieksekusi ke Aneka (${shop.shop_name}).\n${baris}\nTotal modal ${fmtRp(total)}.${official ? ` No resi ${official.tracking_number}.` : " Label resi belum tersedia — akan diisi otomatis sebelum pembayaran."}\nSetuju/batalkan: ${EKSEKUSI_URL}?order=${order.order_id}`,
   );
   if (!notice.startsWith("ok")) {
     return { ok: false, detail: `Tersimpan, tetapi notif WA gagal: ${notice}` };
@@ -649,7 +650,7 @@ export async function executeAnekaOrder(
   } catch {
     return { ok: false, detail: "Data eksekusi rusak — siapkan ulang pesanan ini" };
   }
-  if (!payload.items?.length || !payload.label_pdf_base64) {
+  if (!payload.items?.length) {
     return { ok: false, detail: "Data eksekusi tidak lengkap — siapkan ulang pesanan ini" };
   }
 
@@ -673,7 +674,7 @@ export async function executeAnekaOrder(
     await saveTiktokOrderExec({
       order_id: orderId,
       status: "gagal",
-      payload: row.payload,
+      payload: JSON.stringify(payload),
       detail,
     });
     await sendExecNotice(
@@ -728,6 +729,28 @@ export async function executeAnekaOrder(
     return { ok: false, detail: aktif.detail };
   }
   await logStep("cek-pesanan", `pesanan masih aktif (status ${aktif.detail})`);
+
+  // 2b. Bila label resi masih kosong (slot penjemputan TikTok penuh saat
+  //     persiapan), ambil SEKARANG sebelum pembayaran — label resmi WAJIB
+  //     diunggah saat checkout Aneka. Kegagalan menghentikan eksekusi
+  //     (bisa dicoba ulang lewat tombol Setuju) — tidak pernah membayar
+  //     tanpa label.
+  if (!payload.label_pdf_base64) {
+    await logStep("label", "label resmi kosong — ambil dari TikTok Shop");
+    const official = await getOfficialResiForOrder(orderId);
+    if (!official.ok) {
+      await logStep("label", `GAGAL — ${official.detail}`);
+      return gagal(`label resmi belum tersedia (${official.detail})`);
+    }
+    payload.tracking_number = official.tracking_number;
+    payload.label_pdf_base64 = official.pdf.toString("base64");
+    await saveTiktokOrderExec({
+      order_id: orderId,
+      status: "berjalan",
+      payload: JSON.stringify(payload),
+    });
+    await logStep("label", `terisi — resi ${official.tracking_number}`);
+  }
 
   // PENGAMAN ANTI-DOBEL: sebelum membayar, pastikan percobaan-percobaan
   // sebelumnya belum benar-benar membayar pesanan ini di Aneka — cek
@@ -906,7 +929,7 @@ export async function executeAnekaOrder(
   await saveTiktokOrderExec({
     order_id: orderId,
     status: "selesai",
-    payload: row.payload,
+    payload: JSON.stringify(payload),
     aneka_payment_id: pay.paymentId,
     aneka_order_id: anekaId,
     detail: "",
