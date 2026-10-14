@@ -78,10 +78,11 @@ async function uploadToStorage(
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
       },
+      // Tanpa file_size_limit — field ini ditolak Storage (HTTP 413) di
+      // plan gratis; batas bawaan cukup besar untuk dump mingguan.
       body: JSON.stringify({
         name: BUCKET,
         public: false,
-        file_size_limit: 104857600,
       }),
     });
     if (mk.ok) {
