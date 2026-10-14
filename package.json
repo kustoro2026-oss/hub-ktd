@@ -9,12 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@neondatabase/serverless": "^1.2.0",
     "@types/pdfkit": "^0.17.6",
     "lucide-react": "^1.51.0",
     "next": "16.3.8",
     "pdf-lib": "^1.17.1",
     "pdfkit": "^0.20.2",
+    "pg": "^8.23.1",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "xlsx": "^0.18.5"
@@ -22,6 +22,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24.19.1",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9",

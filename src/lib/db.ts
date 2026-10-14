@@ -13,7 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { DatabaseSync, SQLInputValue } from "node:sqlite";
-import type { Pool } from "@neondatabase/serverless";
+import type { Pool } from "pg";
 
 export type Contact = {
   id: number;
@@ -88,13 +88,20 @@ const g = globalThis as unknown as {
 // ---------- inti koneksi ----------
 
 function dbMode(): "pg" | "sqlite" {
-  return process.env.DATABASE_URL || process.env.POSTGRES_URL
+  return process.env.SUPABASE_DATABASE_URL ||
+    process.env.DATABASE_URL ||
+    process.env.POSTGRES_URL
     ? "pg"
     : "sqlite";
 }
 
 function pgUrl(): string {
-  return (process.env.DATABASE_URL ?? process.env.POSTGRES_URL ?? "").trim();
+  return (
+    process.env.SUPABASE_DATABASE_URL ??
+    process.env.DATABASE_URL ??
+    process.env.POSTGRES_URL ??
+    ""
+  ).trim();
 }
 
 // node:sqlite memakai placeholder `?`; Postgres memakai $1, $2, ... — tulis
@@ -106,8 +113,11 @@ function toPg(query: string): string {
 
 async function pgPool(): Promise<Pool> {
   if (!g.__ktdHubPg) {
-    const { Pool } = await import("@neondatabase/serverless");
-    const pool = new Pool({ connectionString: pgUrl() });
+    const { Pool } = await import("pg");
+    const pool = new Pool({
+      connectionString: pgUrl(),
+      ssl: { rejectUnauthorized: false },
+    });
     await migratePg(pool);
     g.__ktdHubPg = pool;
   }
@@ -118,7 +128,7 @@ async function sqliteDb(): Promise<DatabaseSync> {
   if (!g.__ktdHubSqlite) {
     if (process.env.VERCEL) {
       throw new Error(
-        "KTD Hub di Vercel butuh DATABASE_URL (Postgres/Neon) — hubungkan database di dashboard Vercel → Storage, lalu redeploy.",
+        "KTD Hub di Vercel butuh SUPABASE_DATABASE_URL (Postgres Supabase) — set di dashboard Vercel, lalu redeploy.",
       );
     }
     const { DatabaseSync: Db } = await import("node:sqlite");
