@@ -125,7 +125,7 @@ ${SIGN}`,
     answer: `Ya, KTD Store menyediakan layanan top up digital: pulsa, paket data, token listrik PLN, e-money, dan voucher game. Silakan pilih provider dan nominal di halaman top up:
 https://toko.kustoro2026.com/topup
 
-Cara beli top up: pilih provider, masukkan nomor tujuan, lalu selesaikan pembayaran (COD atau transfer bank).
+Cara beli top up: pilih provider, masukkan nomor tujuan, lalu selesaikan pembayaran (QRIS/Virtual Account atau transfer bank).
 
 ${SIGN}`,
   },
@@ -192,7 +192,7 @@ ${SIGN}`,
       /\bmetode (bayar|pembayaran)\b/,
     ],
     answer:
-      "Metode pembayaran kami: COD (bayar di tempat, biaya Rp 2.500 per paket) atau transfer bank ke rekening resmi toko:\n\nMandiri 1340025493742 a.n. KUSTORO\n\nSetelah transfer, mohon kirim bukti transfer ke chat ini agar pesanan segera kami proses.\n\n" +
+      "Metode pembayaran kami: COD (bayar di tempat, biaya Rp 2.500 per paket) atau transfer bank ke rekening resmi toko:\n\nMandiri 1340025493742 a.n. KUSTORO\n\nSetelah transfer, mohon kirim bukti transfer ke WhatsApp admin kami di 0851 7115 7938 agar pesanan segera kami proses.\n\n" +
       SIGN,
   },
   {

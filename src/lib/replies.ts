@@ -40,6 +40,25 @@ Setelah transfer, mohon kirim bukti transfer (foto/screenshot) ke chat ini. Pesa
 Hormat kami,
 KTD Store`;
 
+// Balasan pesan order TOP UP dari form situs — top up tidak bisa COD, jadi
+// petunjuk pembayarannya hanya transfer bank + arahkan bukti ke admin.
+export const REPLY_TOPUP_ORDER = `Terima kasih, pesanan top up Anda telah kami terima.
+
+Pembayaran top up kami melalui transfer bank ke rekening resmi toko:
+
+Mandiri 1340025493742 a.n. KUSTORO
+
+Setelah transfer, mohon kirim bukti transfer (foto/screenshot) ke WhatsApp admin kami di ${CS_NUMBER_DISPLAY} agar pesanan segera kami proses.
+
+Hormat kami,
+KTD Store`;
+
+// Konfirmasi saat pembeli top up mengirim bukti transfer.
+export const REPLY_TOPUP_PROOF = `Terima kasih, bukti transfer Anda telah kami terima. Pesanan top up Anda akan segera kami proses.
+
+Hormat kami,
+KTD Store`;
+
 export const REPLY_QUESTION = `Terima kasih atas pertanyaan Anda.
 
 Agar jawaban kami tepat, silakan sampaikan detail pertanyaan Anda di chat ini, atau hubungi CS kami di WhatsApp ${CS_NUMBER_DISPLAY} (setiap hari pukul 09:00–18:00 WIB). Pesan Anda tetap kami terima dan akan dibalas secepatnya.
@@ -97,6 +116,15 @@ export function isOrderMessage(text: string): boolean {
   if (/\b\d{5}\b/.test(t) && /\balamat\b/.test(t)) return true;
   if (/\bnama\b/.test(t) && /\balamat\b/.test(t)) return true;
   return false;
+}
+
+/** Deteksi pesan order top up dari form situs ("Halo, saya sudah membuat
+ *  pesanan top up:" + No. Pesanan KTD-xxx). Dipakai sebagai cadangan saat
+ *  cabang status top up di webhook tidak menemukan pesanan yang cocok. */
+export function isTopupOrderMessage(text: string): boolean {
+  return (
+    /pesanan top ?up/i.test(text) && /\bKTD-[A-Z0-9]{6,}\b/i.test(text)
+  );
 }
 
 export type WaMessage = {
@@ -163,6 +191,11 @@ export function pickReply(m: WaMessage): { kind: ReplyKind; reply: string } {
         ? REPLY_ORDER_TRANSFER
         : REPLY_ORDER;
     return { kind: "order", reply };
+  }
+  // Pesan order top up dari form situs → petunjuk pembayaran top up
+  // (transfer bank saja — top up tidak bisa COD).
+  if (m.text?.body && isTopupOrderMessage(m.text.body)) {
+    return { kind: "topup", reply: REPLY_TOPUP_ORDER };
   }
   const adId = m.context?.ad_id;
   if (adId && AD_PRODUCT_MAP[adId]) {

@@ -19,9 +19,11 @@ import {
 import { isBotHandoverActive } from "@/lib/handover";
 import {
   isProofOfTransfer,
+  isTopupOrderMessage,
   paymentMethodOfOrder,
   pickReply,
   REPLY_ORDER,
+  REPLY_TOPUP_PROOF,
   type ReplyKind,
   type WaMessage,
 } from "@/lib/replies";
@@ -175,6 +177,18 @@ export async function POST(request: Request) {
           ) {
             kind = "proof";
             reply = REPLY_ORDER;
+          }
+
+          // Bukti transfer pesanan TOP UP (format form top up situs) →
+          // konfirmasi khusus top up (tanpa menyebut resi pengiriman).
+          if (
+            !suppressed &&
+            lastIn &&
+            isTopupOrderMessage(lastIn.body) &&
+            isProofOfTransfer(m)
+          ) {
+            kind = "proof";
+            reply = REPLY_TOPUP_PROOF;
           }
 
           // Notifikasi pesanan ke nomor admin: tetap jalan meski bot dijeda,
