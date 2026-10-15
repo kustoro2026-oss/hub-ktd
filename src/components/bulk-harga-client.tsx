@@ -6,8 +6,9 @@
 // dan Reset Semua ke harga awal (snapshot otomatis sebelum perubahan massal
 // pertama). Semua penulisan hanya dari klik tombol di halaman ini.
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  CheckCircle2,
   ChevronDown,
   ChevronUp,
   Loader2,
@@ -17,6 +18,8 @@ import {
   Trash2,
   Undo2,
   Wand2,
+  X,
+  XCircle,
 } from "lucide-react";
 
 type Marketplace = "tiktok" | "blibli";
@@ -153,6 +156,23 @@ export default function BulkHargaClient({
   // ---------- Operasi ----------
   const [sibuk, setSibuk] = useState<"" | "terapkan" | "reset">("");
   const [hasil, setHasil] = useState<HasilOperasi | null>(null);
+
+  // ---------- Toast notifikasi (pertanda operasi berhasil/gagal) ----------
+  const [toast, setToast] = useState<{ ok: boolean; teks: string } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const munculkanToast = useCallback((ok: boolean, teks: string) => {
+    setToast({ ok, teks });
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 6000);
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, [toast]);
 
   const loadAturan = useCallback(async () => {
     setMuatAturan("loading");
@@ -309,12 +329,23 @@ export default function BulkHargaClient({
       });
       const data = (await r.json()) as HasilOperasi;
       setHasil(data);
-      if (data.ok) await loadPratinjau();
+      if (data.ok) {
+        munculkanToast(
+          true,
+          marketplace === "blibli"
+            ? `${data.diubah ?? 0} varian dikirim ke antrean Blibli — harga berubah dalam beberapa menit.`
+            : `Harga ${data.diubah ?? 0} SKU berhasil diperbarui di ${info.nama}.`,
+        );
+        await loadPratinjau();
+      } else {
+        munculkanToast(false, data.detail ?? "Terapkan gagal.");
+      }
     } catch {
       setHasil({
         ok: false,
         detail: "Gagal menghubungi server (jaringan).",
       });
+      munculkanToast(false, "Gagal menghubungi server (jaringan).");
     } finally {
       setSibuk("");
     }
@@ -336,12 +367,21 @@ export default function BulkHargaClient({
       });
       const data = (await r.json()) as HasilOperasi;
       setHasil(data);
-      if (data.ok) await loadPratinjau();
+      if (data.ok) {
+        munculkanToast(
+          true,
+          `${data.dipulihkan ?? 0} harga dipulihkan ke harga awal di ${info.nama}.`,
+        );
+        await loadPratinjau();
+      } else {
+        munculkanToast(false, data.detail ?? "Reset gagal.");
+      }
     } catch {
       setHasil({
         ok: false,
         detail: "Gagal menghubungi server (jaringan).",
       });
+      munculkanToast(false, "Gagal menghubungi server (jaringan).");
     } finally {
       setSibuk("");
     }
@@ -751,6 +791,39 @@ export default function BulkHargaClient({
               </ul>
             </div>
           ) : null}
+        </div>
+      ) : null}
+
+      {/* ---------- Toast notifikasi ---------- */}
+      {toast ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className={`fixed bottom-5 right-5 z-50 flex max-w-sm items-start gap-3 rounded-xl border px-4 py-3 text-sm shadow-lg ${
+            toast.ok
+              ? "border-emerald-300 bg-emerald-50 text-emerald-900"
+              : "border-rose-300 bg-rose-50 text-rose-900"
+          }`}
+        >
+          {toast.ok ? (
+            <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" />
+          ) : (
+            <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600" />
+          )}
+          <div className="flex-1">
+            <div className="font-semibold">
+              {toast.ok ? "Berhasil" : "Gagal"}
+            </div>
+            <div className="mt-0.5 text-slate-700">{toast.teks}</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setToast(null)}
+            className="rounded p-0.5 text-slate-400 hover:text-slate-700"
+            aria-label="Tutup notifikasi"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       ) : null}
     </div>
