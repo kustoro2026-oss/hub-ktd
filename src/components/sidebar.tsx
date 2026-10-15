@@ -103,6 +103,11 @@ export const NAV: NavSection[] = [
             Icon: PlayCircle,
           },
           {
+            href: "/marketplace/tiktok/pemetaan",
+            label: "Pemetaan Produk",
+            Icon: Link2,
+          },
+          {
             href: "/marketplace/tiktok/produk",
             label: "Produk",
             Icon: Boxes,
@@ -139,16 +144,6 @@ export const NAV: NavSection[] = [
         items: [
           { href: "", label: "Pesanan", Icon: Package, segera: true },
           { href: "", label: "Produk", Icon: Boxes, segera: true },
-        ],
-      },
-      {
-        title: "Aneka",
-        items: [
-          {
-            href: "/marketplace/aneka/pemetaan",
-            label: "Pemetaan Produk",
-            Icon: Link2,
-          },
         ],
       },
     ],

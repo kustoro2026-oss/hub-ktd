@@ -25,7 +25,7 @@ import {
 type Marketplace = "tiktok" | "blibli";
 
 const INFO: Record<Marketplace, { nama: string; pemetaanUrl: string }> = {
-  tiktok: { nama: "TikTok Shop", pemetaanUrl: "/marketplace/aneka/pemetaan" },
+  tiktok: { nama: "TikTok Shop", pemetaanUrl: "/marketplace/tiktok/pemetaan" },
   blibli: { nama: "Blibli", pemetaanUrl: "/marketplace/blibli/pemetaan" },
 };
 
