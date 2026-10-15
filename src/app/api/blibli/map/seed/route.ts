@@ -1,6 +1,7 @@
 // Impor massal pemetaan awal (seed) Blibli → Aneka dari
 // src/lib/blibli-map-seed.json. Hanya menambah baris yang belum ada —
-// pemetaan manual yang sudah tersimpan tidak ditimpa. Perlu sesi admin.
+// pemetaan manual yang sudah tersimpan tidak ditimpa. Perlu sesi admin
+// ATAU secret cron (saluran yang sama dengan route pemulihan lain).
 import { isAuthed } from "@/lib/auth";
 import seedData from "@/lib/blibli-map-seed.json";
 import { seedBlibliProductMaps } from "@/lib/db";
@@ -18,8 +19,20 @@ type SeedRow = {
   enabled?: number;
 };
 
-export async function POST() {
-  if (!(await isAuthed())) {
+/** True bila secret cron cocok lewat salah satu saluran yang didukung. */
+function cronAuthorized(request: Request): boolean {
+  const secret = process.env.CRON_SECRET;
+  if (!secret) return false;
+  const auth = request.headers.get("authorization") ?? "";
+  const given =
+    (auth.startsWith("Bearer ") ? auth.slice(7) : "") ||
+    request.headers.get("x-cron-secret") ||
+    new URL(request.url).searchParams.get("secret");
+  return given === secret;
+}
+
+export async function POST(request: Request) {
+  if (!cronAuthorized(request) && !(await isAuthed())) {
     return Response.json({ error: "Belum masuk" }, { status: 401 });
   }
   try {
