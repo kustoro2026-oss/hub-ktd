@@ -47,8 +47,12 @@ export default function PengaturanPage() {
     { label: "AUTH_PASSWORD (kata sandi admin)", ok: !!process.env.AUTH_PASSWORD },
     { label: "AUTH_SECRET (penanda cookie sesi)", ok: !!process.env.AUTH_SECRET },
     {
-      label: "DATABASE_URL / POSTGRES_URL (database produksi)",
-      ok: !!(process.env.DATABASE_URL ?? process.env.POSTGRES_URL),
+      label: "SUPABASE_DATABASE_URL / DATABASE_URL / POSTGRES_URL (database produksi)",
+      ok: !!(
+        process.env.SUPABASE_DATABASE_URL ??
+        process.env.DATABASE_URL ??
+        process.env.POSTGRES_URL
+      ),
     },
   ];
 
@@ -108,9 +112,9 @@ export default function PengaturanPage() {
         <ul className="list-disc space-y-1 pl-5 text-slate-600">
           <li>
             <strong>Database:</strong> SQLite lokal (data/ktd-hub.db) untuk
-            pengembangan; di Vercel otomatis memakai Postgres lewat DATABASE_URL
-            (Neon / Vercel Postgres) karena filesystem serverless bersifat
-            sementara.
+            pengembangan; di Vercel otomatis memakai Postgres lewat
+            SUPABASE_DATABASE_URL (Supabase Postgres) karena filesystem
+            serverless bersifat sementara.
           </li>
           <li>
             <strong>Webhook bot:</strong> Callback URL Meta App sudah diarahkan

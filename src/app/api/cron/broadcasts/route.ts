@@ -3,8 +3,9 @@
 // Tick utama datang dari tab admin yang terbuka + webhook pesan masuk,
 // tetapi cron harian ini memastikan kampanye tetap terkirim walau tidak ada
 // yang membuka Hub. Wajib menyertakan secret yang sama dengan env
-// CRON_SECRET (header x-cron-secret atau query ?secret=). Bila CRON_SECRET
-// tidak diatur di Vercel, endpoint ini menolak semua panggilan.
+// CRON_SECRET (header x-cron-secret, Authorization Bearer — Vercel Cron
+// mengirimkannya di sana — atau query ?secret=). Bila CRON_SECRET tidak
+// diatur di Vercel, endpoint ini menolak semua panggilan.
 import { runDueScheduledBroadcasts } from "@/lib/broadcast-send";
 
 export async function GET(request: Request) {
@@ -15,8 +16,10 @@ export async function GET(request: Request) {
       { status: 403 },
     );
   }
+  const auth = request.headers.get("authorization") ?? "";
   const given =
-    request.headers.get("x-cron-secret") ??
+    (auth.startsWith("Bearer ") ? auth.slice(7) : "") ||
+    request.headers.get("x-cron-secret") ||
     new URL(request.url).searchParams.get("secret");
   if (given !== secret) {
     return Response.json({ ok: false, detail: "Secret salah" }, { status: 403 });

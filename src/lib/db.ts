@@ -1,9 +1,9 @@
 // Database KTD Hub — dua backend dengan API async yang sama:
 //
-// - Produksi (Vercel): Postgres via driver serverless Neon. Filesystem
-//   serverless Vercel bersifat sementara, jadi SQLite tidak bisa dipakai di
-//   sana. Koneksi diambil dari env DATABASE_URL (atau POSTGRES_URL bawaan
-//   Vercel Postgres) — hubungkan database lewat dashboard Vercel → Storage.
+// - Produksi (Vercel): Postgres via driver pg (Supabase Postgres pooler).
+//   Filesystem serverless Vercel bersifat sementara, jadi SQLite tidak bisa
+//   dipakai di sana. Koneksi diambil dari env SUPABASE_DATABASE_URL (atau
+//   DATABASE_URL / POSTGRES_URL sebagai cadangan lama).
 // - Pengembangan lokal: SQLite via node:sqlite (file data/ktd-hub.db,
 //   folder ini di-gitignore).
 //
