@@ -1664,35 +1664,21 @@ export async function seedAnekaProductMaps(
 ): Promise<{ inserted: number; skipped: number }> {
   const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
   let inserted = 0;
-  for (const m of rows) {
-    if (dbMode() === "pg") {
-      const r = await (
-        await pgPool()
-      ).query(
-        toPg(
-          `INSERT INTO aneka_product_map (tiktok_product_id, tiktok_product_name, tiktok_sku, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT (tiktok_product_id) DO NOTHING`,
-        ),
-        [
-          m.tiktok_product_id,
-          m.tiktok_product_name ?? "",
-          m.tiktok_sku ?? "",
-          m.aneka_product_id,
-          m.aneka_variant_id ?? "",
-          m.aneka_product_name ?? "",
-          m.enabled ?? 1,
-          nowUtc,
-        ],
-      );
-      inserted += r.rowCount ?? 0;
-    } else {
-      const r = (await sqliteDb())
-        .prepare(
-          `INSERT OR IGNORE INTO aneka_product_map (tiktok_product_id, tiktok_product_name, tiktok_sku, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(
+  // Postgres: bungkus dalam satu INSERT multi-baris per 50 baris — insert
+  // baris-per-baris memakan satu round-trip per baris ke pooler Supabase
+  // dan bisa melewati batas 60 detik fungsi Vercel saat seed membesar.
+  if (dbMode() === "pg") {
+    const pool = await pgPool();
+    const CHUNK = 50;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const part = rows.slice(i, i + CHUNK);
+      const values: string[] = [];
+      const params: unknown[] = [];
+      part.forEach((m, j) => {
+        values.push(
+          `($${j * 8 + 1}, $${j * 8 + 2}, $${j * 8 + 3}, $${j * 8 + 4}, $${j * 8 + 5}, $${j * 8 + 6}, $${j * 8 + 7}, $${j * 8 + 8})`,
+        );
+        params.push(
           m.tiktok_product_id,
           m.tiktok_product_name ?? "",
           m.tiktok_sku ?? "",
@@ -1702,8 +1688,35 @@ export async function seedAnekaProductMaps(
           m.enabled ?? 1,
           nowUtc,
         );
-      inserted += Number(r.changes) || 0;
+      });
+      const r = await pool.query(
+        `INSERT INTO aneka_product_map (tiktok_product_id, tiktok_product_name, tiktok_sku, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+         VALUES ${values.join(", ")}
+         ON CONFLICT (tiktok_product_id) DO NOTHING`,
+        params,
+      );
+      inserted += r.rowCount ?? 0;
     }
+    return { inserted, skipped: rows.length - inserted };
+  }
+
+  for (const m of rows) {
+    const r = (await sqliteDb())
+      .prepare(
+        `INSERT OR IGNORE INTO aneka_product_map (tiktok_product_id, tiktok_product_name, tiktok_sku, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        m.tiktok_product_id,
+        m.tiktok_product_name ?? "",
+        m.tiktok_sku ?? "",
+        m.aneka_product_id,
+        m.aneka_variant_id ?? "",
+        m.aneka_product_name ?? "",
+        m.enabled ?? 1,
+        nowUtc,
+      );
+    inserted += Number(r.changes) || 0;
   }
   return { inserted, skipped: rows.length - inserted };
 }
@@ -2175,35 +2188,21 @@ export async function seedBlibliProductMaps(
 ): Promise<{ inserted: number; skipped: number }> {
   const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
   let inserted = 0;
-  for (const m of rows) {
-    if (dbMode() === "pg") {
-      const r = await (
-        await pgPool()
-      ).query(
-        toPg(
-          `INSERT INTO blibli_product_map (blibli_sku, seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-           ON CONFLICT (blibli_sku) DO NOTHING`,
-        ),
-        [
-          m.blibli_sku,
-          m.seller_sku ?? "",
-          m.product_name ?? "",
-          m.aneka_product_id,
-          m.aneka_variant_id ?? "",
-          m.aneka_product_name ?? "",
-          m.enabled ?? 1,
-          nowUtc,
-        ],
-      );
-      inserted += r.rowCount ?? 0;
-    } else {
-      const r = (await sqliteDb())
-        .prepare(
-          `INSERT OR IGNORE INTO blibli_product_map (blibli_sku, seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-        )
-        .run(
+  // Postgres: bungkus dalam satu INSERT multi-baris per 50 baris — insert
+  // baris-per-baris = 743 round-trip ke pooler Supabase yang melewati batas
+  // 60 detik fungsi Vercel (504 di Cloudflare).
+  if (dbMode() === "pg") {
+    const pool = await pgPool();
+    const CHUNK = 50;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const part = rows.slice(i, i + CHUNK);
+      const values: string[] = [];
+      const params: unknown[] = [];
+      part.forEach((m, j) => {
+        values.push(
+          `($${j * 8 + 1}, $${j * 8 + 2}, $${j * 8 + 3}, $${j * 8 + 4}, $${j * 8 + 5}, $${j * 8 + 6}, $${j * 8 + 7}, $${j * 8 + 8})`,
+        );
+        params.push(
           m.blibli_sku,
           m.seller_sku ?? "",
           m.product_name ?? "",
@@ -2213,8 +2212,35 @@ export async function seedBlibliProductMaps(
           m.enabled ?? 1,
           nowUtc,
         );
-      inserted += Number(r.changes) || 0;
+      });
+      const r = await pool.query(
+        `INSERT INTO blibli_product_map (blibli_sku, seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+         VALUES ${values.join(", ")}
+         ON CONFLICT (blibli_sku) DO NOTHING`,
+        params,
+      );
+      inserted += r.rowCount ?? 0;
     }
+    return { inserted, skipped: rows.length - inserted };
+  }
+
+  for (const m of rows) {
+    const r = (await sqliteDb())
+      .prepare(
+        `INSERT OR IGNORE INTO blibli_product_map (blibli_sku, seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        m.blibli_sku,
+        m.seller_sku ?? "",
+        m.product_name ?? "",
+        m.aneka_product_id,
+        m.aneka_variant_id ?? "",
+        m.aneka_product_name ?? "",
+        m.enabled ?? 1,
+        nowUtc,
+      );
+    inserted += Number(r.changes) || 0;
   }
   return { inserted, skipped: rows.length - inserted };
 }
