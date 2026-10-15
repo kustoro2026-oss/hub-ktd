@@ -1,0 +1,730 @@
+// Aturan harga massal berbasis profit Aneka dropship (TikTok Shop + Blibli).
+//
+// Konsep:
+//  - Profit per SKU = harga jual marketplace − hargaModal produk Aneka
+//    (dari pemetaan aneka_product_map / blibli_product_map → snapshot
+//    aneka-catalog.json). Modal level PRODUK — untuk produk bervarian
+//    profitnya perkiraan.
+//  - Aturan bertingkat: daftar berurutan, tiap aturan = rentang profit +
+//    aksi (potong/naik, Rp/%). Aturan pertama yang cocok menang.
+//  - Snapshot "harga awal" disimpan OTOMATIS sebelum perubahan massal
+//    pertama (hanya SKU yang benar-benar berubah) — tombol Reset Semua
+//    memulihkannya lalu menghapus snapshot yang berhasil.
+import { findAnekaCatalogById } from "@/lib/aneka-map";
+import {
+  getBlibliProductVariants,
+  listBlibliProducts,
+  updateBlibliProductsBulk,
+  type BlibliBulkItemUpdate,
+} from "@/lib/blibli-products";
+import {
+  deleteHargaSnapshot,
+  insertHargaSnapshot,
+  listAnekaProductMaps,
+  listAturanHarga,
+  listBlibliProductMaps,
+  listHargaSnapshot,
+  listTiktokShopTokens,
+  type AturanHargaRow,
+  type HargaSnapshotRow,
+} from "@/lib/db";
+import { prepareShop } from "@/lib/tiktok-orders";
+import {
+  searchTiktokProducts,
+  updateTiktokProductPrices,
+  type TiktokShopCtx,
+} from "@/lib/tiktok-products";
+
+export type Marketplace = "tiktok" | "blibli";
+
+/** Satu aturan dalam bentuk yang dikirim/diterima UI. */
+export type AturanSimpan = {
+  id: string;
+  posisi: number;
+  minProfit: number;
+  /** null = tanpa batas atas. */
+  maxProfit: number | null;
+  aksi: "potong" | "naik";
+  jenis: "rp" | "persen";
+  nilai: number;
+  aktif: boolean;
+};
+
+/** Batas keamanan eksekusi per permintaan (serverless 60 detik). */
+const MAKS_PRODUK_TERAPKAN = 60;
+
+/** "Rp18.450" → 18450. Katalog Aneka bersih (tanpa rentang "/"). */
+function parseRpModal(s: string): number {
+  const n = Number(String(s ?? "").replace(/[^\d]/g, ""));
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** Validasi daftar aturan sebelum disimpan — null = valid. */
+export function validasiAturanSimpan(rows: AturanSimpan[]): string | null {
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return "Minimal satu aturan diperlukan — kosongkan dengan menonaktifkan semua aturan.";
+  }
+  if (rows.length > 20) return "Maksimal 20 aturan.";
+  for (const r of rows) {
+    if (!Number.isInteger(r.minProfit) || r.minProfit < 0) {
+      return "Batas profit minimum harus bilangan bulat ≥ 0.";
+    }
+    if (r.maxProfit !== null && !Number.isInteger(r.maxProfit)) {
+      return "Batas profit maksimum harus bilangan bulat atau kosong.";
+    }
+    if (r.maxProfit !== null && r.maxProfit < r.minProfit) {
+      return "Batas maksimum tidak boleh lebih kecil dari batas minimum.";
+    }
+    if (r.aksi !== "potong" && r.aksi !== "naik") {
+      return "Aksi aturan tidak dikenal.";
+    }
+    if (r.jenis !== "rp" && r.jenis !== "persen") {
+      return "Jenis nilai aturan tidak dikenal.";
+    }
+    if (!Number.isFinite(r.nilai) || r.nilai <= 0) {
+      return "Nilai aturan harus angka > 0.";
+    }
+    if (r.jenis === "persen" && r.nilai > 90) {
+      return "Nilai persen maksimal 90%.";
+    }
+  }
+  return null;
+}
+
+/** Harga baru setelah aturan diterapkan (dibulatkan ke rupiah penuh). */
+export function hitungHargaBaru(
+  hargaSekarang: number,
+  aksi: "potong" | "naik",
+  jenis: "rp" | "persen",
+  nilai: number,
+): number {
+  if (jenis === "rp") {
+    return aksi === "potong" ? hargaSekarang - nilai : hargaSekarang + nilai;
+  }
+  const delta = Math.round((hargaSekarang * nilai) / 100);
+  return aksi === "potong" ? hargaSekarang - delta : hargaSekarang + delta;
+}
+
+/** Aturan aktif pertama (urut posisi) yang rentangnya memuat profit. */
+export function cocokAturan(
+  profit: number,
+  aturan: AturanHargaRow[],
+): AturanHargaRow | null {
+  for (const a of aturan) {
+    if (a.aktif !== 1) continue;
+    if (profit < a.min_profit) continue;
+    if (a.max_profit !== null && profit > a.max_profit) continue;
+    return a;
+  }
+  return null;
+}
+
+/** Modal & rekomendasi jual produk Aneka dari snapshot katalog. */
+function infoModalAneka(
+  anekaProductId: string,
+): { modal: number; rekomendasiJual: number } | null {
+  const cat = findAnekaCatalogById(anekaProductId);
+  if (!cat) return null;
+  const modal = parseRpModal(cat.hargaModal);
+  if (modal <= 0) return null;
+  return { modal, rekomendasiJual: parseRpModal(cat.rekomendasiJual) };
+}
+
+// ---------- Tipe hasil ----------
+
+/** Satu baris pratinjau (bentuk normalisasi kedua marketplace). */
+export type BarisPratinjau = {
+  /** Kunci pilihan: TikTok `productId|skuId`, Blibli productSku. */
+  skuKey: string;
+  productId: string;
+  /** TikTok: sku id; Blibli: "" (tingkat produk). */
+  skuId: string;
+  productName: string;
+  /** TikTok: sellerSku; Blibli: productSku. */
+  skuLabel: string;
+  hargaSekarang: number;
+  /** Blibli: harga varian tertinggi; TikTok: sama dengan hargaSekarang. */
+  hargaSekarangMax: number;
+  modal: number;
+  rekomendasiJual: number;
+  profit: number;
+  profitMax: number;
+  kenaAturan: boolean;
+  aksi: string;
+  jenis: string;
+  nilai: number;
+  hargaBaru: number;
+  hargaBaruMax: number;
+  alasan: string;
+  punyaSnapshot: boolean;
+};
+
+export type HasilTerapkan = {
+  ok: boolean;
+  diubah: number;
+  gagal: { skuKey: string; label: string; detail: string }[];
+  detail: string;
+  catatan: string[];
+};
+
+export type HasilReset = {
+  ok: boolean;
+  dipulihkan: number;
+  gagal: { skuKey: string; label: string; detail: string }[];
+  detail: string;
+  catatan: string[];
+};
+
+// ---------- Pratinjau ----------
+
+/** Susun satu baris pratinjau dari harga + modal + aturan. */
+function barisPratinjau(opts: {
+  skuKey: string;
+  productId: string;
+  skuId: string;
+  productName: string;
+  skuLabel: string;
+  harga: number;
+  hargaMax: number;
+  infoModal: { modal: number; rekomendasiJual: number } | null;
+  alasanModal: string;
+  aturan: AturanHargaRow[];
+  punyaSnapshot: boolean;
+}): BarisPratinjau {
+  const dasar: BarisPratinjau = {
+    skuKey: opts.skuKey,
+    productId: opts.productId,
+    skuId: opts.skuId,
+    productName: opts.productName,
+    skuLabel: opts.skuLabel,
+    hargaSekarang: opts.harga,
+    hargaSekarangMax: opts.hargaMax,
+    modal: 0,
+    rekomendasiJual: 0,
+    profit: 0,
+    profitMax: 0,
+    kenaAturan: false,
+    aksi: "",
+    jenis: "",
+    nilai: 0,
+    hargaBaru: opts.harga,
+    hargaBaruMax: opts.hargaMax,
+    alasan: opts.alasanModal,
+    punyaSnapshot: opts.punyaSnapshot,
+  };
+  if (!opts.infoModal) return dasar;
+
+  const { modal, rekomendasiJual } = opts.infoModal;
+  dasar.modal = modal;
+  dasar.rekomendasiJual = rekomendasiJual;
+  dasar.profit = opts.harga - modal;
+  dasar.profitMax = opts.hargaMax - modal;
+
+  const a = cocokAturan(dasar.profit, opts.aturan);
+  if (!a) {
+    dasar.alasan = "Profit tidak masuk aturan mana pun";
+    return dasar;
+  }
+  const baru = hitungHargaBaru(opts.harga, a.aksi as "potong" | "naik", a.jenis as "rp" | "persen", a.nilai);
+  const baruMax = hitungHargaBaru(
+    opts.hargaMax,
+    a.aksi as "potong" | "naik",
+    a.jenis as "rp" | "persen",
+    a.nilai,
+  );
+  dasar.aksi = a.aksi;
+  dasar.jenis = a.jenis;
+  dasar.nilai = a.nilai;
+  dasar.hargaBaru = baru;
+  dasar.hargaBaruMax = baruMax;
+  if (baru === opts.harga && baruMax === opts.hargaMax) {
+    dasar.alasan = "Perubahan kurang dari Rp 1 (pembulatan)";
+    return dasar;
+  }
+  if (baru < 1) {
+    dasar.alasan = "Harga baru di bawah Rp 1 — aturan dilewati";
+    return dasar;
+  }
+  dasar.kenaAturan = true;
+  dasar.alasan = "";
+  return dasar;
+}
+
+/** Pratinjau TikTok: semua SKU produk ACTIVATE (maks 3 halaman × 100). */
+export async function pratinjauTiktok(): Promise<
+  | { ok: true; shopName: string; rows: BarisPratinjau[]; tanpaPemetaan: number; snapshotCount: number }
+  | { ok: false; detail: string }
+> {
+  const [aturan, maps, snapshots, tokens] = await Promise.all([
+    listAturanHarga("tiktok"),
+    listAnekaProductMaps(),
+    listHargaSnapshot("tiktok"),
+    listTiktokShopTokens(),
+  ]);
+  if (tokens.length === 0) {
+    return { ok: false, detail: "Belum ada toko TikTok Shop yang terhubung." };
+  }
+  const prep = await prepareShop(tokens[0]);
+  if (!prep.ok) return { ok: false, detail: prep.detail };
+  const ctx: TiktokShopCtx = { cipher: prep.cipher, access_token: prep.access_token };
+  const byMap = new Map(
+    maps.filter((m) => m.enabled === 1).map((m) => [m.tiktok_product_id, m]),
+  );
+  const snapKeys = new Set(snapshots.map((s) => s.sku_key));
+  const rows: BarisPratinjau[] = [];
+  let tanpaPemetaan = 0;
+  let token = "";
+  let halaman = 0;
+  do {
+    const r = await searchTiktokProducts(ctx, {
+      status: "ACTIVATE",
+      pageSize: 100,
+      pageToken: token || undefined,
+    });
+    if (!r.ok) return { ok: false, detail: r.detail };
+    for (const p of r.items) {
+      const map = byMap.get(p.id);
+      const info = map ? infoModalAneka(map.aneka_product_id) : null;
+      if (!info) tanpaPemetaan++;
+      for (const sku of p.skus) {
+        rows.push(
+          barisPratinjau({
+            skuKey: `${p.id}|${sku.id}`,
+            productId: p.id,
+            skuId: sku.id,
+            productName: p.title,
+            skuLabel: sku.sellerSku || sku.id,
+            harga: sku.price.display,
+            hargaMax: sku.price.display,
+            infoModal: info,
+            alasanModal: info
+              ? "Tanpa pemetaan Aneka — petakan dulu di halaman Pemetaan"
+              : "Tanpa pemetaan Aneka — petakan dulu di halaman Pemetaan",
+            aturan,
+            punyaSnapshot: snapKeys.has(`${p.id}|${sku.id}`),
+          }),
+        );
+      }
+    }
+    token = r.nextPageToken;
+    halaman++;
+  } while (token && halaman < 3);
+  rows.sort((a, b) => a.productName.localeCompare(b.productName, "id"));
+  return {
+    ok: true,
+    shopName: String(tokens[0].shop_name ?? ""),
+    rows,
+    tanpaPemetaan,
+    snapshotCount: snapshots.length,
+  };
+}
+
+/** Pratinjau Blibli: produk ACTIVE tingkat produk (harga varian terendah
+ *  sebagai patokan konservatif — varian dinilai ulang saat eksekusi). */
+export async function pratinjauBlibli(): Promise<
+  | { ok: true; rows: BarisPratinjau[]; tanpaPemetaan: number; snapshotCount: number }
+  | { ok: false; detail: string }
+> {
+  const [aturan, maps, snapshots] = await Promise.all([
+    listAturanHarga("blibli"),
+    listBlibliProductMaps(),
+    listHargaSnapshot("blibli"),
+  ]);
+  const byMap = new Map(
+    maps.filter((m) => m.enabled === 1).map((m) => [m.blibli_sku, m]),
+  );
+  const snapProductIds = new Set(snapshots.map((s) => s.product_id));
+  const rows: BarisPratinjau[] = [];
+  let tanpaPemetaan = 0;
+  let page = 0;
+  for (;;) {
+    const r = await listBlibliProducts({ state: "ACTIVE", page, size: 50 });
+    if (!r.ok) return { ok: false, detail: r.detail };
+    for (const p of r.data.items) {
+      const sku = String(p.product.sku ?? "");
+      if (!sku) continue;
+      const map = byMap.get(sku);
+      const info = map ? infoModalAneka(map.aneka_product_id) : null;
+      if (!info) tanpaPemetaan++;
+      rows.push(
+        barisPratinjau({
+          skuKey: sku,
+          productId: sku,
+          skuId: "",
+          productName: p.product.name,
+          skuLabel: sku,
+          harga: Number(p.price.normal.min ?? 0),
+          hargaMax: Number(p.price.normal.max ?? 0),
+          infoModal: info,
+          alasanModal: "Tanpa pemetaan Aneka — petakan dulu di halaman Pemetaan",
+          aturan,
+          punyaSnapshot: snapProductIds.has(sku),
+        }),
+      );
+    }
+    if (r.data.items.length < 50 || page >= 40) break;
+    page++;
+  }
+  rows.sort((a, b) => a.productName.localeCompare(b.productName, "id"));
+  return {
+    ok: true,
+    rows,
+    tanpaPemetaan,
+    snapshotCount: snapshots.length,
+  };
+}
+
+// ---------- Terapkan ----------
+
+/** Terapkan aturan ke SKU TikTok terpilih (kunci `productId|skuId`).
+ *  Harga segar diambil dari API sebelum dihitung ulang; snapshot harga awal
+ *  disimpan SEBELUM penulisan (hanya SKU yang benar-benar berubah). */
+export async function terapkanTiktok(
+  pilihan: string[],
+): Promise<HasilTerapkan> {
+  const gagal: HasilTerapkan["gagal"] = [];
+  if (!Array.isArray(pilihan) || pilihan.length === 0) {
+    return { ok: false, diubah: 0, gagal, detail: "Tidak ada SKU yang dipilih.", catatan: [] };
+  }
+  const [aturan, maps, tokens] = await Promise.all([
+    listAturanHarga("tiktok"),
+    listAnekaProductMaps(),
+    listTiktokShopTokens(),
+  ]);
+  if (tokens.length === 0) {
+    return { ok: false, diubah: 0, gagal, detail: "Belum ada toko TikTok Shop yang terhubung.", catatan: [] };
+  }
+  const prep = await prepareShop(tokens[0]);
+  if (!prep.ok) return { ok: false, diubah: 0, gagal, detail: prep.detail, catatan: [] };
+  const ctx: TiktokShopCtx = { cipher: prep.cipher, access_token: prep.access_token };
+  const byMap = new Map(
+    maps.filter((m) => m.enabled === 1).map((m) => [m.tiktok_product_id, m]),
+  );
+
+  // Harga segar: pindai produk ACTIVATE, ambil SKU yang dipilih.
+  const dipilih = new Set(pilihan);
+  const segar = new Map<
+    string,
+    { productId: string; title: string; skuId: string; label: string; harga: number }
+  >();
+  let token = "";
+  let halaman = 0;
+  do {
+    const r = await searchTiktokProducts(ctx, {
+      status: "ACTIVATE",
+      pageSize: 100,
+      pageToken: token || undefined,
+    });
+    if (!r.ok) return { ok: false, diubah: 0, gagal, detail: r.detail, catatan: [] };
+    for (const p of r.items) {
+      for (const sku of p.skus) {
+        const key = `${p.id}|${sku.id}`;
+        if (dipilih.has(key)) {
+          segar.set(key, {
+            productId: p.id,
+            title: p.title,
+            skuId: sku.id,
+            label: sku.sellerSku || sku.id,
+            harga: sku.price.display,
+          });
+        }
+      }
+    }
+    token = r.nextPageToken;
+    halaman++;
+  } while (token && halaman < 3);
+
+  const produkTerpilih = new Set<string>();
+  for (const key of pilihan) {
+    const f = segar.get(key);
+    if (!f) {
+      gagal.push({ skuKey: key, label: key, detail: "Tidak ditemukan lagi di daftar produk Aktif." });
+      continue;
+    }
+    produkTerpilih.add(f.productId);
+  }
+  if (produkTerpilih.size > MAKS_PRODUK_TERAPKAN) {
+    return {
+      ok: false,
+      diubah: 0,
+      gagal,
+      detail: `Maksimal ${MAKS_PRODUK_TERAPKAN} produk per sekali terapkan (dipilih ${produkTerpilih.size}) — terapkan bertahap.`,
+      catatan: [],
+    };
+  }
+
+  // Hitung nilai baru + snapshot per SKU, kelompokkan per produk.
+  const perProduk = new Map<string, { skuId: string; amount: number }[]>();
+  const diubahBaris: { key: string; label: string; productName: string }[] = [];
+  for (const key of pilihan) {
+    const f = segar.get(key);
+    if (!f) continue; // sudah dicatat gagal di atas
+    const map = byMap.get(f.productId);
+    const info = map ? infoModalAneka(map.aneka_product_id) : null;
+    if (!info) {
+      gagal.push({ skuKey: key, label: f.label, detail: "Tanpa pemetaan Aneka — petakan dulu di halaman Pemetaan." });
+      continue;
+    }
+    const profit = f.harga - info.modal;
+    const a = cocokAturan(profit, aturan);
+    if (!a) continue; // tidak kena aturan — biarkan (bukan gagal)
+    const baru = hitungHargaBaru(
+      f.harga,
+      a.aksi as "potong" | "naik",
+      a.jenis as "rp" | "persen",
+      a.nilai,
+    );
+    if (baru < 1 || baru === f.harga) {
+      gagal.push({
+        skuKey: key,
+        label: f.label,
+        detail: baru < 1 ? "Harga baru di bawah Rp 1 — dilewati." : "Perubahan kurang dari Rp 1 — dilewati.",
+      });
+      continue;
+    }
+    await insertHargaSnapshot({
+      marketplace: "tiktok",
+      sku_key: key,
+      product_id: f.productId,
+      sku_id: f.skuId,
+      product_name: f.title,
+      sku_label: f.label,
+      harga_regular: f.harga,
+      harga_sale: 0,
+      pickup_point_code: "",
+    });
+    const arr = perProduk.get(f.productId) ?? [];
+    arr.push({ skuId: f.skuId, amount: baru });
+    perProduk.set(f.productId, arr);
+    diubahBaris.push({ key, label: f.label, productName: f.title });
+  }
+
+  let diubah = 0;
+  for (const [productId, updates] of perProduk) {
+    const r = await updateTiktokProductPrices(ctx, productId, updates);
+    if (r.ok && r.errors.length === 0) {
+      diubah += updates.length;
+      continue;
+    }
+    for (const u of updates) {
+      const baris = diubahBaris.find((b) => b.key === `${productId}|${u.skuId}`);
+      gagal.push({
+        skuKey: `${productId}|${u.skuId}`,
+        label: baris?.label ?? u.skuId,
+        detail: r.detail || r.errors.join("; "),
+      });
+    }
+  }
+
+  return {
+    ok: diubah > 0 || gagal.length === 0,
+    diubah,
+    gagal,
+    detail: "",
+    catatan: [],
+  };
+}
+
+/** Terapkan aturan ke produk Blibli terpilih (kunci = productSku). Tiap
+ *  varian dinilai ulang sendiri saat eksekusi; harga regular & sale digeser
+ *  bersamaan (sale dijaga tetap ≤ regular − 1). Penulisan lewat antrean
+ *  update massal Blibli (asinkron — hasil final beberapa menit kemudian). */
+export async function terapkanBlibli(
+  pilihan: string[],
+): Promise<HasilTerapkan> {
+  const gagal: HasilTerapkan["gagal"] = [];
+  if (!Array.isArray(pilihan) || pilihan.length === 0) {
+    return { ok: false, diubah: 0, gagal, detail: "Tidak ada produk yang dipilih.", catatan: [] };
+  }
+  if (pilihan.length > MAKS_PRODUK_TERAPKAN) {
+    return {
+      ok: false,
+      diubah: 0,
+      gagal,
+      detail: `Maksimal ${MAKS_PRODUK_TERAPKAN} produk per sekali terapkan (dipilih ${pilihan.length}) — terapkan bertahap.`,
+      catatan: [],
+    };
+  }
+  const [aturan, maps] = await Promise.all([
+    listAturanHarga("blibli"),
+    listBlibliProductMaps(),
+  ]);
+  const byMap = new Map(
+    maps.filter((m) => m.enabled === 1).map((m) => [m.blibli_sku, m]),
+  );
+
+  const requests: BlibliBulkItemUpdate[] = [];
+  const berubah: { gdnSku: string; label: string }[] = [];
+  for (const sku of pilihan) {
+    const map = byMap.get(sku);
+    if (!map) {
+      gagal.push({ skuKey: sku, label: sku, detail: "Tanpa pemetaan Aneka — petakan dulu di halaman Pemetaan." });
+      continue;
+    }
+    const info = infoModalAneka(map.aneka_product_id);
+    if (!info) {
+      gagal.push({ skuKey: sku, label: sku, detail: "Harga modal Aneka tidak ditemukan di katalog — refresh snapshot katalog." });
+      continue;
+    }
+    const vars = await getBlibliProductVariants(sku);
+    if (!vars.ok) {
+      gagal.push({ skuKey: sku, label: sku, detail: vars.detail });
+      continue;
+    }
+    for (const v of vars.data) {
+      const profit = Number(v.price.regular) - info.modal;
+      const a = cocokAturan(profit, aturan);
+      if (!a) continue; // varian tidak kena aturan — biarkan
+      const regular = Number(v.price.regular);
+      const sale = Number(v.price.sale);
+      const baru = hitungHargaBaru(
+        regular,
+        a.aksi as "potong" | "naik",
+        a.jenis as "rp" | "persen",
+        a.nilai,
+      );
+      if (baru < 1 || baru === regular) {
+        gagal.push({
+          skuKey: v.variant.blibliSku,
+          label: v.variant.name || v.variant.sellerSku || v.variant.blibliSku,
+          detail: baru < 1 ? "Harga baru di bawah Rp 1 — dilewati." : "Perubahan kurang dari Rp 1 — dilewati.",
+        });
+        continue;
+      }
+      // Geser sale mengikuti regular agar tetap valid (≤ regular − 1).
+      let saleBaru = sale;
+      if (sale > 0) {
+        const jarak = regular - sale;
+        saleBaru = jarak > 0 ? Math.max(1, baru - jarak) : Math.max(1, baru - 1);
+      }
+      await insertHargaSnapshot({
+        marketplace: "blibli",
+        sku_key: v.variant.blibliSku,
+        product_id: sku,
+        sku_id: v.variant.blibliSku,
+        product_name: map.product_name || sku,
+        sku_label: v.variant.name || v.variant.sellerSku || v.variant.blibliSku,
+        harga_regular: regular,
+        harga_sale: sale,
+        pickup_point_code: v.pickupPoint.code,
+      });
+      requests.push({
+        gdnSku: v.variant.blibliSku,
+        pickupPointCode: v.pickupPoint.code,
+        price: baru,
+        salePrice: saleBaru,
+      });
+      berubah.push({
+        gdnSku: v.variant.blibliSku,
+        label: v.variant.name || v.variant.sellerSku || v.variant.blibliSku,
+      });
+    }
+  }
+
+  let diubah = 0;
+  const catatan: string[] = [];
+  for (let i = 0; i < requests.length; i += 100) {
+    const chunk = requests.slice(i, i + 100);
+    const r = await updateBlibliProductsBulk(chunk);
+    if (!r.ok) {
+      for (const c of chunk) {
+        const b = berubah.find((x) => x.gdnSku === c.gdnSku);
+        gagal.push({ skuKey: c.gdnSku, label: b?.label ?? c.gdnSku, detail: r.detail });
+      }
+      continue;
+    }
+    diubah += chunk.length;
+    catatan.push(`Antrean Blibli diterima (${chunk.length} varian) — hasil final cek beberapa menit lagi di daftar produk.`);
+  }
+
+  return {
+    ok: diubah > 0 || gagal.length === 0,
+    diubah,
+    gagal,
+    detail: "",
+    catatan: [...new Set(catatan)],
+  };
+}
+
+// ---------- Reset ke harga awal ----------
+
+/** Pulihkan semua snapshot harga TikTok (satu panggilan per produk) lalu
+ *  hapus snapshot yang berhasil — yang gagal tetap tersimpan untuk coba
+ *  ulang. */
+export async function resetTiktok(): Promise<HasilReset> {
+  const gagal: HasilReset["gagal"] = [];
+  const snap = await listHargaSnapshot("tiktok");
+  if (snap.length === 0) {
+    return { ok: false, dipulihkan: 0, gagal, detail: "Tidak ada snapshot harga untuk di-reset.", catatan: [] };
+  }
+  const tokens = await listTiktokShopTokens();
+  if (tokens.length === 0) {
+    return { ok: false, dipulihkan: 0, gagal, detail: "Belum ada toko TikTok Shop yang terhubung.", catatan: [] };
+  }
+  const prep = await prepareShop(tokens[0]);
+  if (!prep.ok) return { ok: false, dipulihkan: 0, gagal, detail: prep.detail, catatan: [] };
+  const ctx: TiktokShopCtx = { cipher: prep.cipher, access_token: prep.access_token };
+
+  const perProduk = new Map<string, HargaSnapshotRow[]>();
+  for (const s of snap) {
+    const arr = perProduk.get(s.product_id) ?? [];
+    arr.push(s);
+    perProduk.set(s.product_id, arr);
+  }
+
+  let dipulihkan = 0;
+  for (const [productId, rows] of perProduk) {
+    const r = await updateTiktokProductPrices(
+      ctx,
+      productId,
+      rows.map((s) => ({ skuId: s.sku_id, amount: s.harga_regular })),
+    );
+    if (r.ok && r.errors.length === 0) {
+      dipulihkan += rows.length;
+      for (const s of rows) await deleteHargaSnapshot("tiktok", s.sku_key);
+    } else {
+      gagal.push({
+        skuKey: rows.map((s) => s.sku_key).join(", "),
+        label: rows[0].product_name,
+        detail: r.detail || r.errors.join("; "),
+      });
+    }
+  }
+  return { ok: true, dipulihkan, gagal, detail: "", catatan: [] };
+}
+
+/** Pulihkan semua snapshot harga Blibli (batch ≤ 100 gdnSku lewat antrean
+ *  update massal) lalu hapus snapshot yang berhasil dikirim. */
+export async function resetBlibli(): Promise<HasilReset> {
+  const gagal: HasilReset["gagal"] = [];
+  const snap = await listHargaSnapshot("blibli");
+  if (snap.length === 0) {
+    return { ok: false, dipulihkan: 0, gagal, detail: "Tidak ada snapshot harga untuk di-reset.", catatan: [] };
+  }
+  const requests: BlibliBulkItemUpdate[] = snap.map((s) => ({
+    gdnSku: s.sku_id,
+    pickupPointCode: s.pickup_point_code,
+    price: s.harga_regular,
+    salePrice: s.harga_sale,
+  }));
+
+  let dipulihkan = 0;
+  const catatan: string[] = [];
+  for (let i = 0; i < requests.length; i += 100) {
+    const chunk = requests.slice(i, i + 100);
+    const r = await updateBlibliProductsBulk(chunk);
+    if (!r.ok) {
+      for (const c of chunk) {
+        const s = snap.find((x) => x.sku_id === c.gdnSku);
+        gagal.push({ skuKey: c.gdnSku, label: s?.sku_label ?? c.gdnSku, detail: r.detail });
+      }
+      continue;
+    }
+    for (const c of chunk) {
+      await deleteHargaSnapshot("blibli", c.gdnSku);
+    }
+    dipulihkan += chunk.length;
+    catatan.push(`Antrean Blibli diterima (${chunk.length} varian) — harga kembali ke awal beberapa menit lagi.`);
+  }
+  return { ok: true, dipulihkan, gagal, detail: "", catatan: [...new Set(catatan)] };
+}

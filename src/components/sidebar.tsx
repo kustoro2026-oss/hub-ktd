@@ -4,7 +4,8 @@
 // Komunikasi, Marketplace, Lainnya). Marketplace berbentuk grup per platform
 // yang bisa dilipat, masing-masing dengan submenu sendiri (Pesanan, Produk).
 // Item aktif dicocokkan PERSIS dengan pathname (bukan awalan) supaya
-// "/pesan" dan "/pesanan" tidak ikut menyala bersamaan.
+// "/pesan" dan "/pesanan" tidak ikut menyala bersamaan — kecuali subhalaman
+// "/massal" di bawah item Produk (lihat isActive).
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState, type ComponentType } from "react";
@@ -214,6 +215,16 @@ function NavLink({
   );
 }
 
+/** Item navigasi aktif bila pathname sama persis, PLUS subhalaman
+ *  "/produk/massal" di bawah item Produk (agar "Produk" tetap menyala saat
+ *  membuka halaman Harga Massal). Awalan umum tidak dipakai supaya
+ *  "/pesan" dan "/pesanan" tidak ikut menyala bersamaan. */
+function isActive(pathname: string, href: string): boolean {
+  if (!href) return false;
+  if (pathname === href) return true;
+  return href.endsWith("/produk") && pathname === `${href}/massal`;
+}
+
 export default function Sidebar() {
   const pathname = usePathname();
   const router = useRouter();
@@ -258,7 +269,7 @@ export default function Sidebar() {
                   <NavLink
                     key={item.href || item.label}
                     item={item}
-                    active={item.href !== "" && pathname === item.href}
+                    active={isActive(pathname, item.href)}
                   />
                 ))}
               </div>
@@ -266,8 +277,8 @@ export default function Sidebar() {
               <div className="space-y-0.5">
                 {section.groups.map((group) => {
                   const open = openGroups[group.title] ?? false;
-                  const hasActiveChild = group.items.some(
-                    (i) => i.href !== "" && pathname === i.href,
+                  const hasActiveChild = group.items.some((i) =>
+                    isActive(pathname, i.href),
                   );
                   const allSegera = group.items.every((i) => i.segera);
 
@@ -305,7 +316,7 @@ export default function Sidebar() {
                             <NavLink
                               key={item.label}
                               item={item}
-                              active={item.href !== "" && pathname === item.href}
+                              active={isActive(pathname, item.href)}
                             />
                           ))}
                         </div>

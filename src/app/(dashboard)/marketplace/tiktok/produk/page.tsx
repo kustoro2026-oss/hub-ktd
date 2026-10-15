@@ -1,6 +1,8 @@
 // Halaman Produk TikTok Shop — daftar produk + atur harga & stok semua SKU
 // sekaligus (panggilan sinkron ke API produk TikTok). Bagian dari grup
 // Marketplace → TikTok Shop.
+import Link from "next/link";
+import { SlidersHorizontal } from "lucide-react";
 import TiktokProdukClient from "@/components/tiktok-produk-client";
 import RefreshButton from "@/components/refresh-button";
 
@@ -21,7 +23,16 @@ export default function ProdukTiktokPage() {
             &amp; stok untuk semua SKU sekaligus.
           </p>
         </div>
-        <RefreshButton />
+        <div className="flex items-center gap-2">
+          <Link
+            href="/marketplace/tiktok/produk/massal"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Atur Massal
+          </Link>
+          <RefreshButton />
+        </div>
       </div>
       <TiktokProdukClient />
     </div>

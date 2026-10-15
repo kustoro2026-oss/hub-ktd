@@ -400,6 +400,33 @@ function migrateSqlite(db: DatabaseSync) {
       executed_at TEXT NOT NULL DEFAULT ''
     );
 
+    CREATE TABLE IF NOT EXISTS aturan_harga (
+      id TEXT PRIMARY KEY,
+      marketplace TEXT NOT NULL DEFAULT '',
+      posisi INTEGER NOT NULL DEFAULT 0,
+      min_profit INTEGER NOT NULL DEFAULT 0,
+      max_profit INTEGER,
+      aksi TEXT NOT NULL DEFAULT 'potong',
+      jenis TEXT NOT NULL DEFAULT 'rp',
+      nilai INTEGER NOT NULL DEFAULT 0,
+      aktif INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS harga_snapshot (
+      marketplace TEXT NOT NULL DEFAULT '',
+      sku_key TEXT NOT NULL DEFAULT '',
+      product_id TEXT NOT NULL DEFAULT '',
+      sku_id TEXT NOT NULL DEFAULT '',
+      product_name TEXT NOT NULL DEFAULT '',
+      sku_label TEXT NOT NULL DEFAULT '',
+      harga_regular INTEGER NOT NULL DEFAULT 0,
+      harga_sale INTEGER NOT NULL DEFAULT 0,
+      pickup_point_code TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      PRIMARY KEY (marketplace, sku_key)
+    );
+
     CREATE TABLE IF NOT EXISTS aneka_finance_cache (
       k TEXT PRIMARY KEY,
       data TEXT NOT NULL DEFAULT '',
@@ -740,6 +767,33 @@ async function migratePg(pool: Pool) {
       log TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       executed_at TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS aturan_harga (
+      id TEXT PRIMARY KEY,
+      marketplace TEXT NOT NULL DEFAULT '',
+      posisi INTEGER NOT NULL DEFAULT 0,
+      min_profit INTEGER NOT NULL DEFAULT 0,
+      max_profit INTEGER,
+      aksi TEXT NOT NULL DEFAULT 'potong',
+      jenis TEXT NOT NULL DEFAULT 'rp',
+      nilai INTEGER NOT NULL DEFAULT 0,
+      aktif INTEGER NOT NULL DEFAULT 1,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS harga_snapshot (
+      marketplace TEXT NOT NULL DEFAULT '',
+      sku_key TEXT NOT NULL DEFAULT '',
+      product_id TEXT NOT NULL DEFAULT '',
+      sku_id TEXT NOT NULL DEFAULT '',
+      product_name TEXT NOT NULL DEFAULT '',
+      sku_label TEXT NOT NULL DEFAULT '',
+      harga_regular INTEGER NOT NULL DEFAULT 0,
+      harga_sale INTEGER NOT NULL DEFAULT 0,
+      pickup_point_code TEXT NOT NULL DEFAULT '',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      PRIMARY KEY (marketplace, sku_key)
     );
 
     CREATE TABLE IF NOT EXISTS aneka_finance_cache (
@@ -2377,4 +2431,139 @@ export async function claimBlibliOrderExecRunning(
     [packageId],
   );
   return !!r;
+}
+
+// ---------- Aturan harga massal (profit Aneka → ubah harga marketplace) ----------
+
+export type AturanHargaRow = {
+  id: string;
+  marketplace: string;
+  posisi: number;
+  min_profit: number;
+  max_profit: number | null;
+  aksi: string;
+  jenis: string;
+  nilai: number;
+  aktif: number;
+  updated_at: string;
+};
+
+/** Daftar aturan tersimpan untuk satu marketplace, urut posisi (aturan
+ *  pertama yang cocok menang). */
+export async function listAturanHarga(
+  marketplace: string,
+): Promise<AturanHargaRow[]> {
+  return queryAll<AturanHargaRow>(
+    "SELECT * FROM aturan_harga WHERE marketplace = ? ORDER BY posisi ASC, id ASC",
+    [marketplace],
+  );
+}
+
+/** Ganti seluruh aturan satu marketplace (simpan-sekaligus dari editor UI). */
+export async function replaceAturanHarga(
+  marketplace: string,
+  rows: {
+    id: string;
+    posisi: number;
+    min_profit: number;
+    max_profit: number | null;
+    aksi: string;
+    jenis: string;
+    nilai: number;
+    aktif: number;
+  }[],
+): Promise<void> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  await queryRun("DELETE FROM aturan_harga WHERE marketplace = ?", [
+    marketplace,
+  ]);
+  for (const r of rows) {
+    await queryRun(
+      `INSERT INTO aturan_harga (id, marketplace, posisi, min_profit, max_profit, aksi, jenis, nilai, aktif, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        r.id,
+        marketplace,
+        r.posisi,
+        r.min_profit,
+        r.max_profit,
+        r.aksi,
+        r.jenis,
+        r.nilai,
+        r.aktif,
+        nowUtc,
+      ],
+    );
+  }
+}
+
+// ---------- Snapshot harga awal (dasar tombol Reset Semua) ----------
+
+export type HargaSnapshotRow = {
+  marketplace: string;
+  sku_key: string;
+  product_id: string;
+  sku_id: string;
+  product_name: string;
+  sku_label: string;
+  harga_regular: number;
+  harga_sale: number;
+  pickup_point_code: string;
+  updated_at: string;
+};
+
+/** Semua snapshot harga untuk satu marketplace. */
+export async function listHargaSnapshot(
+  marketplace: string,
+): Promise<HargaSnapshotRow[]> {
+  return queryAll<HargaSnapshotRow>(
+    "SELECT * FROM harga_snapshot WHERE marketplace = ? ORDER BY LOWER(product_name) ASC",
+    [marketplace],
+  );
+}
+
+/** Simpan snapshot HANYA bila belum ada — "harga awal" = harga sebelum
+ *  perubahan massal PERTAMA, tidak boleh ditimpa perubahan berikutnya. */
+export async function insertHargaSnapshot(s: {
+  marketplace: string;
+  sku_key: string;
+  product_id: string;
+  sku_id: string;
+  product_name: string;
+  sku_label: string;
+  harga_regular: number;
+  harga_sale: number;
+  pickup_point_code: string;
+}): Promise<void> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const sql =
+    dbMode() === "pg"
+      ? `INSERT INTO harga_snapshot (marketplace, sku_key, product_id, sku_id, product_name, sku_label, harga_regular, harga_sale, pickup_point_code, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (marketplace, sku_key) DO NOTHING`
+      : `INSERT OR IGNORE INTO harga_snapshot (marketplace, sku_key, product_id, sku_id, product_name, sku_label, harga_regular, harga_sale, pickup_point_code, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+  await queryRun(sql, [
+    s.marketplace,
+    s.sku_key,
+    s.product_id,
+    s.sku_id,
+    s.product_name,
+    s.sku_label,
+    s.harga_regular,
+    s.harga_sale,
+    s.pickup_point_code,
+    nowUtc,
+  ]);
+}
+
+/** Hapus snapshot satu SKU (dipanggil setelah harga berhasil dipulihkan). */
+export async function deleteHargaSnapshot(
+  marketplace: string,
+  skuKey: string,
+): Promise<void> {
+  await queryRun(
+    "DELETE FROM harga_snapshot WHERE marketplace = ? AND sku_key = ?",
+    [marketplace, skuKey],
+  );
 }

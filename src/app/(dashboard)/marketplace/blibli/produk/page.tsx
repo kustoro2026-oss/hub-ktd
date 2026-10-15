@@ -1,5 +1,7 @@
 // Halaman Produk Blibli — daftar produk + atur harga & stok (update massal
 // lewat antrian API Blibli, asinkron). Bagian dari grup Marketplace → Blibli.
+import Link from "next/link";
+import { SlidersHorizontal } from "lucide-react";
 import BlibliProdukClient from "@/components/blibli-produk-client";
 import RefreshButton from "@/components/refresh-button";
 
@@ -20,7 +22,16 @@ export default function ProdukBlibliPage() {
             stok untuk semua varian sekaligus.
           </p>
         </div>
-        <RefreshButton />
+        <div className="flex items-center gap-2">
+          <Link
+            href="/marketplace/blibli/produk/massal"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+            Atur Massal
+          </Link>
+          <RefreshButton />
+        </div>
       </div>
       <BlibliProdukClient />
     </div>
