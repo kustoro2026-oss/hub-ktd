@@ -6,7 +6,8 @@ import { createHmac } from "crypto";
 
 const AUTH_URL = "https://auth.tiktok-shops.com/api/v2/token/get";
 const REFRESH_URL = "https://auth.tiktok-shops.com/api/v2/token/refresh";
-const API_HOST = "https://open-api.tiktokglobalshop.com";
+/** Host business API TikTok Shop (Open API). Diekspor untuk lib produk. */
+export const API_HOST = "https://open-api.tiktokglobalshop.com";
 
 export type TiktokTokenResult =
   | {
@@ -105,8 +106,9 @@ export async function exchangeTiktokAuthCode(
 /** Hitung sign request per dokumen "Sign your API request":
  *  input = app_secret + path + (kunci tersortir {key}{value}, tanpa sign &
  *  access_token) + body mentah (bila bukan multipart) + app_secret,
- *  lalu HMAC-SHA256 key=app_secret, output hex huruf kecil. */
-function signRequest(
+ *  lalu HMAC-SHA256 key=app_secret, output hex huruf kecil.
+ *  Diekspor untuk dipakai lib tiktok-products. */
+export function signRequest(
   appSecret: string,
   path: string,
   params: Record<string, string>,

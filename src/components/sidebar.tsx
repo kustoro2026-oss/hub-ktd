@@ -101,7 +101,11 @@ export const NAV: NavSection[] = [
             label: "Eksekusi Pesanan",
             Icon: PlayCircle,
           },
-          { href: "", label: "Produk", Icon: Boxes, segera: true },
+          {
+            href: "/marketplace/tiktok/produk",
+            label: "Produk",
+            Icon: Boxes,
+          },
         ],
       },
       {
@@ -122,7 +126,11 @@ export const NAV: NavSection[] = [
             label: "Pemetaan Produk",
             Icon: Link2,
           },
-          { href: "", label: "Produk", Icon: Boxes, segera: true },
+          {
+            href: "/marketplace/blibli/produk",
+            label: "Produk",
+            Icon: Boxes,
+          },
         ],
       },
       {

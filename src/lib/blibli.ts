@@ -190,8 +190,9 @@ export type BlibliResult<T> = { ok: true; data: T } | { ok: false; detail: strin
 // ---------- Bantuan HTTP ----------
 
 /** Headers wajib semua panggilan Seller API (Signature opsional, tidak
- *  dipakai karena Signature Key belum diaktifkan di Seller Center). */
-function blibliHeaders(): Record<string, string> {
+ *  dipakai karena Signature Key belum diaktifkan di Seller Center).
+ *  Diekspor untuk dipakai lib blibli-products. */
+export function blibliHeaders(): Record<string, string> {
   const env = blibliEnv();
   return {
     Authorization:
@@ -204,8 +205,8 @@ function blibliHeaders(): Record<string, string> {
 }
 
 /** Query params standar (storeCode, username, storeId, channelId,
- *  requestId) untuk endpoint proxy seller. */
-function blibliQuery(extra: Record<string, string> = {}): string {
+ *  requestId) untuk endpoint proxy seller. Diekspor untuk lib blibli-products. */
+export function blibliQuery(extra: Record<string, string> = {}): string {
   const env = blibliEnv();
   const qs = new URLSearchParams({
     storeCode: env.storeCode,
@@ -218,8 +219,9 @@ function blibliQuery(extra: Record<string, string> = {}): string {
   return qs.toString();
 }
 
-/** Parse body respons; kembalikan pesan error yang bisa ditampilkan. */
-async function parseBody(res: Response): Promise<Record<string, unknown>> {
+/** Parse body respons; kembalikan pesan error yang bisa ditampilkan.
+ *  Diekspor untuk dipakai lib blibli-products. */
+export async function parseBody(res: Response): Promise<Record<string, unknown>> {
   const text = await res.text();
   if (text === "") return {};
   try {
@@ -229,7 +231,8 @@ async function parseBody(res: Response): Promise<Record<string, unknown>> {
   }
 }
 
-function errorDetail(
+/** Susun pesan error dari respons Blibli. Diekspor untuk lib blibli-products. */
+export function errorDetail(
   label: string,
   res: Response,
   body: Record<string, unknown>,
