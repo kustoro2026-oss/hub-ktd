@@ -367,7 +367,7 @@ export default function BulkHargaClient({
           marketplace === "blibli"
             ? `${hasilGabung.diubah ?? 0} varian dikirim ke antrean Blibli — harga berubah dalam beberapa menit.`
             : marketplace === "ktd-store"
-              ? `${hasilGabung.diubah ?? 0} produk diperbarui di KTD Store — situs memakai harga baru dalam ±5 menit.`
+              ? `${hasilGabung.diubah ?? 0} produk diperbarui di KTD Store — situs memakai harga baru dalam beberapa menit.`
               : `Harga ${hasilGabung.diubah ?? 0} SKU berhasil diperbarui di ${info.nama}.`,
         );
         await loadPratinjau();

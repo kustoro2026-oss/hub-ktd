@@ -1,7 +1,7 @@
 // Halaman Harga Massal KTD Store — aturan bertingkat berbasis profit dari
 // modal Aneka dropship, pratinjau dengan centang per produk, tombol
 // Terapkan, dan Reset Semua. Hasil disimpan ke override harga toko yang
-// dibaca situs (toko.kustoro2026.com) dalam ±5 menit. Subhalaman dari
+// dibaca situs (toko.kustoro2026.com) dalam beberapa menit. Subhalaman dari
 // Marketplace → KTD Store → Produk.
 import Link from "next/link";
 import BulkHargaClient from "@/components/bulk-harga-client";
@@ -20,7 +20,7 @@ export default function HargaMassalKtdStorePage() {
         <p className="text-sm text-slate-500">
           Atur harga banyak produk situs toko sekaligus lewat aturan berbasis
           profit (harga toko − modal Aneka dropship). Perubahan tampil di
-          toko.kustoro2026.com dalam ±5 menit. Kembali ke{" "}
+          toko.kustoro2026.com dalam beberapa menit. Kembali ke{" "}
           <Link
             href="/marketplace/ktd-store/produk"
             className="font-medium text-emerald-700 hover:underline"

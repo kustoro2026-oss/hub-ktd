@@ -974,7 +974,7 @@ export async function terapkanKtdStore(
     detail: "",
     catatan:
       akanSimpan.length > 0
-        ? ["Situs toko memakai harga baru dalam ±5 menit (cache)."]
+        ? ["Situs toko memakai harga baru dalam beberapa menit (cache)."]
         : [],
   };
 }
@@ -1141,6 +1141,6 @@ export async function resetKtdStore(): Promise<HasilReset> {
     dipulihkan: snap.length,
     gagal,
     detail: "",
-    catatan: ["Situs toko kembali memakai rekomendasi jual Aneka dalam ±5 menit."],
+    catatan: ["Situs toko kembali memakai rekomendasi jual Aneka dalam beberapa menit."],
   };
 }
