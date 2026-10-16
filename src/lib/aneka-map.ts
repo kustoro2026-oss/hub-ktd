@@ -3,7 +3,7 @@
 // dan daftar produk TikTok yang pernah muncul di pesanan terbaru.
 // Dipakai halaman Pemetaan Produk dan (Fase 2+) eksekusi checkout otomatis.
 import catalogData from "@/lib/aneka-catalog.json";
-import { listTiktokShopTokens } from "@/lib/db";
+import { getAnekaFinanceCache, setAnekaFinanceCache, listTiktokShopTokens } from "@/lib/db";
 import { getTiktokOrders } from "@/lib/tiktok";
 import { prepareShop } from "@/lib/tiktok-orders";
 import { blibliProductSku, listBlibliOrders } from "@/lib/blibli";
@@ -43,6 +43,42 @@ const gSeen = globalThis as unknown as {
 const SEEN_CACHE_TTL_MS = 5 * 60 * 1000;
 function seenCacheGet<T>(c: SeenCacheEntry<T> | undefined): T[] | null {
   return c && Date.now() - c.at < SEEN_CACHE_TTL_MS ? c.products : null;
+}
+
+/** L2 cache daftar terlihat di tabel aneka_finance_cache (lintas instance
+ *  serverless Vercel). Gagal baca/parse dianggap tidak ada — pemanggil
+ *  cukup menarik ulang dari API marketplace. */
+async function seenDbGet<T>(
+  key: string,
+  mem: SeenCacheEntry<T> | undefined,
+): Promise<T[] | null> {
+  const hit = seenCacheGet(mem);
+  if (hit) return hit;
+  const row = await getAnekaFinanceCache(key);
+  if (
+    row?.fetched_at &&
+    Date.now() - Date.parse(row.fetched_at) < SEEN_CACHE_TTL_MS
+  ) {
+    try {
+      return JSON.parse(row.data) as T[];
+    } catch {
+      /* cache korup → tarik ulang */
+    }
+  }
+  return null;
+}
+
+/** Simpan L2 + kembalikan daftar. Gagal simpan diabaikan. */
+async function seenDbSet<T>(key: string, products: T[]): Promise<void> {
+  try {
+    await setAnekaFinanceCache(
+      key,
+      JSON.stringify(products),
+      new Date().toISOString(),
+    );
+  } catch {
+    /* abaikan */
+  }
 }
 
 /** Normalisasi nama produk untuk pencocokan (huruf kecil, tanpa tanda baca). */
@@ -99,6 +135,11 @@ export async function getSeenTiktokProducts(): Promise<
 > {
   const hit = seenCacheGet(gSeen.__ktdSeenTik);
   if (hit) return { ok: true, products: hit };
+  const dbHit = await seenDbGet("seen-tiktok:v1", gSeen.__ktdSeenTik);
+  if (dbHit) {
+    gSeen.__ktdSeenTik = { at: Date.now(), products: dbHit };
+    return { ok: true, products: dbHit };
+  }
   const tokens = await listTiktokShopTokens();
   if (tokens.length === 0) {
     return { ok: false, detail: "Belum ada toko TikTok Shop yang terhubung." };
@@ -139,6 +180,7 @@ export async function getSeenTiktokProducts(): Promise<
     (a, b) => b.last_order_at - a.last_order_at,
   );
   gSeen.__ktdSeenTik = { at: Date.now(), products };
+  await seenDbSet("seen-tiktok:v1", products);
   return { ok: true, products };
 }
 
@@ -163,6 +205,11 @@ export async function getSeenBlibliProducts(): Promise<
 > {
   const hit = seenCacheGet(gSeen.__ktdSeenBli);
   if (hit) return { ok: true, products: hit };
+  const dbHit = await seenDbGet("seen-blibli:v1", gSeen.__ktdSeenBli);
+  if (dbHit) {
+    gSeen.__ktdSeenBli = { at: Date.now(), products: dbHit };
+    return { ok: true, products: dbHit };
+  }
   const r = await listBlibliOrders({
     statusFPDateRange: {
       start: Date.now() - 30 * 24 * 60 * 60 * 1000,
@@ -203,6 +250,7 @@ export async function getSeenBlibliProducts(): Promise<
     (a, b) => b.last_order_at - a.last_order_at,
   );
   gSeen.__ktdSeenBli = { at: Date.now(), products };
+  await seenDbSet("seen-blibli:v1", products);
   return { ok: true, products };
 }
 
@@ -226,6 +274,11 @@ export async function getSeenLazadaProducts(): Promise<
 > {
   const hit = seenCacheGet(gSeen.__ktdSeenLaz);
   if (hit) return { ok: true, products: hit };
+  const dbHit = await seenDbGet("seen-lazada:v1", gSeen.__ktdSeenLaz);
+  if (dbHit) {
+    gSeen.__ktdSeenLaz = { at: Date.now(), products: dbHit };
+    return { ok: true, products: dbHit };
+  }
   const bySku = new Map<string, SeenLazadaProduct>();
   const pages = 4; // 4 × 50 = 200 produk terbaru
   for (let page = 0; page < pages; page++) {
@@ -255,5 +308,6 @@ export async function getSeenLazadaProducts(): Promise<
   }
   const products = [...bySku.values()];
   gSeen.__ktdSeenLaz = { at: Date.now(), products };
+  await seenDbSet("seen-lazada:v1", products);
   return { ok: true, products };
 }
