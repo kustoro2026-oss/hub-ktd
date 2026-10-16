@@ -479,6 +479,12 @@ function migrateSqlite(db: DatabaseSync) {
       fetched_at TEXT NOT NULL DEFAULT ''
     );
 
+    CREATE TABLE IF NOT EXISTS ktd_store_harga (
+      aneka_id TEXT PRIMARY KEY,
+      harga INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
     CREATE TABLE IF NOT EXISTS topup_orders (
       id TEXT PRIMARY KEY,
       ref_id TEXT NOT NULL UNIQUE,
@@ -892,6 +898,12 @@ async function migratePg(pool: Pool) {
       k TEXT PRIMARY KEY,
       data TEXT NOT NULL DEFAULT '',
       fetched_at TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS ktd_store_harga (
+      aneka_id TEXT PRIMARY KEY,
+      harga INTEGER NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
     CREATE TABLE IF NOT EXISTS topup_orders (
@@ -3103,4 +3115,48 @@ export async function deleteHargaSnapshot(
     "DELETE FROM harga_snapshot WHERE marketplace = ? AND sku_key = ?",
     [marketplace, skuKey],
   );
+}
+
+// ---------- Harga jual KTD Store (override rekomendasi jual Aneka) ----------
+
+export type KtdStoreHargaRow = {
+  aneka_id: string;
+  harga: number;
+  updated_at: string;
+};
+
+/** Semua harga jual override KTD Store (biasanya hanya sebagian katalog). */
+export async function listKtdStoreHarga(): Promise<KtdStoreHargaRow[]> {
+  return queryAll<KtdStoreHargaRow>(
+    "SELECT * FROM ktd_store_harga ORDER BY LOWER(aneka_id) ASC",
+  );
+}
+
+/** Simpan/timpa harga jual override (upsert per aneka_id). */
+export async function upsertKtdStoreHarga(
+  rows: { aneka_id: string; harga: number }[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  for (const r of rows) {
+    await queryRun(
+      `INSERT INTO ktd_store_harga (aneka_id, harga, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT (aneka_id) DO UPDATE SET harga = excluded.harga, updated_at = excluded.updated_at`,
+      [r.aneka_id, r.harga, nowUtc],
+    );
+  }
+}
+
+/** Hapus override (harga kembali ke rekomendasi jual Aneka).
+ *  Dipotong per 100 id — batas variabel terikat SQLite (999). */
+export async function deleteKtdStoreHarga(ids: string[]): Promise<void> {
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    const marks = chunk.map(() => "?").join(", ");
+    await queryRun(
+      `DELETE FROM ktd_store_harga WHERE aneka_id IN (${marks})`,
+      chunk,
+    );
+  }
 }

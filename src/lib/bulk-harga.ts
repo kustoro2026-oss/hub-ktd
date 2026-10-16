@@ -10,7 +10,7 @@
 //  - Snapshot "harga awal" disimpan OTOMATIS sebelum perubahan massal
 //    pertama (hanya SKU yang benar-benar berubah) — tombol Reset Semua
 //    memulihkannya lalu menghapus snapshot yang berhasil.
-import { findAnekaCatalogById } from "@/lib/aneka-map";
+import { findAnekaCatalogById, listAnekaCatalog } from "@/lib/aneka-map";
 import {
   getBlibliProductVariants,
   listBlibliProducts,
@@ -24,13 +24,16 @@ import {
 } from "@/lib/lazada-products";
 import {
   deleteHargaSnapshot,
+  deleteKtdStoreHarga,
   insertHargaSnapshot,
   listAnekaProductMaps,
   listAturanHarga,
   listBlibliProductMaps,
   listHargaSnapshot,
+  listKtdStoreHarga,
   listLazadaProductMaps,
   listTiktokShopTokens,
+  upsertKtdStoreHarga,
   type AturanHargaRow,
   type HargaSnapshotRow,
 } from "@/lib/db";
@@ -41,7 +44,7 @@ import {
   type TiktokShopCtx,
 } from "@/lib/tiktok-products";
 
-export type Marketplace = "tiktok" | "blibli" | "lazada";
+export type Marketplace = "tiktok" | "blibli" | "lazada" | "ktd-store";
 
 /** Satu aturan dalam bentuk yang dikirim/diterima UI. */
 export type AturanSimpan = {
@@ -445,6 +448,47 @@ export async function pratinjauLazada(): Promise<
     tanpaPemetaan,
     snapshotCount: snapshots.length,
   };
+}
+
+/** Pratinjau KTD Store: seluruh produk katalog Aneka (situs toko sendiri) —
+ *  satu baris per produk, tanpa pemetaan karena katalog Aneka ADALAH
+ *  katalog toko. Harga patokan = override tersimpan bila ada, selain itu
+ *  rekomendasi jual Aneka. */
+export async function pratinjauKtdStore(): Promise<
+  | { ok: true; rows: BarisPratinjau[]; tanpaPemetaan: number; snapshotCount: number }
+  | { ok: false; detail: string }
+> {
+  const [aturan, snapshots, overrideRows] = await Promise.all([
+    listAturanHarga("ktd-store"),
+    listHargaSnapshot("ktd-store"),
+    listKtdStoreHarga(),
+  ]);
+  const override = new Map(overrideRows.map((r) => [r.aneka_id, r.harga]));
+  const snapKeys = new Set(snapshots.map((s) => s.sku_key));
+  const rows: BarisPratinjau[] = [];
+  for (const p of listAnekaCatalog()) {
+    const id = String(p.id ?? "");
+    if (!id) continue;
+    const info = infoModalAneka(id);
+    const harga = info ? (override.get(id) ?? info.rekomendasiJual) : 0;
+    rows.push(
+      barisPratinjau({
+        skuKey: id,
+        productId: id,
+        skuId: "",
+        productName: p.name,
+        skuLabel: `Aneka #${id}`,
+        harga,
+        hargaMax: harga,
+        infoModal: info,
+        alasanModal: "Modal Aneka tidak ditemukan di snapshot katalog",
+        aturan,
+        punyaSnapshot: snapKeys.has(id),
+      }),
+    );
+  }
+  rows.sort((a, b) => a.productName.localeCompare(b.productName, "id"));
+  return { ok: true, rows, tanpaPemetaan: 0, snapshotCount: snapshots.length };
 }
 
 // ---------- Terapkan ----------
@@ -858,6 +902,83 @@ export async function terapkanLazada(
   };
 }
 
+/** Terapkan aturan ke produk KTD Store terpilih (kunci = id Aneka). Harga
+ *  patokan = override tersimpan bila ada, selain itu rekomendasi jual Aneka;
+ *  hasil disimpan ke tabel ktd_store_harga yang dibaca situs toko. Murni
+ *  basis data — tanpa API eksternal, jadi cepat dan aman. */
+export async function terapkanKtdStore(
+  pilihan: string[],
+): Promise<HasilTerapkan> {
+  const gagal: HasilTerapkan["gagal"] = [];
+  if (!Array.isArray(pilihan) || pilihan.length === 0) {
+    return { ok: false, diubah: 0, gagal, detail: "Tidak ada produk yang dipilih.", catatan: [] };
+  }
+  if (pilihan.length > MAKS_PRODUK_TERAPKAN) {
+    return {
+      ok: false,
+      diubah: 0,
+      gagal,
+      detail: `Maksimal ${MAKS_PRODUK_TERAPKAN} produk per sekali terapkan (dipilih ${pilihan.length}) — terapkan bertahap.`,
+      catatan: [],
+    };
+  }
+  const [aturan, overrideRows] = await Promise.all([
+    listAturanHarga("ktd-store"),
+    listKtdStoreHarga(),
+  ]);
+  const override = new Map(overrideRows.map((r) => [r.aneka_id, r.harga]));
+  const akanSimpan: { aneka_id: string; harga: number }[] = [];
+  for (const id of pilihan) {
+    const info = infoModalAneka(id);
+    if (!info) {
+      gagal.push({ skuKey: id, label: id, detail: "Harga modal Aneka tidak ditemukan di katalog — refresh snapshot katalog." });
+      continue;
+    }
+    const sekarang = override.get(id) ?? info.rekomendasiJual;
+    const profit = sekarang - info.modal;
+    const a = cocokAturan(profit, aturan);
+    if (!a) continue; // tidak kena aturan — biarkan (bukan gagal)
+    const baru = hitungHargaBaru(
+      sekarang,
+      a.aksi as "potong" | "naik",
+      a.jenis as "rp" | "persen",
+      a.nilai,
+    );
+    if (baru < 1 || baru === sekarang) {
+      gagal.push({
+        skuKey: id,
+        label: id,
+        detail: baru < 1 ? "Harga baru di bawah Rp 1 — dilewati." : "Perubahan kurang dari Rp 1 — dilewati.",
+      });
+      continue;
+    }
+    const cat = findAnekaCatalogById(id);
+    await insertHargaSnapshot({
+      marketplace: "ktd-store",
+      sku_key: id,
+      product_id: id,
+      sku_id: "",
+      product_name: cat?.name ?? id,
+      sku_label: `Aneka #${id}`,
+      harga_regular: sekarang,
+      harga_sale: 0,
+      pickup_point_code: "",
+    });
+    akanSimpan.push({ aneka_id: id, harga: baru });
+  }
+  await upsertKtdStoreHarga(akanSimpan);
+  return {
+    ok: akanSimpan.length > 0 || gagal.length === 0,
+    diubah: akanSimpan.length,
+    gagal,
+    detail: "",
+    catatan:
+      akanSimpan.length > 0
+        ? ["Situs toko memakai harga baru dalam ±5 menit (cache)."]
+        : [],
+  };
+}
+
 // ---------- Reset ke harga awal ----------
 
 /** Pulihkan semua snapshot harga TikTok (satu panggilan per produk) lalu
@@ -1003,4 +1124,23 @@ export async function resetLazada(): Promise<HasilReset> {
     dipulihkan += reqs.length;
   }
   return { ok: true, dipulihkan, gagal, detail: "", catatan: [] };
+}
+
+/** Pulihkan semua harga KTD Store: hapus override tersimpan (harga kembali
+ *  ke rekomendasi jual Aneka) lalu hapus snapshot yang berhasil. */
+export async function resetKtdStore(): Promise<HasilReset> {
+  const gagal: HasilReset["gagal"] = [];
+  const snap = await listHargaSnapshot("ktd-store");
+  if (snap.length === 0) {
+    return { ok: false, dipulihkan: 0, gagal, detail: "Tidak ada snapshot harga untuk di-reset.", catatan: [] };
+  }
+  await deleteKtdStoreHarga(snap.map((s) => s.sku_key));
+  for (const s of snap) await deleteHargaSnapshot("ktd-store", s.sku_key);
+  return {
+    ok: true,
+    dipulihkan: snap.length,
+    gagal,
+    detail: "",
+    catatan: ["Situs toko kembali memakai rekomendasi jual Aneka dalam ±5 menit."],
+  };
 }

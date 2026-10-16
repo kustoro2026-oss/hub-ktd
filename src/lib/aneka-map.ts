@@ -122,6 +122,11 @@ export function findAnekaCatalogById(id: string): AnekaCatalogProduct | null {
   return CATALOG.find((p) => p.id === id) ?? null;
 }
 
+/** Seluruh produk katalog Aneka (snapshot) — dasar daftar produk KTD Store. */
+export function listAnekaCatalog(): AnekaCatalogProduct[] {
+  return CATALOG;
+}
+
 /** Tanggal pembuatan snapshot (teks info di UI). */
 export function anekaCatalogGeneratedAt(): string {
   return String((catalogData as { generatedAt?: string }).generatedAt ?? "");

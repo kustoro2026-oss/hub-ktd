@@ -22,12 +22,13 @@ import {
   XCircle,
 } from "lucide-react";
 
-type Marketplace = "tiktok" | "blibli" | "lazada";
+type Marketplace = "tiktok" | "blibli" | "lazada" | "ktd-store";
 
 const INFO: Record<Marketplace, { nama: string; pemetaanUrl: string }> = {
   tiktok: { nama: "TikTok Shop", pemetaanUrl: "/marketplace/tiktok/pemetaan" },
   blibli: { nama: "Blibli", pemetaanUrl: "/marketplace/blibli/pemetaan" },
   lazada: { nama: "Lazada", pemetaanUrl: "/marketplace/lazada/pemetaan" },
+  "ktd-store": { nama: "KTD Store", pemetaanUrl: "" },
 };
 
 type AturanApi = {
@@ -365,7 +366,9 @@ export default function BulkHargaClient({
           true,
           marketplace === "blibli"
             ? `${hasilGabung.diubah ?? 0} varian dikirim ke antrean Blibli — harga berubah dalam beberapa menit.`
-            : `Harga ${hasilGabung.diubah ?? 0} SKU berhasil diperbarui di ${info.nama}.`,
+            : marketplace === "ktd-store"
+              ? `${hasilGabung.diubah ?? 0} produk diperbarui di KTD Store — situs memakai harga baru dalam ±5 menit.`
+              : `Harga ${hasilGabung.diubah ?? 0} SKU berhasil diperbarui di ${info.nama}.`,
         );
         await loadPratinjau();
       } else {

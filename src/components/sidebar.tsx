@@ -90,6 +90,16 @@ export const NAV: NavSection[] = [
     title: "Marketplace",
     groups: [
       {
+        title: "KTD Store",
+        items: [
+          {
+            href: "/marketplace/ktd-store/produk",
+            label: "Produk",
+            Icon: Boxes,
+          },
+        ],
+      },
+      {
         title: "TikTok Shop",
         items: [
           {
@@ -249,6 +259,7 @@ export default function Sidebar() {
   // Grup marketplace yang sedang dibuka — TikTok Shop dan Blibli dibuka
   // sejak awal karena sudah aktif; grup lain tertutup sampai fiturnya hadir.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    "KTD Store": true,
     "TikTok Shop": true,
     Blibli: true,
   });

@@ -10,12 +10,15 @@ import { randomUUID } from "crypto";
 import { isAuthed } from "@/lib/auth";
 import {
   pratinjauBlibli,
+  pratinjauKtdStore,
   pratinjauLazada,
   pratinjauTiktok,
   resetBlibli,
+  resetKtdStore,
   resetLazada,
   resetTiktok,
   terapkanBlibli,
+  terapkanKtdStore,
   terapkanLazada,
   terapkanTiktok,
   validasiAturanSimpan,
@@ -31,9 +34,12 @@ function bad(detail: string) {
   return Response.json({ ok: false, detail }, { status: 400 });
 }
 
-/** Pastikan nilai marketplace valid ("tiktok" | "blibli" | "lazada"). */
+/** Pastikan nilai marketplace valid ("tiktok" | "blibli" | "lazada" |
+ *  "ktd-store"). */
 function pas(s: unknown): Marketplace | null {
-  return s === "tiktok" || s === "blibli" || s === "lazada" ? s : null;
+  return s === "tiktok" || s === "blibli" || s === "lazada" || s === "ktd-store"
+    ? s
+    : null;
 }
 
 /** Di production, body 5xx bisa diganti Cloudflare dengan halaman 502
@@ -52,7 +58,7 @@ export async function GET(request: Request) {
   }
   const url = new URL(request.url);
   const marketplace = pas(url.searchParams.get("marketplace"));
-  if (!marketplace) return bad("marketplace wajib tiktok, blibli, atau lazada.");
+  if (!marketplace) return bad("marketplace wajib tiktok, blibli, lazada, atau ktd-store.");
   const op = url.searchParams.get("op") ?? "pratinjau";
 
   if (op === "aturan") {
@@ -83,7 +89,9 @@ export async function GET(request: Request) {
           ? await pratinjauTiktok()
           : marketplace === "blibli"
             ? await pratinjauBlibli()
-            : await pratinjauLazada();
+            : marketplace === "lazada"
+              ? await pratinjauLazada()
+              : await pratinjauKtdStore();
       return Response.json(r);
     } catch (e) {
       return balasRusak(e);
@@ -102,7 +110,7 @@ export async function POST(request: Request) {
     unknown
   >;
   const marketplace = pas(body.marketplace);
-  if (!marketplace) return bad("marketplace wajib tiktok, blibli, atau lazada.");
+  if (!marketplace) return bad("marketplace wajib tiktok, blibli, lazada, atau ktd-store.");
   const op = String(body.op ?? "");
 
   if (op === "simpan-aturan") {
@@ -162,7 +170,9 @@ export async function POST(request: Request) {
           ? await terapkanTiktok(pilihan)
           : marketplace === "blibli"
             ? await terapkanBlibli(pilihan)
-            : await terapkanLazada(pilihan);
+            : marketplace === "lazada"
+              ? await terapkanLazada(pilihan)
+              : await terapkanKtdStore(pilihan);
       return Response.json(r);
     } catch (e) {
       return balasRusak(e);
@@ -176,7 +186,9 @@ export async function POST(request: Request) {
           ? await resetTiktok()
           : marketplace === "blibli"
             ? await resetBlibli()
-            : await resetLazada();
+            : marketplace === "lazada"
+              ? await resetLazada()
+              : await resetKtdStore();
       return Response.json(r);
     } catch (e) {
       return balasRusak(e);
