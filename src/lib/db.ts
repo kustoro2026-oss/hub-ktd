@@ -334,6 +334,18 @@ function migrateSqlite(db: DatabaseSync) {
       updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
 
+    CREATE TABLE IF NOT EXISTS lazada_seller_tokens (
+      seller_id TEXT PRIMARY KEY,
+      short_code TEXT NOT NULL DEFAULT '',
+      country TEXT NOT NULL DEFAULT '',
+      account TEXT NOT NULL DEFAULT '',
+      access_token TEXT NOT NULL DEFAULT '',
+      refresh_token TEXT NOT NULL DEFAULT '',
+      expires_at TEXT NOT NULL DEFAULT '',
+      refresh_expires_at TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
     CREATE TABLE IF NOT EXISTS tiktok_order_seen (
       order_id TEXT PRIMARY KEY,
       shop_id TEXT NOT NULL DEFAULT '',
@@ -700,6 +712,18 @@ async function migratePg(pool: Pool) {
       access_token TEXT NOT NULL DEFAULT '',
       refresh_token TEXT NOT NULL DEFAULT '',
       expires_at TEXT NOT NULL DEFAULT '',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS lazada_seller_tokens (
+      seller_id TEXT PRIMARY KEY,
+      short_code TEXT NOT NULL DEFAULT '',
+      country TEXT NOT NULL DEFAULT '',
+      account TEXT NOT NULL DEFAULT '',
+      access_token TEXT NOT NULL DEFAULT '',
+      refresh_token TEXT NOT NULL DEFAULT '',
+      expires_at TEXT NOT NULL DEFAULT '',
+      refresh_expires_at TEXT NOT NULL DEFAULT '',
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
@@ -1534,6 +1558,63 @@ export async function saveTiktokShopToken(
 export async function listTiktokShopTokens(): Promise<TiktokShopToken[]> {
   return queryAll<TiktokShopToken>(
     "SELECT * FROM tiktok_shop_tokens ORDER BY updated_at DESC",
+  );
+}
+
+// ---------- Token seller Lazada (Open Platform) ----------
+
+export type LazadaSellerToken = {
+  seller_id: string;
+  short_code: string;
+  country: string;
+  account: string;
+  access_token: string;
+  refresh_token: string;
+  expires_at: string;
+  refresh_expires_at: string;
+  updated_at: string;
+};
+
+/** Simpan/timpa token OAuth seller Lazada (kunci: seller_id). */
+export async function saveLazadaSellerToken(
+  t: Pick<
+    LazadaSellerToken,
+    | "seller_id"
+    | "short_code"
+    | "country"
+    | "account"
+    | "access_token"
+    | "refresh_token"
+    | "expires_at"
+    | "refresh_expires_at"
+  >,
+): Promise<void> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  await queryRun(
+    `INSERT INTO lazada_seller_tokens (seller_id, short_code, country, account, access_token, refresh_token, expires_at, refresh_expires_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (seller_id) DO UPDATE SET short_code = excluded.short_code, country = excluded.country,
+       account = excluded.account, access_token = excluded.access_token,
+       refresh_token = excluded.refresh_token, expires_at = excluded.expires_at,
+       refresh_expires_at = excluded.refresh_expires_at, updated_at = excluded.updated_at`,
+    [
+      t.seller_id,
+      t.short_code ?? "",
+      t.country ?? "",
+      t.account ?? "",
+      t.access_token,
+      t.refresh_token,
+      t.expires_at,
+      t.refresh_expires_at,
+      nowUtc,
+    ],
+  );
+}
+
+/** Daftar seller Lazada yang sudah diotorisasi (token tersimpan). */
+export async function listLazadaSellerTokens(): Promise<LazadaSellerToken[]> {
+  return queryAll<LazadaSellerToken>(
+    "SELECT * FROM lazada_seller_tokens ORDER BY updated_at DESC",
   );
 }
 
