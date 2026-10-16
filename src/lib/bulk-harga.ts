@@ -73,8 +73,11 @@ function parseRpModal(s: string): number {
 
 /** Validasi daftar aturan sebelum disimpan — null = valid. */
 export function validasiAturanSimpan(rows: AturanSimpan[]): string | null {
-  if (!Array.isArray(rows) || rows.length === 0) {
-    return "Minimal satu aturan diperlukan — kosongkan dengan menonaktifkan semua aturan.";
+  // Daftar kosong sah: artinya semua aturan dihapus (editor mengirim daftar
+  // kosong saat aturan terakhir dihapus, dan tombol Simpan tidak lagi
+  // dinonaktifkan pada daftar kosong).
+  if (!Array.isArray(rows)) {
+    return "aturan wajib berupa daftar.";
   }
   if (rows.length > 20) return "Maksimal 20 aturan.";
   for (const r of rows) {

@@ -106,6 +106,22 @@ function fmtAksi(a: { aksi: string; jenis: string; nilai: number }): string {
   return a.jenis === "rp" ? `${tanda}${fmtRp(a.nilai)}` : `${tanda}${a.nilai}%`;
 }
 
+/** Serialisasi stabil untuk membandingkan draf dengan kondisi terakhir
+ *  yang tersimpan di server (indikator "Belum disimpan"). */
+function serializeDraf(daftar: AturanDraft[]): string {
+  return JSON.stringify(
+    daftar.map((d) => [
+      d.id,
+      d.minProfit,
+      d.maxProfit,
+      d.aksi,
+      d.jenis,
+      d.nilai,
+      d.aktif,
+    ]),
+  );
+}
+
 /** Draf aturan baru (contoh awal sesuai permintaan: profit ≥ 20.000 →
  *  potong Rp 2.000). */
 function draftBaru(): AturanDraft {
@@ -148,6 +164,9 @@ export default function BulkHargaClient({
     { ok: true, teks: "" },
   );
   const [simpanSedang, setSimpanSedang] = useState(false);
+  // Serialisasi draf terakhir yang tersimpan di server — pembanding untuk
+  // penanda "Belum disimpan" (kosong = belum pernah dimuat/disimpan).
+  const [dasarTersimpan, setDasarTersimpan] = useState<string>("");
 
   // ---------- Pratinjau ----------
   const [pratinjau, setPratinjau] = useState<PratinjauApi | null>(null);
@@ -187,7 +206,9 @@ export default function BulkHargaClient({
         | { ok: true; aturan: AturanApi[] }
         | { ok: false; detail?: string };
       if (data.ok) {
-        setDrafts(data.aturan.map(apiKeDraft));
+        const daftar = data.aturan.map(apiKeDraft);
+        setDrafts(daftar);
+        setDasarTersimpan(serializeDraf(daftar));
         setMuatAturan("idle");
       } else {
         setMuatAturan("error");
@@ -243,17 +264,20 @@ export default function BulkHargaClient({
     });
   };
 
-  const simpanAturan = async () => {
+  /** Simpan daftar aturan ke server. Dipakai oleh tombol Simpan Aturan dan
+   *  oleh penghapusan aturan (hapus = langsung tersimpan otomatis, supaya
+   *  refresh halaman tidak memunculkan lagi aturan yang sudah dihapus). */
+  const simpanDaftar = async (daftar: AturanDraft[]): Promise<boolean> => {
     setPesanAturan({ ok: true, teks: "" });
     // Validasi ringan di sisi klien — validasi lengkap tetap di server.
-    for (const d of drafts) {
+    for (const d of daftar) {
       const min = Number(d.minProfit);
       if (!Number.isInteger(min) || min < 0) {
         setPesanAturan({
           ok: false,
           teks: "Batas profit minimum harus bilangan bulat ≥ 0.",
         });
-        return;
+        return false;
       }
       if (d.maxProfit !== "") {
         const max = Number(d.maxProfit);
@@ -262,13 +286,13 @@ export default function BulkHargaClient({
             ok: false,
             teks: "Batas maksimum harus bilangan bulat ≥ batas minimum (atau kosong).",
           });
-          return;
+          return false;
         }
       }
       const nilai = Number(d.nilai);
       if (!Number.isFinite(nilai) || nilai <= 0) {
         setPesanAturan({ ok: false, teks: "Nilai aturan harus angka > 0." });
-        return;
+        return false;
       }
     }
     setSimpanSedang(true);
@@ -279,7 +303,7 @@ export default function BulkHargaClient({
         body: JSON.stringify({
           marketplace,
           op: "simpan-aturan",
-          aturan: drafts.map((d, i) => ({
+          aturan: daftar.map((d, i) => ({
             id: d.id,
             posisi: i,
             minProfit: Number(d.minProfit),
@@ -296,19 +320,36 @@ export default function BulkHargaClient({
         detail?: string;
         tersimpan?: number;
       };
-      setPesanAturan(
-        data.ok
-          ? {
-              ok: true,
-              teks: `${data.tersimpan ?? drafts.length} aturan tersimpan — muat ulang pratinjau untuk melihat efeknya.`,
-            }
-          : { ok: false, teks: data.detail ?? "Gagal menyimpan aturan." },
-      );
+      if (data.ok) {
+        setDasarTersimpan(serializeDraf(daftar));
+        setPesanAturan({
+          ok: true,
+          teks:
+            daftar.length === 0
+              ? "Semua aturan dihapus — muat ulang pratinjau untuk melihat efeknya."
+              : `${data.tersimpan ?? daftar.length} aturan tersimpan — muat ulang pratinjau untuk melihat efeknya.`,
+        });
+        return true;
+      }
+      setPesanAturan({ ok: false, teks: data.detail ?? "Gagal menyimpan aturan." });
+      return false;
     } catch {
       setPesanAturan({ ok: false, teks: "Gagal menghubungi server (jaringan)." });
+      return false;
     } finally {
       setSimpanSedang(false);
     }
+  };
+
+  const simpanAturan = async () => {
+    await simpanDaftar(drafts);
+  };
+
+  /** Hapus aturan = langsung tersimpan otomatis (bukan sekadar draf lokal). */
+  const hapusDraf = (id: string) => {
+    const sisa = drafts.filter((y) => y.id !== id);
+    setDrafts(sisa);
+    void simpanDaftar(sisa);
   };
 
   const terapkan = async () => {
@@ -433,7 +474,8 @@ export default function BulkHargaClient({
         (level produk, dari pemetaan &amp; snapshot katalog). Aturan dinilai
         berurutan dari atas — aturan pertama yang cocok menang. Harga awal
         disimpan otomatis sebelum perubahan massal pertama; tombol Reset Semua
-        memulihkannya.
+        memulihkannya. Menghapus aturan (ikon tong sampah) langsung tersimpan;
+        mengubah angka/centang perlu klik <strong>Simpan Aturan</strong>.
         {pratinjau?.ok && pratinjau.tanpaPemetaan > 0 ? (
           <span className="mt-1 block text-amber-700">
             {pratinjau.tanpaPemetaan} produk tanpa pemetaan Aneka — petakan di{" "}
@@ -451,8 +493,14 @@ export default function BulkHargaClient({
       {/* ---------- Editor aturan ---------- */}
       <div className="rounded-xl border border-slate-200 bg-white p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold text-slate-800">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
             Aturan Harga ({drafts.length})
+            {dasarTersimpan !== "" &&
+            serializeDraf(drafts) !== dasarTersimpan ? (
+              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-800">
+                Belum disimpan
+              </span>
+            ) : null}
           </h2>
           <div className="flex items-center gap-2">
             <button
@@ -472,7 +520,7 @@ export default function BulkHargaClient({
             <button
               type="button"
               onClick={() => void simpanAturan()}
-              disabled={simpanSedang || drafts.length === 0}
+              disabled={simpanSedang}
               className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-60"
             >
               {simpanSedang ? (
@@ -505,6 +553,8 @@ export default function BulkHargaClient({
           <div className="rounded-lg border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">
             Belum ada aturan. Contoh: <strong>profit ≥ 20.000 → potong Rp
             2.000</strong> — klik Tambah Aturan, lalu sesuaikan nilainya.
+            Menghapus aturan tersimpan otomatis, jadi daftar kosong ini tetap
+            kosong setelah halaman dimuat ulang.
           </div>
         ) : (
           <div className="space-y-2">
@@ -598,9 +648,11 @@ export default function BulkHargaClient({
                 </label>
                 <button
                   type="button"
-                  onClick={() => setDrafts((x) => x.filter((y) => y.id !== d.id))}
-                  className="ml-auto rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600"
+                  onClick={() => hapusDraf(d.id)}
+                  disabled={simpanSedang}
+                  className="ml-auto rounded p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-40"
                   aria-label="Hapus aturan"
+                  title="Hapus aturan (langsung tersimpan)"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
