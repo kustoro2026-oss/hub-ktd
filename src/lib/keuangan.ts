@@ -381,14 +381,41 @@ async function estimasiModalAneka(d: TiktokOrderDetail): Promise<number> {
 
 // ---------- perakitan data keuangan ----------
 
-// Cache dalam-memori hasil perakitan (5 menit per rentang). Perakitan
-// menarik pesanan tiga pasar + detail secara live (belasan detik); pindah
-// menu tidak boleh mengulanginya. Tombol Muat Ulang (refreshAneka)
-// melewati cache.
+// Cache hasil perakitan keuangan (5 menit per rentang): L1 dalam-memori
+// (instance yang sama), L2 tabel aneka_finance_cache (lintas instance
+// serverless Vercel — tiap request bisa mendarat di instance berbeda).
+// Perakitan menarik pesanan tiga pasar + detail secara live (belasan
+// detik); pindah menu tidak boleh mengulanginya. Tombol Muat Ulang
+// (refreshAneka) melewati cache.
 const gKeu = globalThis as unknown as {
   __ktdKeuCache?: { key: string; at: number; data: DataKeuangan };
 };
 const KEU_CACHE_TTL_MS = 5 * 60 * 1000;
+const keuCacheKey = (dariMs: number, sampaiMs: number) =>
+  `keuangan:v1:${dariMs}|${sampaiMs}`;
+
+async function ambilCacheKeuangan(
+  key: string,
+): Promise<{ data: DataKeuangan } | null> {
+  const hit = gKeu.__ktdKeuCache;
+  if (hit && hit.key === key && Date.now() - hit.at < KEU_CACHE_TTL_MS) {
+    return { data: hit.data };
+  }
+  const row = await getAnekaFinanceCache(key);
+  if (
+    row?.fetched_at &&
+    Date.now() - Date.parse(row.fetched_at) < KEU_CACHE_TTL_MS
+  ) {
+    try {
+      const data = JSON.parse(row.data) as DataKeuangan;
+      gKeu.__ktdKeuCache = { key, at: Date.parse(row.fetched_at), data };
+      return { data };
+    } catch {
+      /* cache korup → hitung ulang */
+    }
+  }
+  return null;
+}
 
 /** Data lengkap dashboard keuangan untuk rentang [dariMs, sampaiMs)
  *  (epoch ms UTC). Order TikTok difilter waktu pembuatan; pembayaran Aneka
@@ -398,15 +425,10 @@ export async function ambilDataKeuangan(
   sampaiMs: number,
   opts: { refreshAneka?: boolean } = {},
 ): Promise<DataKeuangan> {
-  const cacheKey = `${dariMs}|${sampaiMs}`;
-  const hit = gKeu.__ktdKeuCache;
-  if (
-    !opts.refreshAneka &&
-    hit &&
-    hit.key === cacheKey &&
-    Date.now() - hit.at < KEU_CACHE_TTL_MS
-  ) {
-    return hit.data;
+  const cacheKey = keuCacheKey(dariMs, sampaiMs);
+  if (!opts.refreshAneka) {
+    const hit = await ambilCacheKeuangan(cacheKey);
+    if (hit) return hit.data;
   }
 
   // 1) Snapshot Aneka (riwayat + saldo).
@@ -863,5 +885,14 @@ export async function ambilDataKeuangan(
     perkiraanTopup,
   };
   gKeu.__ktdKeuCache = { key: cacheKey, at: Date.now(), data };
+  try {
+    await setAnekaFinanceCache(
+      cacheKey,
+      JSON.stringify(data),
+      new Date().toISOString(),
+    );
+  } catch {
+    /* penyimpanan cache gagal — halaman tetap dikembalikan */
+  }
   return data;
 }
