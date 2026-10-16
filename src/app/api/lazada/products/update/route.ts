@@ -45,13 +45,14 @@ export async function POST(request: Request) {
     limit: 50,
   });
   if (!list.ok) return Response.json({ ok: false, detail: list.detail });
-  let current: { price: number; quantity: number } | null = null;
+  let current: { price: number; quantity: number; skuId: string } | null = null;
   for (const p of list.data.items) {
     for (const s of p.skus ?? []) {
       if ((s.SellerSku ?? "") === sellerSku) {
         current = {
           price: Number(s.price ?? s.special_price ?? 0) || 0,
           quantity: Number(s.quantity) || 0,
+          skuId: String(s.SkuId ?? ""),
         };
       }
     }
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
       if (!Number.isFinite(price) || price < 1) {
         return bad("Harga harus angka ≥ 1.");
       }
-      update = { sellerSku, price, quantity: current.quantity };
+      update = { sellerSku, price, quantity: current.quantity, skuId: current.skuId || undefined };
       break;
     }
     case "priceDelta": {
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
       }
       const price = current.price + delta;
       if (price < 1) return bad("Harga baru di bawah Rp 1 — dibatalkan.");
-      update = { sellerSku, price, quantity: current.quantity };
+      update = { sellerSku, price, quantity: current.quantity, skuId: current.skuId || undefined };
       break;
     }
     case "stockDelta": {
@@ -92,6 +93,7 @@ export async function POST(request: Request) {
         sellerSku,
         price: current.price,
         quantity: current.quantity + delta,
+        skuId: current.skuId || undefined,
       };
       break;
     }
@@ -100,7 +102,7 @@ export async function POST(request: Request) {
       if (!Number.isInteger(stock) || stock < 0) {
         return bad("Stok persis harus bilangan bulat ≥ 0.");
       }
-      update = { sellerSku, price: current.price, quantity: stock };
+      update = { sellerSku, price: current.price, quantity: stock, skuId: current.skuId || undefined };
       break;
     }
     default:

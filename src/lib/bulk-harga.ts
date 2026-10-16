@@ -62,6 +62,9 @@ export type AturanSimpan = {
 /** Batas keamanan eksekusi per permintaan (serverless 60 detik). */
 const MAKS_PRODUK_TERAPKAN = 60;
 
+/** Jeda sederhana antar panggilan API Lazada (batas frekuensi ketat). */
+const tunda = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 /** "Rp18.450" → 18450. Katalog Aneka bersih (tanpa rentang "/"). */
 function parseRpModal(s: string): number {
   const n = Number(String(s ?? "").replace(/[^\d]/g, ""));
@@ -404,11 +407,25 @@ export async function pratinjauLazada(): Promise<
   let tanpaPemetaan = 0;
   let page = 0;
   for (;;) {
-    const r = await listLazadaProducts({
+    let r = await listLazadaProducts({
       filter: "all",
       offset: page * 50,
       limit: 50,
     });
+    // ApiCallLimit = ban sementara beberapa detik karena panggilan beruntun
+    // tanpa jeda (katalog ±700 SKU = 15 halaman) — coba lagi sebelum menyerah.
+    for (
+      let ulang = 0;
+      !r.ok && /ApiCallLimit|E901/.test(r.detail) && ulang < 3;
+      ulang++
+    ) {
+      await tunda(1500 * (ulang + 1));
+      r = await listLazadaProducts({
+        filter: "all",
+        offset: page * 50,
+        limit: 50,
+      });
+    }
     if (!r.ok) return { ok: false, detail: r.detail };
     for (const p of r.data.items) {
       const nama = String(p.attributes?.name ?? "");
@@ -440,6 +457,7 @@ export async function pratinjauLazada(): Promise<
     }
     if (r.data.items.length < 50 || page >= 40) break;
     page++;
+    await tunda(600); // kurangi tekanan ke batas frekuensi Lazada
   }
   rows.sort((a, b) => a.productName.localeCompare(b.productName, "id"));
   return {
@@ -794,11 +812,19 @@ export async function terapkanLazada(
   // Harga + stok segar lewat sku_seller_list (kelompok maks 100 SKU).
   const segar = new Map<
     string,
-    { harga: number; stok: number; nama: string }
+    { harga: number; stok: number; nama: string; skuId: string; itemId: string }
   >();
   for (let i = 0; i < pilihan.length; i += 100) {
     const chunk = pilihan.slice(i, i + 100);
-    const r = await listLazadaProducts({ filter: "all", skuSellerList: chunk });
+    let r = await listLazadaProducts({ filter: "all", skuSellerList: chunk });
+    for (
+      let ulang = 0;
+      !r.ok && /ApiCallLimit|E901/.test(r.detail) && ulang < 3;
+      ulang++
+    ) {
+      await tunda(1500 * (ulang + 1));
+      r = await listLazadaProducts({ filter: "all", skuSellerList: chunk });
+    }
     if (!r.ok) {
       for (const sku of chunk) {
         gagal.push({ skuKey: sku, label: sku, detail: r.detail });
@@ -816,6 +842,8 @@ export async function terapkanLazada(
           harga: special > 0 && special < price ? special : price,
           stok: Number(sku.quantity ?? 0) || 0,
           nama: nama || key,
+          skuId: String(sku.SkuId ?? ""),
+          itemId: String(p.item_id ?? ""),
         });
       }
     }
@@ -871,7 +899,13 @@ export async function terapkanLazada(
       harga_sale: 0,
       pickup_point_code: "",
     });
-    requests.push({ sellerSku: sku, price: baru, quantity: f.stok });
+    requests.push({
+      sellerSku: sku,
+      price: baru,
+      quantity: f.stok,
+      skuId: f.skuId || undefined,
+      itemId: f.itemId || undefined,
+    });
     berubah.push({ key: sku, label: sku });
   }
 

@@ -20,11 +20,15 @@ export type LazadaProductsFilter = {
 };
 
 /** Satu baris permintaan update massal — kirim harga + stok sekaligus
- *  (keduanya wajib di payload XML supaya nilai tidak terhapus). */
+ *  (keduanya wajib di payload XML supaya nilai tidak terhapus). SkuId dan
+ *  ItemId opsional, diambil dari daftar produk supaya payload persis
+ *  mengikuti contoh resmi Open Platform. */
 export type LazadaBulkItemUpdate = {
   sellerSku: string;
   price: number;
   quantity: number;
+  skuId?: string;
+  itemId?: string;
 };
 
 /** GetProducts — daftar produk beserta SKU-nya (SellerSku = kunci pemetaan).
@@ -52,17 +56,25 @@ function xmlEscape(s: string): string {
     .replace(/'/g, "&apos;");
 }
 
-/** Susun payload XML UpdatePriceQuantity untuk satu kelompok produk. */
+/** Susun payload XML UpdatePriceQuantity untuk satu kelompok produk.
+ *  Format resmi Open Platform membungkus tiap SKU dalam
+ *  <Request><Product><Skus><Sku>...</Sku></Skus></Product></Request> —
+ *  tanpa pembungkus Skus/Sku API menolak dengan E006 (Unexpected
+ *  internal error) untuk SEMUA SKU. */
 function buildPriceQuantityXml(rows: LazadaBulkItemUpdate[]): string {
-  const products = rows
-    .map(
-      (r) =>
-        `<Product><SellerSku>${xmlEscape(r.sellerSku)}</SellerSku><Price>${Math.round(
-          r.price,
-        )}</Price><Quantity>${Math.max(0, Math.round(r.quantity))}</Quantity></Product>`,
-    )
+  const skus = rows
+    .map((r) => {
+      const itemId = r.itemId ? `<ItemId>${xmlEscape(r.itemId)}</ItemId>` : "";
+      const skuId = r.skuId ? `<SkuId>${xmlEscape(r.skuId)}</SkuId>` : "";
+      return (
+        `<Sku>${itemId}${skuId}` +
+        `<SellerSku>${xmlEscape(r.sellerSku)}</SellerSku>` +
+        `<Price>${Math.round(r.price)}</Price>` +
+        `<Quantity>${Math.max(0, Math.round(r.quantity))}</Quantity></Sku>`
+      );
+    })
     .join("");
-  return `<Request>${products}</Request>`;
+  return `<Request><Product><Skus>${skus}</Skus></Product></Request>`;
 }
 
 /** UpdatePriceQuantity — update massal harga/stok dalam kelompok maks 20
@@ -81,7 +93,17 @@ export async function updateLazadaProductsBulk(
   const chunk = 20;
   for (let i = 0; i < requests.length; i += chunk) {
     const part = requests.slice(i, i + chunk);
-    const r = await updateLazadaPriceQuantity(buildPriceQuantityXml(part));
+    let r = await updateLazadaPriceQuantity(buildPriceQuantityXml(part));
+    // ApiCallLimit/E901 = batas frekuensi Lazada yang sementara (ban beberapa
+    // detik) — coba lagi dengan jeda sebelum dinyatakan gagal.
+    for (
+      let ulang = 0;
+      !r.ok && /ApiCallLimit|E901/.test(r.detail) && ulang < 3;
+      ulang++
+    ) {
+      await new Promise((res) => setTimeout(res, 1500 * (ulang + 1)));
+      r = await updateLazadaPriceQuantity(buildPriceQuantityXml(part));
+    }
     if (!r.ok) {
       return {
         ok: false,
