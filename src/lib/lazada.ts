@@ -393,9 +393,33 @@ export async function getLazadaOrders(
         ...o,
         statuses: Array.isArray(o.statuses) ? o.statuses : [],
         items_count: Number(o.items_count ?? 0),
+        // API Lazada ID mengembalikan waktu lokal ber-offset (mis.
+        // "2026-10-13 06:24:54 +0700") — normalisasi ke UTC murni karena
+        // semua kode hilir (tabel pesanan, keuangan) mengasumsikan UTC.
+        created_at: lazadaTimeUtc(o.created_at),
+        updated_at: lazadaTimeUtc(o.updated_at),
       })),
     },
   };
+}
+
+/** Normalisasi stempel waktu Lazada ("YYYY-MM-DD HH:MM:SS [+HHMM]") menjadi
+ *  UTC murni "YYYY-MM-DD HH:MM:SS". Tanpa offset dianggap sudah UTC; input
+ *  yang bukan pola ini dikembalikan apa adanya. Idempotent. */
+export function lazadaTimeUtc(s: string): string {
+  if (!s) return "";
+  const m = /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2})(?: ([+-])(\d{2}):?(\d{2}))?$/.exec(
+    s.trim(),
+  );
+  if (!m) return s;
+  const base = Date.parse(m[1] + "T" + m[2] + "Z");
+  if (!Number.isFinite(base)) return s;
+  const shiftMin = m[3]
+    ? (m[3] === "+" ? 1 : -1) * (Number(m[4]) * 60 + Number(m[5] ?? 0))
+    : 0;
+  const d = new Date(base - shiftMin * 60_000);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${p(d.getUTCMonth() + 1)}-${p(d.getUTCDate())} ${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
 }
 
 /** Satu order item dari /order/items/get — Lazada menulis SATU baris per
