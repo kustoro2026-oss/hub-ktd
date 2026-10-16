@@ -3117,6 +3117,24 @@ export async function deleteHargaSnapshot(
   );
 }
 
+/** Hapus banyak snapshot sekaligus (reset massal) — satu query per potongan,
+ *  bukan satu kueri per baris, supaya reset ratusan baris tidak melewati
+ *  batas waktu serverless. */
+export async function deleteHargaSnapshotBanyak(
+  marketplace: string,
+  skuKeys: string[],
+): Promise<void> {
+  if (skuKeys.length === 0) return;
+  for (let i = 0; i < skuKeys.length; i += 500) {
+    const chunk = skuKeys.slice(i, i + 500);
+    const marks = chunk.map(() => "?").join(", ");
+    await queryRun(
+      `DELETE FROM harga_snapshot WHERE marketplace = ? AND sku_key IN (${marks})`,
+      [marketplace, ...chunk],
+    );
+  }
+}
+
 // ---------- Harga jual KTD Store (override rekomendasi jual Aneka) ----------
 
 export type KtdStoreHargaRow = {

@@ -24,6 +24,7 @@ import {
 } from "@/lib/lazada-products";
 import {
   deleteHargaSnapshot,
+  deleteHargaSnapshotBanyak,
   deleteKtdStoreHarga,
   insertHargaSnapshot,
   listAnekaProductMaps,
@@ -1174,7 +1175,10 @@ export async function resetKtdStore(): Promise<HasilReset> {
     return { ok: false, dipulihkan: 0, gagal, detail: "Tidak ada snapshot harga untuk di-reset.", catatan: [] };
   }
   await deleteKtdStoreHarga(snap.map((s) => s.sku_key));
-  for (const s of snap) await deleteHargaSnapshot("ktd-store", s.sku_key);
+  // Hapus snapshot massal (satu query per potongan) — penghapusan per baris
+  // memakan ratusan kueri berurutan dan pernah membuat reset terpotong
+  // batas 60 detik serverless di tengah jalan.
+  await deleteHargaSnapshotBanyak("ktd-store", snap.map((s) => s.sku_key));
   return {
     ok: true,
     dipulihkan: snap.length,
