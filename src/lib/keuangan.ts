@@ -381,6 +381,15 @@ async function estimasiModalAneka(d: TiktokOrderDetail): Promise<number> {
 
 // ---------- perakitan data keuangan ----------
 
+// Cache dalam-memori hasil perakitan (5 menit per rentang). Perakitan
+// menarik pesanan tiga pasar + detail secara live (belasan detik); pindah
+// menu tidak boleh mengulanginya. Tombol Muat Ulang (refreshAneka)
+// melewati cache.
+const gKeu = globalThis as unknown as {
+  __ktdKeuCache?: { key: string; at: number; data: DataKeuangan };
+};
+const KEU_CACHE_TTL_MS = 5 * 60 * 1000;
+
 /** Data lengkap dashboard keuangan untuk rentang [dariMs, sampaiMs)
  *  (epoch ms UTC). Order TikTok difilter waktu pembuatan; pembayaran Aneka
  *  difilter stempel kode pembayarannya. */
@@ -389,6 +398,17 @@ export async function ambilDataKeuangan(
   sampaiMs: number,
   opts: { refreshAneka?: boolean } = {},
 ): Promise<DataKeuangan> {
+  const cacheKey = `${dariMs}|${sampaiMs}`;
+  const hit = gKeu.__ktdKeuCache;
+  if (
+    !opts.refreshAneka &&
+    hit &&
+    hit.key === cacheKey &&
+    Date.now() - hit.at < KEU_CACHE_TTL_MS
+  ) {
+    return hit.data;
+  }
+
   // 1) Snapshot Aneka (riwayat + saldo).
   const aneka = await ambilSnapshotAneka(opts.refreshAneka ?? false);
   const snapRows = aneka.snapshot?.rows ?? [];
@@ -821,7 +841,7 @@ export async function ambilDataKeuangan(
     if (perkiraanTopup < 0) perkiraanTopup = null;
   }
 
-  return {
+  const data: DataKeuangan = {
     dariMs,
     sampaiMs,
     omset,
@@ -842,4 +862,6 @@ export async function ambilDataKeuangan(
     orderBatalTerbayar,
     perkiraanTopup,
   };
+  gKeu.__ktdKeuCache = { key: cacheKey, at: Date.now(), data };
+  return data;
 }

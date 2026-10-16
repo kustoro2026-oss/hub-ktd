@@ -217,6 +217,10 @@ function NavLink({
   return (
     <Link
       href={item.href}
+      // Prefetch DIMATIKAN: halaman dashboard menarik API marketplace
+      // secara live, jadi prefetch semua menu (yang dipicu begitu link
+      // masuk viewport) membanjiri fungsi server saat berpindah halaman.
+      prefetch={false}
       className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${
         active
           ? "bg-emerald-600 font-medium text-white"

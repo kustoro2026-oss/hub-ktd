@@ -180,6 +180,8 @@ export default function LazadaMapClient({
     return acc;
   });
   const [seen, setSeen] = useState<SeenProduct[]>(initialSeen);
+  // Daftar produk terlihat dimuat klien (bukan render server) — lihat sync().
+  const [seenLoading, setSeenLoading] = useState(true);
   const [saving, setSaving] = useState<string>("");
   const [error, setError] = useState("");
   // Formulir pemetaan manual (produk Lazada yang belum ada di katalog).
@@ -188,20 +190,30 @@ export default function LazadaMapClient({
   const [manualAneka, setManualAneka] = useState<CatalogHit | null>(null);
 
   const sync = useCallback(async () => {
-    const r = await fetch("/api/lazada/map", { cache: "no-store" });
-    const data = (await r.json()) as {
-      maps?: MapRow[];
-      seen?: SeenProduct[];
-      seenDetail?: string;
-    };
-    if (data.maps) {
-      const acc: Record<string, MapRow> = {};
-      for (const m of data.maps) acc[m.lazada_sku] = m;
-      setMapsById(acc);
+    try {
+      const r = await fetch("/api/lazada/map", { cache: "no-store" });
+      const data = (await r.json()) as {
+        maps?: MapRow[];
+        seen?: SeenProduct[];
+        seenDetail?: string;
+      };
+      if (data.maps) {
+        const acc: Record<string, MapRow> = {};
+        for (const m of data.maps) acc[m.lazada_sku] = m;
+        setMapsById(acc);
+      }
+      if (data.seen) setSeen(data.seen);
+      if (data.seenDetail) setError(data.seenDetail);
+    } finally {
+      setSeenLoading(false);
     }
-    if (data.seen) setSeen(data.seen);
-    if (data.seenDetail) setError(data.seenDetail);
   }, []);
+
+  // Muat produk terlihat setelah mount — 4 panggilan API Lazada tidak
+  // boleh memblokir render halaman (hasilnya di-cache 5 menit di server).
+  useEffect(() => {
+    void sync();
+  }, [sync]);
 
   const saveMap = useCallback(
     async (lazadaSku: string, productName: string, hit: CatalogHit) => {
@@ -412,7 +424,11 @@ export default function LazadaMapClient({
             {seenDetail}
           </div>
         ) : null}
-        {rows.length === 0 ? (
+        {seenLoading ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+            Memuat produk dari katalog Lazada…
+          </div>
+        ) : rows.length === 0 ? (
           <div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
             Belum ada produk yang terlihat dari katalog Lazada. Impor
             pemetaan awal lewat tombol biru, tambahkan manual di bawah, atau

@@ -51,6 +51,9 @@ export default function MobileNav() {
             <Link
               key={href}
               href={href}
+              // Prefetch dimatikan — halaman dashboard menarik API
+              // marketplace live; prefetch semua menu membebani server.
+              prefetch={false}
               className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs ${
                 active
                   ? "bg-emerald-600 font-medium text-white"

@@ -30,6 +30,21 @@ export type SeenTiktokProduct = {
 
 const CATALOG = (catalogData as { products: AnekaCatalogProduct[] }).products;
 
+// ————— cache daftar "produk terlihat" (5 menit) —————
+// Daftar ini bersumber dari API marketplace yang lambat (pesanan 30 hari /
+// katalog live). Cached di globalThis (satu proses serverless) supaya
+// pindah menu tidak memicu panggilan API ulang setiap render halaman.
+type SeenCacheEntry<T> = { at: number; products: T[] };
+const gSeen = globalThis as unknown as {
+  __ktdSeenTik?: SeenCacheEntry<SeenTiktokProduct>;
+  __ktdSeenBli?: SeenCacheEntry<SeenBlibliProduct>;
+  __ktdSeenLaz?: SeenCacheEntry<SeenLazadaProduct>;
+};
+const SEEN_CACHE_TTL_MS = 5 * 60 * 1000;
+function seenCacheGet<T>(c: SeenCacheEntry<T> | undefined): T[] | null {
+  return c && Date.now() - c.at < SEEN_CACHE_TTL_MS ? c.products : null;
+}
+
 /** Normalisasi nama produk untuk pencocokan (huruf kecil, tanpa tanda baca). */
 function norm(s: string): string {
   return s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, " ").replace(/\s+/g, " ").trim();
@@ -82,6 +97,8 @@ export function anekaCatalogGeneratedAt(): string {
 export async function getSeenTiktokProducts(): Promise<
   { ok: true; products: SeenTiktokProduct[] } | { ok: false; detail: string }
 > {
+  const hit = seenCacheGet(gSeen.__ktdSeenTik);
+  if (hit) return { ok: true, products: hit };
   const tokens = await listTiktokShopTokens();
   if (tokens.length === 0) {
     return { ok: false, detail: "Belum ada toko TikTok Shop yang terhubung." };
@@ -121,6 +138,7 @@ export async function getSeenTiktokProducts(): Promise<
   const products = [...byId.values()].sort(
     (a, b) => b.last_order_at - a.last_order_at,
   );
+  gSeen.__ktdSeenTik = { at: Date.now(), products };
   return { ok: true, products };
 }
 
@@ -143,6 +161,8 @@ export type SeenBlibliProduct = {
 export async function getSeenBlibliProducts(): Promise<
   { ok: true; products: SeenBlibliProduct[] } | { ok: false; detail: string }
 > {
+  const hit = seenCacheGet(gSeen.__ktdSeenBli);
+  if (hit) return { ok: true, products: hit };
   const r = await listBlibliOrders({
     statusFPDateRange: {
       start: Date.now() - 30 * 24 * 60 * 60 * 1000,
@@ -182,6 +202,7 @@ export async function getSeenBlibliProducts(): Promise<
   const products = [...bySku.values()].sort(
     (a, b) => b.last_order_at - a.last_order_at,
   );
+  gSeen.__ktdSeenBli = { at: Date.now(), products };
   return { ok: true, products };
 }
 
@@ -203,6 +224,8 @@ export type SeenLazadaProduct = {
 export async function getSeenLazadaProducts(): Promise<
   { ok: true; products: SeenLazadaProduct[] } | { ok: false; detail: string }
 > {
+  const hit = seenCacheGet(gSeen.__ktdSeenLaz);
+  if (hit) return { ok: true, products: hit };
   const bySku = new Map<string, SeenLazadaProduct>();
   const pages = 4; // 4 × 50 = 200 produk terbaru
   for (let page = 0; page < pages; page++) {
@@ -230,5 +253,7 @@ export async function getSeenLazadaProducts(): Promise<
     }
     if (r.data.total <= (page + 1) * 50) break;
   }
-  return { ok: true, products: [...bySku.values()] };
+  const products = [...bySku.values()];
+  gSeen.__ktdSeenLaz = { at: Date.now(), products };
+  return { ok: true, products };
 }
