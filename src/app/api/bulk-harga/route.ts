@@ -1,5 +1,5 @@
-// Aturan harga massal (TikTok Shop & Blibli) — satu route konsolidasi untuk
-// kedua marketplace. Hanya untuk sesi admin.
+// Aturan harga massal (TikTok Shop, Blibli & Lazada) — satu route
+// konsolidasi untuk ketiga marketplace. Hanya untuk sesi admin.
 //
 // GET  /api/bulk-harga?marketplace=tiktok&op=aturan    → daftar aturan
 // GET  /api/bulk-harga?marketplace=tiktok&op=pratinjau → baris pratinjau
@@ -10,10 +10,13 @@ import { randomUUID } from "crypto";
 import { isAuthed } from "@/lib/auth";
 import {
   pratinjauBlibli,
+  pratinjauLazada,
   pratinjauTiktok,
   resetBlibli,
+  resetLazada,
   resetTiktok,
   terapkanBlibli,
+  terapkanLazada,
   terapkanTiktok,
   validasiAturanSimpan,
   type AturanSimpan,
@@ -28,9 +31,9 @@ function bad(detail: string) {
   return Response.json({ ok: false, detail }, { status: 400 });
 }
 
-/** Pastikan nilai marketplace valid ("tiktok" | "blibli"). */
+/** Pastikan nilai marketplace valid ("tiktok" | "blibli" | "lazada"). */
 function pas(s: unknown): Marketplace | null {
-  return s === "tiktok" || s === "blibli" ? s : null;
+  return s === "tiktok" || s === "blibli" || s === "lazada" ? s : null;
 }
 
 /** Di production, body 5xx bisa diganti Cloudflare dengan halaman 502
@@ -49,7 +52,7 @@ export async function GET(request: Request) {
   }
   const url = new URL(request.url);
   const marketplace = pas(url.searchParams.get("marketplace"));
-  if (!marketplace) return bad("marketplace wajib tiktok atau blibli.");
+  if (!marketplace) return bad("marketplace wajib tiktok, blibli, atau lazada.");
   const op = url.searchParams.get("op") ?? "pratinjau";
 
   if (op === "aturan") {
@@ -76,7 +79,11 @@ export async function GET(request: Request) {
   if (op === "pratinjau") {
     try {
       const r =
-        marketplace === "tiktok" ? await pratinjauTiktok() : await pratinjauBlibli();
+        marketplace === "tiktok"
+          ? await pratinjauTiktok()
+          : marketplace === "blibli"
+            ? await pratinjauBlibli()
+            : await pratinjauLazada();
       return Response.json(r);
     } catch (e) {
       return balasRusak(e);
@@ -95,7 +102,7 @@ export async function POST(request: Request) {
     unknown
   >;
   const marketplace = pas(body.marketplace);
-  if (!marketplace) return bad("marketplace wajib tiktok atau blibli.");
+  if (!marketplace) return bad("marketplace wajib tiktok, blibli, atau lazada.");
   const op = String(body.op ?? "");
 
   if (op === "simpan-aturan") {
@@ -153,7 +160,9 @@ export async function POST(request: Request) {
       const r =
         marketplace === "tiktok"
           ? await terapkanTiktok(pilihan)
-          : await terapkanBlibli(pilihan);
+          : marketplace === "blibli"
+            ? await terapkanBlibli(pilihan)
+            : await terapkanLazada(pilihan);
       return Response.json(r);
     } catch (e) {
       return balasRusak(e);
@@ -163,7 +172,11 @@ export async function POST(request: Request) {
   if (op === "reset") {
     try {
       const r =
-        marketplace === "tiktok" ? await resetTiktok() : await resetBlibli();
+        marketplace === "tiktok"
+          ? await resetTiktok()
+          : marketplace === "blibli"
+            ? await resetBlibli()
+            : await resetLazada();
       return Response.json(r);
     } catch (e) {
       return balasRusak(e);

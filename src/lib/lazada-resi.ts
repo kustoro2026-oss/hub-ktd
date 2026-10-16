@@ -1,0 +1,720 @@
+// Deteksi pesanan Lazada baru → jalur dua arah, identik dengan pola modul
+// Blibli (blibli-resi.ts):
+//
+//  a. Item belum terpetakan ke Aneka → pemenuhan Lazada (pack → rts dengan
+//     nomor resi penjual "KT<order_id>" → unduh label resmi) lalu PDF
+//     dikirim ke WhatsApp pemilik toko.
+//  b. SEMUA item terpetakan ke Aneka → antrean eksekusi "menunggu"
+//     disiapkan (pemenuhan Lazada DITUNDA sampai tombol Setuju — status
+//     pesanan tidak berubah sebelum pemilik menyetujui).
+//
+// Alur pengecekan:
+//  1. Tarik pesanan terbaru (7 hari) lewat /orders/get dan bandingkan per
+//     order item dengan tabel lazada_order_seen (kunci order_item_id +
+//     order_id).
+//  2. Mode baseline: bila tabel masih kosong (pertama kali), semua item
+//     lama hanya DITANDAI tanpa kirim resi — mencegah banjir PDF sekaligus.
+//  3. Item dibatalkan: kabari admin lewat WA sekali, tandai "batal: ..." —
+//     resi tidak pernah dikirim untuk item batal.
+//  4. Item baru (status pending): ditahan NEW_ORDER_WAIT_MS (default 15
+//     menit, env LAZADA_RESI_DELAY_MINUTES) sebelum diproses — memberi
+//     kesempatan pembeli membatalkan. Selama menunggu statusnya
+//     "menunggu:<epoch_ms>".
+//  5. Setelah masa tunggu (dipicu item pending pertama pesanan): item
+//     pesanan diambil lewat /order/items/get → bila SEMUA terpetakan ke
+//     Aneka, pesanan disiapkan sebagai antrean Setuju; bila tidak,
+//     pemenuhan dijalankan dan label resmi dikirim ke WA admin. Satu
+//     pesanan = SATU proses, item anggota lain ikut ditandai.
+//  6. Kirim gagal ditandai + hitungan percobaan naik — dicoba ulang pada
+//     pengecekan berikutnya sampai batas, lalu dihentikan (label tetap
+//     bisa dibuka manual dari halaman Pesanan).
+//
+// Status pesanan Lazada yang relevan: pending (baru), packed/ready_to_ship
+// (sudah dipenuhi), canceled/returned/failed/lost (pembatalan/pengembalian).
+import {
+  countSeenLazadaOrders,
+  listLazadaOrderExecs,
+  listSeenLazadaOrders,
+  markLazadaOrderSeen,
+  recordLazadaOrderFailure,
+  touchLazadaOrderSeen,
+} from "@/lib/db";
+import {
+  cancelLazadaExec,
+  checkLazadaExecutable,
+  prepareLazadaExec,
+  type LazadaExecSourceItem,
+} from "@/lib/lazada-exec";
+import {
+  fulfillLazadaOrderForItems,
+  getLazadaCtx,
+  getLazadaOrderItems,
+  getLazadaOrders,
+  type LazadaOrderItemRow,
+  type LazadaOrderRow,
+} from "@/lib/lazada";
+import { LAZADA_STORE_NAME } from "@/lib/lazada-orders";
+import {
+  NOTIF_TEMPLATE,
+  ownerNumber,
+  sendDocument,
+  sendDocumentTemplate,
+  sendTemplateParams,
+  sendText,
+} from "@/lib/wa";
+
+/** Batas percobaan kirim ulang untuk item yang resinya gagal terkirim.
+ *  Dengan jeda RETRY_COOLDOWN_MS antar percobaan, batas ini mencakup
+ *  sekitar 6 jam pemulihan (label belum tersedia, situs sibuk, dll.). */
+const MAX_SEND_ATTEMPTS = 12;
+
+/** Jeda minimal antar percobaan ulang item yang gagal. Penting karena
+ *  pengecekan bisa berjalan tiap menit (tab admin terbuka) — tanpa jeda,
+ *  kegagalan sementara menghabiskan seluruh kuota percobaan dalam beberapa
+ *  menit lalu item diam selamanya. */
+const RETRY_COOLDOWN_MS = 30 * 60 * 1000;
+
+/** Lama item baru ditahan sebelum diproses (env LAZADA_RESI_DELAY_MINUTES,
+ *  default 15 menit) — memberi kesempatan pembeli membatalkan supaya label
+ *  tidak dicetak/dikirim percuma. */
+const NEW_ORDER_WAIT_MS =
+  (Number(process.env.LAZADA_RESI_DELAY_MINUTES) || 15) * 60 * 1000;
+
+/** Jeda minimal antar cek ulang status pesanan yang SUDAH diproses (untuk
+ *  deteksi pengembalian/pembatalan parsial) — /order/items/get dipanggil
+ *  per pesanan, tanpa jeda tick tiap menit akan menghabiskan kuota API. */
+const RETURN_CHECK_INTERVAL_MS = 30 * 60 * 1000;
+
+/** Status item yang perlu diproses (belum dipenuhi). "pending" = pesanan
+ *  baru menunggu penjual; to_pack/to_ship/ready_to_ship/packed/shipped/
+ *  delivered = sudah lewat gerbang pemrosesan. */
+const ACTIONABLE_STATUSES = [
+  "pending",
+  "to_pack",
+  "to_ship",
+  "packed",
+  "ready_to_ship",
+  "shipped",
+  "delivered",
+];
+
+/** Status item yang berarti "tidak akan dikirim" — pembatalan pembeli
+ *  (canceled) atau pengembalian/gagal antar (returned/failed/lost). */
+const PROBLEM_STATUSES = ["canceled", "returned", "failed", "lost"];
+
+const PESANAN_URL = "https://admin.kustoro2026.com/marketplace/lazada/pesanan";
+
+/** UTC "YYYY-MM-DD HH:MM:SS" → epoch ms. */
+function parseUtcMs(s: string): number {
+  const t = Date.parse(s.replace(" ", "T") + "Z");
+  return Number.isFinite(t) ? t : 0;
+}
+
+export type LazadaResiCheckResult = {
+  ok: boolean;
+  baseline?: boolean;
+  newOrders?: number;
+  sent?: string[];
+  errors?: string[];
+  detail?: string;
+};
+
+/** Dokumen label resmi satu pesanan — hasil pemenuhan Lazada. */
+export type LazadaOfficialResiResult =
+  | { ok: true; pdf: Buffer; tracking_number: string }
+  | { ok: false; detail: string };
+
+/** Kirim label resmi satu pesanan ke nomor admin; kembalikan hasil untuk
+ *  riwayat. Rantai: dokumen bebas (window 24 jam) → template dokumen resi
+ *  (bebas window, menunggu review Meta) → template teks berisi tautan
+ *  halaman Pesanan. */
+export async function sendLazadaResiPdf(
+  orderId: string,
+  opts: { pdf: Buffer; label?: string },
+): Promise<string> {
+  const owner = ownerNumber();
+  if (!owner) return "gagal: OWNER_WA_NUMBER belum diatur";
+
+  const filename = `resi-lazada-${orderId}.pdf`;
+  const caption = opts.label
+    ? `Resi resmi pesanan ${orderId} — ${LAZADA_STORE_NAME} (${opts.label})`
+    : `Resi pesanan ${orderId} — ${LAZADA_STORE_NAME}`;
+  const suffix = opts.label ? ` (${opts.label})` : "";
+
+  // 1. Dokumen bebas — hanya sah dalam window 24 jam sejak pemilik chat ke
+  //    nomor API. Bila aktif, ini jalur tercepat tanpa menunggu review.
+  const free = await sendDocument(owner, opts.pdf, filename, caption);
+  if (free.ok) return `ok${suffix}`;
+
+  // 2. Template utility ber-header DOKUMEN — bebas window 24 jam, tetapi
+  //    menunggu status APPROVED dari review Meta.
+  const doc = await sendDocumentTemplate(owner, opts.pdf, filename, orderId);
+  if (doc.ok) return `ok (template${suffix})`;
+
+  // 3. Template teks biasa: kabari saja dengan tautan halaman Pesanan Hub
+  //    supaya resi tetap bisa dibuka manual.
+  const tpl = await sendTemplateParams(owner, NOTIF_TEMPLATE, [
+    `Pesanan ${orderId} — resi PDF gagal terkirim otomatis. Buka halaman Pesanan untuk mencetaknya: ${PESANAN_URL}`,
+  ]);
+  if (tpl.ok) return `ok (template teks${suffix})`;
+
+  return `gagal: ${doc.error ?? "dokumen ditolak"} | template: ${tpl.error ?? "ditolak"}`;
+}
+
+/** Kirim notifikasi teks ke WA admin: teks bebas (window 24 jam) → template
+ *  teks cadangan (bebas window, menunggu review Meta). */
+async function sendOwnerNotice(msg: string): Promise<string> {
+  const owner = ownerNumber();
+  if (!owner) return "gagal: OWNER_WA_NUMBER belum diatur";
+  const free = await sendText(owner, msg);
+  if (free.ok) return "ok";
+  const tpl = await sendTemplateParams(owner, NOTIF_TEMPLATE, [msg]);
+  if (tpl.ok) return "ok (template)";
+  return `gagal: ${free.error ?? "teks ditolak"} | template: ${tpl.error ?? "ditolak"}`;
+}
+
+/** Ambil label RESMI Lazada untuk satu pesanan (pemenuhan penuh: pack →
+ *  rts → document) — tanpa mengirim WA. Dipakai route cetak resi (dibuka
+ *  di tab baru dari halaman Pesanan) dan tombol "Kirim Resi". */
+export async function getLazadaResiPdf(
+  orderId: string,
+): Promise<LazadaOfficialResiResult> {
+  const items = await getLazadaOrderItems(orderId);
+  if (!items.ok) return { ok: false, detail: items.detail };
+  if (items.data.length === 0) {
+    return { ok: false, detail: "Item pesanan tidak ditemukan" };
+  }
+  const problem = items.data.filter((i) =>
+    PROBLEM_STATUSES.includes((i.status ?? "").toLowerCase()),
+  );
+  if (problem.length > 0) {
+    return {
+      ok: false,
+      detail: `Pesanan memuat item dibatalkan/dikembalikan (${problem
+        .map((i) => i.order_item_id)
+        .join(", ")}) — tidak bisa dicetak resinya`,
+    };
+  }
+  const fulf = await fulfillLazadaOrderForItems(
+    items.data.map((i) => i.order_item_id),
+    orderId,
+  );
+  if (!fulf.ok) return { ok: false, detail: fulf.detail };
+  return { ok: true, pdf: fulf.pdf, tracking_number: fulf.trackingNumber };
+}
+
+/** Kirim label resmi pesanan tertentu ke WA admin (dipakai tombol manual
+ *  "Kirim Resi" di halaman Pesanan). */
+export async function sendResiForLazadaOrder(
+  orderId: string,
+): Promise<{ ok: boolean; result: string }> {
+  const official = await getLazadaResiPdf(orderId);
+  if (!official.ok) return { ok: false, result: official.detail };
+
+  const result = await sendLazadaResiPdf(orderId, {
+    pdf: official.pdf,
+    label: `resi ${official.tracking_number}`,
+  });
+  if (result.startsWith("ok")) {
+    const items = await getLazadaOrderItems(orderId);
+    const ctx = await getLazadaCtx();
+    if (items.ok && ctx.ok) {
+      for (const it of items.data) {
+        await markLazadaOrderSeen(
+          it.order_item_id,
+          orderId,
+          ctx.sellerId,
+          result,
+        );
+      }
+    }
+  }
+  return { ok: result.startsWith("ok"), result };
+}
+
+/** Jalankan satu ronde pengecekan pesanan Lazada baru toko KTD STORE.
+ *  Idempoten — tabel lazada_order_seen mencegah kirim ganda. Satu pesanan
+ *  diproses SATU kali (dipicu item pending pertama yang melewati masa
+ *  tunggu); item anggota lain ikut ditandai hasil yang sama. */
+export async function checkNewLazadaOrders(): Promise<LazadaResiCheckResult> {
+  const owner = ownerNumber();
+  if (!owner) {
+    return { ok: false, detail: "OWNER_WA_NUMBER belum diatur" };
+  }
+  const ctx = await getLazadaCtx();
+  if (!ctx.ok) {
+    return { ok: false, detail: ctx.detail };
+  }
+  const storeCode = ctx.sellerId || ctx.shortCode;
+
+  const baseline = (await countSeenLazadaOrders()) === 0;
+  const seenRows = await listSeenLazadaOrders();
+  const seen = new Map(
+    seenRows.map((s) => [
+      s.order_item_id,
+      {
+        order_id: s.order_id,
+        notify: s.notify,
+        attempts: Number(s.attempts ?? 0),
+        last_attempt_at: s.last_attempt_at,
+      },
+    ]),
+  );
+  const markSeen = async (id: string, orderId: string, notify: string) => {
+    await markLazadaOrderSeen(id, orderId, storeCode, notify);
+    seen.set(id, { order_id: orderId, notify, attempts: 0, last_attempt_at: "" });
+  };
+
+  // Tarik pesanan 7 hari terakhir (semua status — pembatalan & pending
+  // sama-sama perlu dipantau), terbaru dulu.
+  const now = Date.now();
+  const ord = await getLazadaOrders({
+    created_after: new Date(now - 7 * 86400 * 1000).toISOString(),
+    sort_by: "updated_at",
+    sort_direction: "DESC",
+    offset: 0,
+    limit: 100,
+  });
+  if (!ord.ok) return { ok: false, detail: ord.detail };
+
+  const orders = ord.data.orders;
+  const orderRowMap = new Map(orders.map((o) => [o.order_id, o]));
+  const orderItemsMap = new Map<string, LazadaOrderItemRow[]>();
+
+  const sent: string[] = [];
+  const errors: string[] = [];
+  let newOrders = 0;
+
+  // Baris eksekusi Aneka per pesanan — dipakai untuk notifikasi refund.
+  const execByOrder = new Map(
+    (await listLazadaOrderExecs()).map((e) => [e.order_id, e]),
+  );
+
+  /** Potongan pesan "minta refund ke CS Aneka" berdasar baris eksekusi
+   *  (bila ada) — sebutkan ID pembayaran, kode pesanan, dan total modal
+   *  supaya admin tinggal membacakan datanya ke CS Aneka. */
+  function refundAnekaInfo(
+    exec:
+      | { aneka_payment_id: string; aneka_order_id: string; payload: string }
+      | undefined,
+  ): string {
+    if (!exec) {
+      return " Bila sudah dibayar ke Aneka, SEGERA minta refund ke CS Aneka.";
+    }
+    const parts: string[] = [];
+    if (exec.aneka_payment_id) {
+      parts.push(`ID pembayaran ${exec.aneka_payment_id}`);
+    }
+    if (exec.aneka_order_id) {
+      parts.push(`pesanan ${exec.aneka_order_id}`);
+    }
+    try {
+      const t = Number(JSON.parse(exec.payload).total_modal ?? 0);
+      if (t > 0) parts.push(`total ${"Rp" + t.toLocaleString("id-ID")}`);
+    } catch {
+      /* payload rusak — lewati total */
+    }
+    return parts.length > 0
+      ? ` SEGERA minta refund ke CS Aneka (${parts.join(", ")}).`
+      : " SEGERA minta refund ke CS Aneka.";
+  }
+
+  const noticedOrders = new Set<string>(); // notif "pesanan baru" sekali per pesanan
+  const handledOrders = new Set<string>(); // proses label/eksekusi sekali per pesanan
+
+  for (const order of orders) {
+    const orderId = order.order_id;
+    const statuses = (order.statuses ?? []).map((s) => (s ?? "").toLowerCase());
+    const hit = (list: string[]) => statuses.some((s) => list.includes(s));
+    const hasActionable = hit(ACTIONABLE_STATUSES);
+    const hasProblem = hit(PROBLEM_STATUSES);
+
+    // Baris seen milik pesanan ini (semua status notifikasi).
+    const orderSeen = seenRows.filter((r) => r.order_id === orderId);
+    const anyMenungguGagal = orderSeen.some(
+      (r) => r.notify.startsWith("menunggu") || r.notify.startsWith("gagal"),
+    );
+    const anyAktifDiproses = orderSeen.some(
+      (r) => r.notify.startsWith("ok") || r.notify.startsWith("eksekusi"),
+    );
+    const anyBelumSelesai = orderSeen.some(
+      (r) =>
+        !r.notify.startsWith("batal") &&
+        !r.notify.startsWith("refund") &&
+        r.notify !== "skip",
+    );
+
+    // Hemat kuota /order/items/get: ambil item HANYA bila ada alasan
+    // (pesanan baru/menunggu/gagal, atau masalah status untuk pesanan
+    // yang pernah diproses — dengan jeda antar cek ulang).
+    let needItems = false;
+    let recheckMode = false;
+    if (orderSeen.length === 0) {
+      needItems = hasActionable;
+    } else if (anyMenungguGagal) {
+      needItems = hasActionable || hasProblem;
+    } else if (hasProblem && anyBelumSelesai) {
+      needItems = true;
+    } else if (anyAktifDiproses) {
+      const lastCheck = Math.max(
+        ...orderSeen.map((r) =>
+          r.last_attempt_at ? parseUtcMs(r.last_attempt_at) : 0,
+        ),
+        0,
+      );
+      recheckMode = true;
+      needItems =
+        (hasActionable || hasProblem) &&
+        Date.now() - lastCheck >= RETURN_CHECK_INTERVAL_MS;
+    }
+    if (!needItems) continue;
+
+    const itemsR = await getLazadaOrderItems(orderId);
+    if (!itemsR.ok) {
+      errors.push(`${LAZADA_STORE_NAME}: ${orderId}: ${itemsR.detail}`);
+      // Item yang sedang menunggu/gagal ikut dicatat supaya percobaan
+      // ulangnya diberi jeda dan tidak membakar kuota tiap menit.
+      for (const r of orderSeen) {
+        if (r.notify.startsWith("menunggu") || r.notify.startsWith("gagal")) {
+          await recordLazadaOrderFailure(
+            r.order_item_id,
+            orderId,
+            storeCode,
+            `gagal: ${itemsR.detail}`,
+          );
+        }
+      }
+      continue;
+    }
+    const items = itemsR.data;
+    orderItemsMap.set(orderId, items);
+
+    /** true bila baris item ini pernah diproses (resi terkirim / eksekusi
+     *  disiapkan) — membedakan jalur pembatalan vs pengembalian. */
+    const diproses = (notify: string) =>
+      notify.startsWith("ok") || notify.startsWith("eksekusi");
+
+    /** Ditandai ketika ada aksi (kirim/tandai) untuk pesanan ini pada ronde
+     *  ini — bila recheckMode dan tidak ada aksi, sentuh last_attempt_at
+     *  supaya cek ulang berikutnya diberi jeda. */
+    let orderAdaAksi = false;
+
+    for (const it of items) {
+      const itemId = it.order_item_id;
+      const prev = seen.get(itemId);
+      const st = (it.status ?? "").toLowerCase();
+      const problem = PROBLEM_STATUSES.includes(st);
+      const isNew = st === "pending";
+
+      // Sudah pernah dikabari pembatalan/pengembaliannya — lewati.
+      if (
+        prev &&
+        (prev.notify.startsWith("batal") || prev.notify.startsWith("refund"))
+      )
+        continue;
+
+      // Item dibatalkan/dikembalikan SEBELUM diproses: kabari admin (sekali
+      // per pesanan) — resi tidak dikirim untuk item batal.
+      if (problem && !(prev && diproses(prev.notify))) {
+        // Batalkan juga antrean eksekusi Aneka bila SELURUH item bermasalah.
+        if (items.every((x) => PROBLEM_STATUSES.includes((x.status ?? "").toLowerCase()))) {
+          await cancelLazadaExec(orderId);
+        }
+        // Percobaan ulang notifikasi pembatalan juga diberi jeda — tanpa
+        // jeda, WA down beberapa menit menghabiskan kuota percobaan.
+        if (
+          prev &&
+          prev.notify.startsWith("gagal") &&
+          prev.last_attempt_at &&
+          Date.now() - parseUtcMs(prev.last_attempt_at) < RETRY_COOLDOWN_MS
+        ) {
+          continue;
+        }
+        const silent =
+          baseline ||
+          prev?.notify === "skip" ||
+          (prev && prev.attempts >= MAX_SEND_ATTEMPTS);
+        if (silent) {
+          await markSeen(itemId, orderId, "batal (tanpa kirim)");
+          continue;
+        }
+        const itemsTxt = ` — ${it.name}`;
+        const resiTerlanjur = prev && prev.notify.startsWith("ok");
+        // Item yang SUDAH diproses lalu dibatalkan = uang mungkin sudah
+        // keluar ke Aneka — ingatkan admin untuk minta refund ke CS Aneka.
+        const exec = execByOrder.get(orderId);
+        const terlanjurBayar =
+          resiTerlanjur ||
+          prev?.notify.startsWith("eksekusi") ||
+          (exec?.aneka_payment_id ?? "") !== "";
+        const msg = terlanjurBayar
+          ? `Pesanan Lazada dibatalkan SETELAH diproses: ${orderId}${itemsTxt}.${refundAnekaInfo(exec)} Label yang sempat terkirim mohon diabaikan.`
+          : `Pesanan Lazada dibatalkan: ${orderId}${itemsTxt}. Tidak perlu disiapkan/dikirim.`;
+        const res = await sendOwnerNotice(msg);
+        if (res.startsWith("ok")) {
+          const mark = `batal: ${res}${terlanjurBayar ? " (minta refund Aneka)" : ""}`;
+          await markSeen(itemId, orderId, mark);
+          orderAdaAksi = true;
+          sent.push(`${LAZADA_STORE_NAME} ${orderId} → ${mark}`);
+        } else {
+          errors.push(`${LAZADA_STORE_NAME}: ${orderId}: ${res}`);
+          await recordLazadaOrderFailure(
+            itemId,
+            orderId,
+            storeCode,
+            `gagal batal: ${res}`,
+          );
+        }
+        continue;
+      }
+
+      // Deteksi pesanan dikembalikan/gagal antar untuk item yang SUDAH
+      // diproses. Status item dari /order/items/get — tanpa panggilan
+      // tambahan; recheckMode menjamin cek ini hanya berjalan dengan jeda.
+      if (prev && diproses(prev.notify) && problem) {
+        const exec = execByOrder.get(orderId);
+        const msg = `Pesanan Lazada dikembalikan/gagal antar: ${orderId} — ${it.name} (status: ${st}).${refundAnekaInfo(exec)}`;
+        const res = await sendOwnerNotice(msg);
+        if (res.startsWith("ok")) {
+          await markSeen(itemId, orderId, `refund: ${res}`);
+          orderAdaAksi = true;
+          sent.push(`${LAZADA_STORE_NAME} ${orderId} → refund: ${res}`);
+        } else {
+          errors.push(`${LAZADA_STORE_NAME}: ${orderId}: ${res}`);
+          await recordLazadaOrderFailure(
+            itemId,
+            orderId,
+            storeCode,
+            `gagal refund: ${res}`,
+          );
+        }
+        continue;
+      }
+
+      // Gerbang status: hanya item pending (pesanan baru penjual) yang
+      // diproses. PENGECUALIAN: item yang gagal/menunggu SETELAH pemenuhan
+      // (notify "gagal"/"menunggu" dan status bukan problem) boleh diulang.
+      const bisaUlangLabel =
+        (prev?.notify.startsWith("gagal") ||
+          prev?.notify.startsWith("menunggu")) &&
+        !problem;
+      if (!isNew && !bisaUlangLabel) continue;
+
+      // Mode baseline: tandai saja item lama, jangan kirim resi.
+      if (!prev && baseline) {
+        await markSeen(itemId, orderId, "skip");
+        continue;
+      }
+
+      // Item baru: tunda pemrosesan (baris "menunggu" menyimpan epoch saat
+      // pertama kali terlihat) — beri kesempatan pembeli membatalkan.
+      if (!prev) {
+        await markSeen(itemId, orderId, `menunggu:${Date.now()}`);
+        orderAdaAksi = true;
+        newOrders++;
+        // Kabari admin bahwa pesanan terdeteksi — informasi saja, tidak
+        // memengaruhi alur (masa tunggu tetap berjalan). Sekali per pesanan.
+        if (!noticedOrders.has(orderId)) {
+          noticedOrders.add(orderId);
+          const itemsTxt =
+            items.length > 0
+              ? ` — ${items[0].name}${items.length > 1 ? ` (+${items.length - 1} produk lain)` : ""}`
+              : "";
+          const notice = await sendOwnerNotice(
+            `Pesanan Lazada baru: ${orderId}${itemsTxt}. Akan diproses otomatis ±15 menit (memberi kesempatan pembeli membatalkan).`,
+          );
+          if (!notice.startsWith("ok")) {
+            errors.push(
+              `${LAZADA_STORE_NAME}: ${orderId}: notif pesanan baru gagal: ${notice}`,
+            );
+          }
+        }
+        continue;
+      }
+
+      // Masih dalam masa tunggu sebelum item boleh diproses.
+      if (prev.notify.startsWith("menunggu")) {
+        const since = Number(prev.notify.split(":")[1] ?? 0);
+        if (Date.now() - since < NEW_ORDER_WAIT_MS) continue;
+      } else if (!prev.notify.startsWith("gagal")) {
+        // Sudah pernah berhasil diproses — lewati.
+        continue;
+      }
+
+      // Sudah gagal berkali-kali — berhenti mencoba (label tetap bisa
+      // dibuka manual dari halaman Pesanan).
+      if (prev.attempts >= MAX_SEND_ATTEMPTS) continue;
+
+      // Percobaan ulang diberi jeda — bila pengecekan berjalan tiap menit
+      // (tab admin terbuka), tanpa jeda ini kegagalan sementara langsung
+      // menghabiskan kuota percobaan dalam hitungan menit.
+      if (
+        prev.notify.startsWith("gagal") &&
+        prev.last_attempt_at &&
+        Date.now() - parseUtcMs(prev.last_attempt_at) < RETRY_COOLDOWN_MS
+      ) {
+        continue;
+      }
+
+      // Pesanan ini mungkin sudah diproses lewat item lain di ronde ini.
+      if (handledOrders.has(orderId)) continue;
+
+      // Masa tunggu selesai, atau percobaan ulang untuk kiriman yang gagal.
+      newOrders++;
+      handledOrders.add(orderId);
+      orderAdaAksi = true;
+
+      // Item pesanan sudah diambil di atas (orderItemsMap) — sumber data
+      // yang benar: satu baris per unit, status terbaru tiap item (item
+      // bisa saja dibatalkan di tengah masa tunggu).
+      const semuaBatal =
+        items.length > 0 &&
+        items.every((x) =>
+          PROBLEM_STATUSES.includes((x.status ?? "").toLowerCase()),
+        );
+      const adaBatal = items.some((x) =>
+        PROBLEM_STATUSES.includes((x.status ?? "").toLowerCase()),
+      );
+      if (semuaBatal) {
+        await cancelLazadaExec(orderId);
+        const itemsTxt = items.length > 0 ? ` — ${items[0].name}` : "";
+        const res = await sendOwnerNotice(
+          `Pesanan Lazada dibatalkan: ${orderId}${itemsTxt}. Tidak perlu disiapkan/dikirim.`,
+        );
+        for (const x of items) {
+          await markSeen(
+            x.order_item_id,
+            orderId,
+            res.startsWith("ok") ? `batal: ${res}` : "batal (tanpa kirim)",
+          );
+        }
+        if (!res.startsWith("ok")) {
+          errors.push(`${LAZADA_STORE_NAME}: ${orderId}: ${res}`);
+        }
+        continue;
+      }
+
+      const aktif = items.filter(
+        (x) =>
+          !PROBLEM_STATUSES.includes((x.status ?? "").toLowerCase()),
+      );
+
+      // Fase 2: bila SEMUA item pesanan sudah dipetakan ke Aneka, jangan
+      // kirim resi — siapkan eksekusi semi-otomatis (tunggu tombol Setuju
+      // di halaman Eksekusi; rantai checkout Aneka + pemenuhan Lazada baru
+      // dijalankan saat disetujui supaya tidak menumpuk pembayaran
+      // mangkrak). Pesanan dengan item dibatalkan sebagian TIDAK dieksekusi
+      // otomatis — proses manual.
+      const srcItems: LazadaExecSourceItem[] = aktif.map((d) => ({
+        // Kunci pemetaan = SellerSku; shop_sku untuk tampilan.
+        lazada_sku: d.seller_sku,
+        seller_sku: d.shop_sku,
+        item_name: d.name,
+        variant_name: d.variation ?? "",
+        // Satu order item = satu unit — baris kembar (SKU + varian sama)
+        // digabung otomatis di checkLazadaExecutable.
+        qty: 1,
+      }));
+      const execCheck = adaBatal
+        ? {
+            ok: false as const,
+            detail: "Sebagian item pesanan dibatalkan pembeli — proses manual",
+          }
+        : await checkLazadaExecutable(srcItems);
+
+      const address = orderRowMap.get(orderId)?.address_shipping;
+      const customerName = [address?.first_name, address?.last_name]
+        .filter((n) => n && n.trim() !== "")
+        .join(" ")
+        .trim();
+
+      if (execCheck.ok) {
+        const prep = await prepareLazadaExec(
+          {
+            order_id: orderId,
+            order_item_ids: items.map((x) => x.order_item_id),
+            store_name: LAZADA_STORE_NAME,
+            customer_name: customerName,
+            items: srcItems,
+          },
+          // Percobaan ulang setelah kegagalan: antrean "menunggu" mungkin
+          // sudah tersimpan tetapi notif WA-nya gagal — kirim ulang.
+          { resendNotice: prev.notify.startsWith("gagal") },
+        );
+        if (prep.ok) {
+          for (const x of items) {
+            await markSeen(x.order_item_id, orderId, "eksekusi:menunggu");
+          }
+          sent.push(
+            `${LAZADA_STORE_NAME} ${orderId} → menunggu persetujuan Aneka`,
+          );
+        } else {
+          errors.push(`${LAZADA_STORE_NAME}: ${orderId}: ${prep.detail}`);
+          await recordLazadaOrderFailure(
+            itemId,
+            orderId,
+            storeCode,
+            `gagal: ${prep.detail}`,
+          );
+        }
+        continue;
+      }
+
+      // Item belum terpetakan ke Aneka — jalur lama: pemenuhan Lazada lalu
+      // kirim label ke WA.
+      const official = await fulfillLazadaOrderForItems(
+        items.map((x) => x.order_item_id),
+        orderId,
+      );
+      if (!official.ok) {
+        errors.push(`${LAZADA_STORE_NAME}: ${orderId}: ${official.detail}`);
+        await recordLazadaOrderFailure(
+          itemId,
+          orderId,
+          storeCode,
+          `gagal: ${official.detail}`,
+        );
+        continue;
+      }
+
+      const result = await sendLazadaResiPdf(orderId, {
+        pdf: official.pdf,
+        label: `resi ${official.trackingNumber}`,
+      });
+      if (result.startsWith("ok")) {
+        for (const x of items) {
+          await markSeen(x.order_item_id, orderId, result);
+        }
+        sent.push(`${LAZADA_STORE_NAME} ${orderId} → ${result}`);
+        // Jelaskan KENAPA tidak dieksekusi otomatis — jangan biarkan
+        // pemilik mengira pesanan berjalan otomatis padahal manual.
+        await sendOwnerNotice(
+          `Catatan pesanan ${orderId}: eksekusi otomatis TIDAK dijalankan — ${execCheck.detail}. Pesanan ini diproses manual.`,
+        );
+      } else {
+        errors.push(`${LAZADA_STORE_NAME}: ${orderId}: ${result}`);
+        await recordLazadaOrderFailure(itemId, orderId, storeCode, result);
+      }
+    }
+
+    // Cek ulang status (recheckMode) tanpa temuan apa pun: sentuh
+    // last_attempt_at baris yang sudah diproses supaya cek berikutnya
+    // diberi jeda dan kuota /order/items/get tidak habis tiap menit.
+    if (recheckMode && !orderAdaAksi) {
+      const nowStr = new Date().toISOString().slice(0, 19).replace("T", " ");
+      for (const r of orderSeen) {
+        if (diproses(r.notify)) {
+          await touchLazadaOrderSeen(r.order_item_id, nowStr);
+        }
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    baseline,
+    newOrders,
+    sent,
+    errors,
+  };
+}

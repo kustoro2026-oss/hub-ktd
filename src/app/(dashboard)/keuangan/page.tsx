@@ -102,6 +102,22 @@ const STATUS_BLIBLI: Record<string, string> = {
   X: "Dibatalkan",
 };
 
+const STATUS_LAZADA: Record<string, string> = {
+  unpaid: "Belum bayar",
+  pending: "Pesanan Baru",
+  to_pack: "Siap dikemas",
+  to_ship: "Siap dikirim",
+  packed: "Dikemas",
+  ready_to_ship: "Siap dikirim",
+  shipped: "Dikirim",
+  delivered: "Terkirim",
+  canceled: "Dibatalkan",
+  returned: "Dikembalikan",
+  failed: "Gagal",
+  lost: "Hilang",
+  shipped_back: "Dikirim balik",
+};
+
 const STATUS_EXEC: Record<string, { label: string; cls: string }> = {
   "": { label: "Belum diproses", cls: "bg-slate-100 text-slate-600" },
   menunggu: { label: "Menunggu setuju", cls: "bg-amber-100 text-amber-800" },
@@ -181,7 +197,7 @@ export default async function KeuanganPage({
             Dashboard Keuangan
           </h1>
           <p className="text-sm text-slate-500">
-            Omset TikTok + Blibli − pembayaran Aneka = laba kotor · {rentang.label}
+            Omset TikTok + Blibli + Lazada − pembayaran Aneka = laba kotor · {rentang.label}
           </p>
         </div>
         <KeuanganRefresh />
@@ -454,7 +470,13 @@ export default async function KeuanganPage({
                   const se = STATUS_EXEC[b.statusExec] ?? STATUS_EXEC[""];
                   const batal =
                     b.statusOrder === "CANCELLED" ||
-                    b.statusOrder.split(",").some((s) => s.trim() === "X");
+                    b.statusOrder.split(",").some(
+                      (s) =>
+                        s.trim() === "X" ||
+                        ["canceled", "returned", "failed", "lost"].includes(
+                          s.trim(),
+                        ),
+                    );
                   return (
                     <tr
                       key={`${b.pasar}-${b.orderId}`}
@@ -468,7 +490,9 @@ export default async function KeuanganPage({
                           className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                             b.pasar === "Blibli"
                               ? "bg-blue-100 text-blue-800"
-                              : "bg-slate-800 text-white"
+                              : b.pasar === "Lazada"
+                                ? "bg-orange-100 text-orange-800"
+                                : "bg-slate-800 text-white"
                           }`}
                         >
                           {b.pasar}
@@ -531,7 +555,12 @@ export default async function KeuanganPage({
                                 .split(", ")
                                 .map((s) => STATUS_BLIBLI[s] ?? s)
                                 .join(", ")
-                            : (STATUS_TIKTOK[b.statusOrder] ?? b.statusOrder)}
+                            : b.pasar === "Lazada"
+                              ? b.statusOrder
+                                  .split(", ")
+                                  .map((s) => STATUS_LAZADA[s] ?? s)
+                                  .join(", ")
+                              : (STATUS_TIKTOK[b.statusOrder] ?? b.statusOrder)}
                         </span>
                       </td>
                       <td className="px-4 py-2.5">

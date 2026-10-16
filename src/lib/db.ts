@@ -412,6 +412,40 @@ function migrateSqlite(db: DatabaseSync) {
       executed_at TEXT NOT NULL DEFAULT ''
     );
 
+    CREATE TABLE IF NOT EXISTS lazada_order_seen (
+      order_item_id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL DEFAULT '',
+      store_code TEXT NOT NULL DEFAULT '',
+      first_seen_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      notify TEXT NOT NULL DEFAULT '',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_attempt_at TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS lazada_product_map (
+      lazada_sku TEXT PRIMARY KEY,
+      seller_sku TEXT NOT NULL DEFAULT '',
+      product_name TEXT NOT NULL DEFAULT '',
+      aneka_product_id TEXT NOT NULL DEFAULT '',
+      aneka_variant_id TEXT NOT NULL DEFAULT '',
+      aneka_product_name TEXT NOT NULL DEFAULT '',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS lazada_order_exec (
+      order_id TEXT PRIMARY KEY,
+      store_code TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'menunggu',
+      payload TEXT NOT NULL DEFAULT '',
+      aneka_payment_id TEXT NOT NULL DEFAULT '',
+      aneka_order_id TEXT NOT NULL DEFAULT '',
+      detail TEXT NOT NULL DEFAULT '',
+      log TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      executed_at TEXT NOT NULL DEFAULT ''
+    );
+
     CREATE TABLE IF NOT EXISTS aturan_harga (
       id TEXT PRIMARY KEY,
       marketplace TEXT NOT NULL DEFAULT '',
@@ -782,6 +816,40 @@ async function migratePg(pool: Pool) {
 
     CREATE TABLE IF NOT EXISTS blibli_order_exec (
       package_id TEXT PRIMARY KEY,
+      store_code TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'menunggu',
+      payload TEXT NOT NULL DEFAULT '',
+      aneka_payment_id TEXT NOT NULL DEFAULT '',
+      aneka_order_id TEXT NOT NULL DEFAULT '',
+      detail TEXT NOT NULL DEFAULT '',
+      log TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      executed_at TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS lazada_order_seen (
+      order_item_id TEXT PRIMARY KEY,
+      order_id TEXT NOT NULL DEFAULT '',
+      store_code TEXT NOT NULL DEFAULT '',
+      first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      notify TEXT NOT NULL DEFAULT '',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      last_attempt_at TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS lazada_product_map (
+      lazada_sku TEXT PRIMARY KEY,
+      seller_sku TEXT NOT NULL DEFAULT '',
+      product_name TEXT NOT NULL DEFAULT '',
+      aneka_product_id TEXT NOT NULL DEFAULT '',
+      aneka_variant_id TEXT NOT NULL DEFAULT '',
+      aneka_product_name TEXT NOT NULL DEFAULT '',
+      enabled INTEGER NOT NULL DEFAULT 1,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS lazada_order_exec (
+      order_id TEXT PRIMARY KEY,
       store_code TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'menunggu',
       payload TEXT NOT NULL DEFAULT '',
@@ -2510,6 +2578,394 @@ export async function claimBlibliOrderExecRunning(
      WHERE package_id = ? AND status IN ('menunggu', 'gagal')
      RETURNING package_id`,
     [packageId],
+  );
+  return !!r;
+}
+
+// ---------- Riwayat resi pesanan Lazada (deteksi pesanan baru) ----------
+
+export type LazadaOrderSeen = {
+  order_item_id: string;
+  order_id: string;
+  store_code: string;
+  first_seen_at: string;
+  notify: string;
+  attempts: number;
+  /** Waktu percobaan ulang terakhir (UTC "YYYY-MM-DD HH:MM:SS") — dipakai
+   *  sebagai pengatur jeda antar percobaan ulang. */
+  last_attempt_at: string;
+};
+
+/** Jumlah order item Lazada yang sudah pernah diproses. 0 berarti tabel
+ *  kosong dan pengecekan berikutnya berjalan dalam mode baseline (tandai
+ *  semua item yang ada tanpa kirim resi — mencegah banjir PDF sekaligus). */
+export async function countSeenLazadaOrders(): Promise<number> {
+  const row = await queryOne<{ n: string | number }>(
+    "SELECT COUNT(*) AS n FROM lazada_order_seen",
+  );
+  return Number(row?.n ?? 0);
+}
+
+/** Semua baris riwayat resi Lazada — untuk memfilter order item baru dan
+ *  mencoba ulang kiriman yang sebelumnya gagal (dibatasi kolom attempts). */
+export async function listSeenLazadaOrders(): Promise<LazadaOrderSeen[]> {
+  return queryAll<LazadaOrderSeen>("SELECT * FROM lazada_order_seen");
+}
+
+/** Catat order item sebagai sudah diproses (upsert: notifikasi terakhir
+ *  menggantikan yang lama, mis. "menunggu" → "ok", tanpa mengubah
+ *  first_seen_at). `notify` = hasil kirim resi ('ok', 'ok (template)',
+ *  'skip', 'menunggu:<epoch_ms>', 'batal: ...', 'eksekusi:menunggu', atau
+ *  'gagal: ...'). order_id dicatat supaya item bisa dikelompokkan per
+ *  pesanan tanpa memanggil API lagi (lazada-resi.ts). */
+export async function markLazadaOrderSeen(
+  orderItemId: string,
+  orderId: string,
+  storeCode: string,
+  notify = "",
+): Promise<void> {
+  const sql =
+    dbMode() === "pg"
+      ? "INSERT INTO lazada_order_seen (order_item_id, order_id, store_code, notify) VALUES (?, ?, ?, ?) ON CONFLICT (order_item_id) DO UPDATE SET notify = EXCLUDED.notify, store_code = EXCLUDED.store_code, order_id = EXCLUDED.order_id"
+      : "INSERT INTO lazada_order_seen (order_item_id, order_id, store_code, notify) VALUES (?, ?, ?, ?) ON CONFLICT (order_item_id) DO UPDATE SET notify = excluded.notify, store_code = excluded.store_code, order_id = excluded.order_id";
+  await queryRun(sql, [orderItemId, orderId, storeCode, notify]);
+}
+
+/** Atur ulang status order item supaya diproses ulang dari awal (dipakai
+ *  route siapkan-ulang yang dijaga CRON_SECRET). Hitungan percobaan
+ *  di-nol-kan supaya tidak tersangkut batas MAX_SEND_ATTEMPTS. Return false
+ *  bila baris belum pernah tercatat. */
+export async function resetLazadaOrderSeen(
+  orderItemId: string,
+  notify: string,
+): Promise<boolean> {
+  const updated = await queryOne<{ order_item_id: string }>(
+    "UPDATE lazada_order_seen SET notify = ?, attempts = 0, last_attempt_at = '' WHERE order_item_id = ? RETURNING order_item_id",
+    [notify, orderItemId],
+  );
+  return Boolean(updated);
+}
+
+/** Tambah hitungan percobaan kirim resi yang gagal — order item yang belum
+ *  pernah tercatat otomatis dibuatkan barisnya dengan attempts = 1.
+ *  last_attempt_at dicatat supaya percobaan ulang bisa diberi jeda. */
+export async function recordLazadaOrderFailure(
+  orderItemId: string,
+  orderId: string,
+  storeCode: string,
+  notify: string,
+): Promise<void> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const updated = await queryOne<{ order_item_id: string }>(
+    "UPDATE lazada_order_seen SET attempts = attempts + 1, notify = ?, last_attempt_at = ? WHERE order_item_id = ? RETURNING order_item_id",
+    [notify, nowUtc, orderItemId],
+  );
+  if (!updated) {
+    const sql =
+      dbMode() === "pg"
+        ? "INSERT INTO lazada_order_seen (order_item_id, order_id, store_code, notify, attempts, last_attempt_at) VALUES (?, ?, ?, ?, 1, ?) ON CONFLICT (order_item_id) DO NOTHING"
+        : "INSERT OR IGNORE INTO lazada_order_seen (order_item_id, order_id, store_code, notify, attempts, last_attempt_at) VALUES (?, ?, ?, ?, 1, ?)";
+    await queryRun(sql, [orderItemId, orderId, storeCode, notify, nowUtc]);
+  }
+}
+
+/** Sentuh last_attempt_at tanpa mengubah notify — dipakai sebagai penanda
+ *  waktu cek terakhir deteksi status pengiriman (lazada-resi.ts) supaya
+ *  cek detail API tidak diulang setiap tick. */
+export async function touchLazadaOrderSeen(
+  orderItemId: string,
+  atUtc: string,
+): Promise<void> {
+  await queryRun(
+    "UPDATE lazada_order_seen SET last_attempt_at = ? WHERE order_item_id = ?",
+    [atUtc, orderItemId],
+  );
+}
+
+// ---------- Pemetaan produk Lazada (SellerSku) → Aneka ----------
+
+export type LazadaProductMap = {
+  /** Kunci pemetaan: SellerSku Lazada — tingkat produk seperti product_id
+   *  TikTok / productSku Blibli, satu baris menaungi semua varian. */
+  lazada_sku: string;
+  /** SKU internal Lazada baris terakhir yang terlihat (tampilan saja). */
+  seller_sku: string;
+  product_name: string;
+  aneka_product_id: string;
+  aneka_variant_id: string;
+  aneka_product_name: string;
+  enabled: number;
+  updated_at: string;
+};
+
+/** Semua pemetaan produk tersimpan (kunci: lazada_sku). Urutkan tanpa
+ *  COLLATE NOCASE — itu sintaks khusus SQLite dan membuat Postgres
+ *  melempar "collation \"nocase\" does not exist" (halaman 500). */
+export async function listLazadaProductMaps(): Promise<LazadaProductMap[]> {
+  return queryAll<LazadaProductMap>(
+    "SELECT * FROM lazada_product_map ORDER BY LOWER(product_name) ASC",
+  );
+}
+
+/** Satu pemetaan untuk SellerSku Lazada tertentu (null = belum dipetakan). */
+export async function getLazadaProductMap(
+  lazadaSku: string,
+): Promise<LazadaProductMap | null> {
+  return (
+    (await queryOne<LazadaProductMap>(
+      "SELECT * FROM lazada_product_map WHERE lazada_sku = ?",
+      [lazadaSku],
+    )) ?? null
+  );
+}
+
+/** Simpan/timpa pemetaan (upsert). `enabled` = 0 menonaktifkan eksekusi
+ *  otomatis untuk produk itu tanpa menghapus barisnya. */
+export async function saveLazadaProductMap(m: {
+  lazada_sku: string;
+  seller_sku?: string;
+  product_name?: string;
+  aneka_product_id: string;
+  aneka_variant_id?: string;
+  aneka_product_name?: string;
+  enabled?: number;
+}): Promise<void> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  const sql =
+    dbMode() === "pg"
+      ? `INSERT INTO lazada_product_map (lazada_sku, seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (lazada_sku) DO UPDATE SET seller_sku = EXCLUDED.seller_sku, product_name = EXCLUDED.product_name,
+           aneka_product_id = EXCLUDED.aneka_product_id,
+           aneka_variant_id = EXCLUDED.aneka_variant_id, aneka_product_name = EXCLUDED.aneka_product_name,
+           enabled = EXCLUDED.enabled, updated_at = EXCLUDED.updated_at`
+      : `INSERT INTO lazada_product_map (lazada_sku, seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (lazada_sku) DO UPDATE SET seller_sku = excluded.seller_sku, product_name = excluded.product_name,
+           aneka_product_id = excluded.aneka_product_id,
+           aneka_variant_id = excluded.aneka_variant_id, aneka_product_name = excluded.aneka_product_name,
+           enabled = excluded.enabled, updated_at = excluded.updated_at`;
+  await queryRun(sql, [
+    m.lazada_sku,
+    m.seller_sku ?? "",
+    m.product_name ?? "",
+    m.aneka_product_id,
+    m.aneka_variant_id ?? "",
+    m.aneka_product_name ?? "",
+    m.enabled ?? 1,
+    nowUtc,
+  ]);
+}
+
+/** Hapus pemetaan untuk satu SellerSku Lazada. */
+export async function deleteLazadaProductMap(lazadaSku: string): Promise<void> {
+  await queryRun(
+    "DELETE FROM lazada_product_map WHERE lazada_sku = ?",
+    [lazadaSku],
+  );
+}
+
+/** Impor massal pemetaan awal (seed) Lazada → Aneka. Hanya menambah baris
+ *  yang belum ada — pemetaan manual yang sudah tersimpan tidak ditimpa. */
+export async function seedLazadaProductMaps(
+  rows: {
+    lazada_sku: string;
+    seller_sku?: string;
+    product_name?: string;
+    aneka_product_id: string;
+    aneka_variant_id?: string;
+    aneka_product_name?: string;
+    enabled?: number;
+  }[],
+): Promise<{ inserted: number; skipped: number }> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  let inserted = 0;
+  // Postgres: bungkus dalam satu INSERT multi-baris per 50 baris — insert
+  // baris-per-baris melewati batas 60 detik fungsi Vercel untuk seed besar.
+  if (dbMode() === "pg") {
+    const pool = await pgPool();
+    const CHUNK = 50;
+    for (let i = 0; i < rows.length; i += CHUNK) {
+      const part = rows.slice(i, i + CHUNK);
+      const values: string[] = [];
+      const params: unknown[] = [];
+      part.forEach((m, j) => {
+        values.push(
+          `($${j * 8 + 1}, $${j * 8 + 2}, $${j * 8 + 3}, $${j * 8 + 4}, $${j * 8 + 5}, $${j * 8 + 6}, $${j * 8 + 7}, $${j * 8 + 8})`,
+        );
+        params.push(
+          m.lazada_sku,
+          m.seller_sku ?? "",
+          m.product_name ?? "",
+          m.aneka_product_id,
+          m.aneka_variant_id ?? "",
+          m.aneka_product_name ?? "",
+          m.enabled ?? 1,
+          nowUtc,
+        );
+      });
+      const r = await pool.query(
+        `INSERT INTO lazada_product_map (lazada_sku, seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+         VALUES ${values.join(", ")}
+         ON CONFLICT (lazada_sku) DO NOTHING`,
+        params,
+      );
+      inserted += r.rowCount ?? 0;
+    }
+    return { inserted, skipped: rows.length - inserted };
+  }
+
+  for (const m of rows) {
+    const r = (await sqliteDb())
+      .prepare(
+        `INSERT OR IGNORE INTO lazada_product_map (lazada_sku, seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        m.lazada_sku,
+        m.seller_sku ?? "",
+        m.product_name ?? "",
+        m.aneka_product_id,
+        m.aneka_variant_id ?? "",
+        m.aneka_product_name ?? "",
+        m.enabled ?? 1,
+        nowUtc,
+      );
+    inserted += Number(r.changes) || 0;
+  }
+  return { inserted, skipped: rows.length - inserted };
+}
+
+// ---------- Eksekusi pesanan Lazada → Aneka (semi-otomatis) ----------
+
+export type LazadaOrderExec = {
+  order_id: string;
+  store_code: string;
+  status: string;
+  payload: string;
+  aneka_payment_id: string;
+  aneka_order_id: string;
+  detail: string;
+  /** Jejak langkah eksekusi checkout Aneka (satu baris per langkah,
+   *  format "WAKTU | langkah | keterangan") — ditulis per langkah supaya
+   *  diagnosa tetap tersedia bila proses terputus di tengah jalan. */
+  log: string;
+  created_at: string;
+  executed_at: string;
+};
+
+/** Satu baris eksekusi pesanan (null = belum pernah disiapkan). */
+export async function getLazadaOrderExec(
+  orderId: string,
+): Promise<LazadaOrderExec | null> {
+  return (
+    (await queryOne<LazadaOrderExec>(
+      "SELECT * FROM lazada_order_exec WHERE order_id = ?",
+      [orderId],
+    )) ?? null
+  );
+}
+
+/** Semua baris eksekusi (menunggu persetujuan di depan, lalu terbaru). */
+export async function listLazadaOrderExecs(): Promise<LazadaOrderExec[]> {
+  return queryAll<LazadaOrderExec>(
+    `SELECT * FROM lazada_order_exec
+     ORDER BY CASE status WHEN 'menunggu' THEN 0 ELSE 1 END, created_at DESC`,
+  );
+}
+
+/** Tambah satu baris ke jejak log eksekusi (langkah checkout Aneka). */
+export async function appendLazadaOrderExecLog(
+  orderId: string,
+  line: string,
+): Promise<void> {
+  await queryRun(
+    "UPDATE lazada_order_exec SET log = log || ? WHERE order_id = ?",
+    ["\n" + line, orderId],
+  );
+}
+
+/** Kosongkan jejak log (awal percobaan baru / persiapan ulang). */
+export async function clearLazadaOrderExecLog(
+  orderId: string,
+): Promise<void> {
+  await queryRun(
+    "UPDATE lazada_order_exec SET log = '' WHERE order_id = ?",
+    [orderId],
+  );
+}
+
+/** Catat payment_id Aneka yang BARU dibuat ke baris eksekusi — dipanggil
+ *  SEGERA setelah /payment/create sukses supaya jejak pembayaran tidak
+ *  hilang bila percobaan gagal/terputus (anti pembayaran dobel saat coba
+ *  ulang). Hanya menyentuh kolom aneka_payment_id. */
+export async function setLazadaOrderExecPayment(
+  orderId: string,
+  paymentId: string,
+): Promise<void> {
+  await queryRun(
+    "UPDATE lazada_order_exec SET aneka_payment_id = ? WHERE order_id = ?",
+    [paymentId, orderId],
+  );
+}
+
+/** Simpan/timpa baris eksekusi (upsert — persiapan ulang menimpa baris
+ *  lama, mis. "gagal" → "menunggu" setelah percobaan berikutnya).
+ *  aneka_payment_id / aneka_order_id HANYA ditimpa bila nilai baru tidak
+ *  kosong (COALESCE) — pemanggil yang tidak menyebutkannya TIDAK akan
+ *  menghapus jejak pembayaran (bahan pengaman anti-dobel). */
+export async function saveLazadaOrderExec(e: {
+  order_id: string;
+  store_code?: string;
+  status?: string;
+  payload?: string;
+  aneka_payment_id?: string;
+  aneka_order_id?: string;
+  detail?: string;
+  executed_at?: string;
+}): Promise<void> {
+  const sql =
+    dbMode() === "pg"
+      ? `INSERT INTO lazada_order_exec (order_id, store_code, status, payload, aneka_payment_id, aneka_order_id, detail, executed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (order_id) DO UPDATE SET store_code = EXCLUDED.store_code, status = EXCLUDED.status,
+           payload = EXCLUDED.payload,
+           aneka_payment_id = COALESCE(NULLIF(EXCLUDED.aneka_payment_id, ''), lazada_order_exec.aneka_payment_id),
+           aneka_order_id = COALESCE(NULLIF(EXCLUDED.aneka_order_id, ''), lazada_order_exec.aneka_order_id),
+           detail = EXCLUDED.detail,
+           executed_at = EXCLUDED.executed_at`
+      : `INSERT INTO lazada_order_exec (order_id, store_code, status, payload, aneka_payment_id, aneka_order_id, detail, executed_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+         ON CONFLICT (order_id) DO UPDATE SET store_code = excluded.store_code, status = excluded.status,
+           payload = excluded.payload,
+           aneka_payment_id = COALESCE(NULLIF(excluded.aneka_payment_id, ''), lazada_order_exec.aneka_payment_id),
+           aneka_order_id = COALESCE(NULLIF(excluded.aneka_order_id, ''), lazada_order_exec.aneka_order_id),
+           detail = excluded.detail,
+           executed_at = excluded.executed_at`;
+  await queryRun(sql, [
+    e.order_id,
+    e.store_code ?? "",
+    e.status ?? "menunggu",
+    e.payload ?? "",
+    e.aneka_payment_id ?? "",
+    e.aneka_order_id ?? "",
+    e.detail ?? "",
+    e.executed_at ?? "",
+  ]);
+}
+
+/** Klaim atomik antrean eksekusi → status "berjalan". HANYA baris berstatus
+ *  "menunggu" atau "gagal" yang boleh diklaim — mengembalikan false bila
+ *  baris sedang berjalan (mencegah dua klik Setuju bersamaan membayar dua
+ *  kali di Aneka) atau sudah selesai/batal. */
+export async function claimLazadaOrderExecRunning(
+  orderId: string,
+): Promise<boolean> {
+  const r = await queryOne<{ order_id: string }>(
+    `UPDATE lazada_order_exec SET status = 'berjalan', detail = ''
+     WHERE order_id = ? AND status IN ('menunggu', 'gagal')
+     RETURNING order_id`,
+    [orderId],
   );
   return !!r;
 }

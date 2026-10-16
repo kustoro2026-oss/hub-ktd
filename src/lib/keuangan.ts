@@ -1,10 +1,12 @@
-// Dashboard Keuangan KTD Hub — merangkum uang masuk (omset TikTok Shop +
-// Blibli) dan uang keluar (pembayaran Aneka) untuk rentang tanggal, plus
-// saldo wallet Aneka hasil scrape read-only yang di-cache di database.
+// Dashboard Keuangan KTD Hub — merangkum uang masuk (omset TikTok Shop,
+// Blibli & Lazada) dan uang keluar (pembayaran Aneka) untuk rentang
+// tanggal, plus saldo wallet Aneka hasil scrape read-only yang di-cache
+// di database.
 //
 // Sumber data:
-// - Omset: API resmi TikTok (detail pesanan — harga jual per baris item)
-//   dan API Seller Blibli (paket pesanan — finalPrice per item).
+// - Omset: API resmi TikTok (detail pesanan — harga jual per baris item),
+//   API Seller Blibli (paket pesanan — finalPrice per item), dan Open
+//   Platform Lazada (price tingkat pesanan).
 // - Pengeluaran + saldo: situs anekadropship.id (halaman /payment-history:
 //   baris pembayaran berisi kode ORDER, total, status, nomor resi — saldo
 //   wallet tampil di header halaman yang sama). Aneka tidak punya API
@@ -19,8 +21,10 @@ import {
   listTiktokOrderExecs,
   listTiktokShopTokens,
   listBlibliOrderExecs,
+  listLazadaOrderExecs,
   type AnekaFinanceCacheRow,
   type BlibliOrderExec,
+  type LazadaOrderExec,
   type TiktokOrderExec,
   type TiktokShopToken,
 } from "@/lib/db";
@@ -28,6 +32,9 @@ import { anekaLogin, fetchRetry } from "@/lib/aneka-checkout";
 import { prepareShop, pullTiktokShopOrders } from "@/lib/tiktok-orders";
 import { pullBlibliOrders } from "@/lib/blibli-orders";
 import { type BlibliOrderPackage } from "@/lib/blibli";
+import { pullLazadaOrders } from "@/lib/lazada-orders";
+import { getLazadaOrderItems, type LazadaOrderRow } from "@/lib/lazada";
+import { type LazadaExecPayload } from "@/lib/lazada-exec";
 import {
   getTiktokOrderDetail,
   resolveLineQty,
@@ -72,8 +79,8 @@ export type AnekaSnapshot = {
 
 export type BarisKeuangan = {
   orderId: string;
-  /** Sumber pesanan — TikTok Shop atau Blibli. */
-  pasar: "TikTok" | "Blibli";
+  /** Sumber pesanan — TikTok Shop, Blibli, atau Lazada. */
+  pasar: "TikTok" | "Blibli" | "Lazada";
   waktuMs: number;
   produk: string;
   qty: number;
@@ -135,6 +142,13 @@ function parseRpNomor(s: string): number {
 /** "Rp19.200" / 19200 → "Rp19.200". */
 export function fmtRp(n: number): string {
   return "Rp" + Math.round(n).toLocaleString("id-ID");
+}
+
+/** "YYYY-MM-DD HH:MM:SS" (UTC, format API Lazada) → epoch ms. */
+function lazadaTimeMs(s: string): number {
+  const iso = s.includes("T") ? s : s.replace(" ", "T") + "Z";
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? t : 0;
 }
 
 /** Epoch ms → "DD/MM HH:MM" WIB. */
@@ -404,6 +418,30 @@ export async function ambilDataKeuangan(
     if ((st.packages ?? []).length < 50) break;
   }
 
+  // 2c) Pesanan Lazada — pola yang sama: tarik semua halaman (maks 10 ×
+  //     100) dengan created_after sebagai patokan lalu saring per
+  //     created_at di sini.
+  const lazadaOrders: LazadaOrderRow[] = [];
+  for (let off = 0; off < 1000; off += 100) {
+    const so = (
+      await pullLazadaOrders({
+        created_after: new Date(dariMs).toISOString(),
+        sort_by: "created_at",
+        sort_direction: "ASC",
+        offset: off,
+        limit: 100,
+      })
+    )[0];
+    if (!so?.ok) break;
+    lazadaOrders.push(
+      ...(so.orders ?? []).filter((o) => {
+        const t = lazadaTimeMs(o.created_at);
+        return t >= dariMs && t < sampaiMs;
+      }),
+    );
+    if ((so.orders ?? []).length < 100) break;
+  }
+
   // 3) Detail tiap order (harga jual + qty asli + resi). ID dikumpulkan
   //    per toko supaya satu panggilan detail melayani banyak order.
   const detailByOrder = new Map<string, TiktokOrderDetail>();
@@ -434,12 +472,16 @@ export async function ambilDataKeuangan(
   const execByPkg = new Map<string, BlibliOrderExec>(
     blibliExecs.map((e) => [e.package_id, e]),
   );
+  const lazadaExecs = await listLazadaOrderExecs();
+  const execByLazada = new Map<string, LazadaOrderExec>(
+    lazadaExecs.map((e) => [e.order_id, e]),
+  );
 
   // 4b) Himpunan id pembayaran yang dibuat KTD Hub: kolom aneka_payment_id
-  //     tiap baris eksekusi (TikTok + Blibli) plus jejak id di log (percobaan
-  //     lama yang id-nya tertimpa di kolom tetap terdeteksi dari baris log).
-  //     Pembayaran di luar himpunan ini = orderan manual (dibuat langsung
-  //     di Aneka).
+  //     tiap baris eksekusi (TikTok + Blibli + Lazada) plus jejak id di log
+  //     (percobaan lama yang id-nya tertimpa di kolom tetap terdeteksi dari
+  //     baris log). Pembayaran di luar himpunan ini = orderan manual (dibuat
+  //     langsung di Aneka).
   const hubPaymentIds = new Set<string>();
   const serapPaymentIds = (rows: { aneka_payment_id: string; log: string }[]) => {
     for (const e of rows) {
@@ -455,6 +497,7 @@ export async function ambilDataKeuangan(
   };
   serapPaymentIds(execs);
   serapPaymentIds(blibliExecs);
+  serapPaymentIds(lazadaExecs);
 
   /** Pembayaran Aneka Success yang resinya cocok dengan satu resi pasar. */
   const biayaAnekaUntuk = (resi: string) => {
@@ -627,14 +670,94 @@ export async function ambilDataKeuangan(
     });
   }
 
+  // 5c) Baris per pesanan Lazada (kunci order_id — satu pesanan = satu
+  //     label = satu slot resi Aneka). Omset = price tingkat pesanan
+  //     (nilai barang — ongkir tidak ikut). Nama produk dari payload
+  //     eksekusi; pesanan tanpa baris eksekusi diambil dari
+  //     /order/items/get dengan pembatas panggilan (kuota harian Lazada).
+  let itemCalls = 0;
+  const ITEM_CALLS_MAX = 20;
+  for (const o of lazadaOrders) {
+    const exec = execByLazada.get(o.order_id);
+    let payload: LazadaExecPayload | null = null;
+    try {
+      payload = exec?.payload
+        ? (JSON.parse(exec.payload) as LazadaExecPayload)
+        : null;
+    } catch {
+      payload = null;
+    }
+    let produk = (payload?.items ?? [])
+      .map((it) =>
+        it.variant_name ? `${it.item_name} (${it.variant_name})` : it.item_name,
+      )
+      .join(", ");
+    if (!produk && itemCalls < ITEM_CALLS_MAX) {
+      itemCalls++;
+      const it = await getLazadaOrderItems(o.order_id);
+      if (it.ok) {
+        const nama = new Map<string, number>();
+        for (const row of it.data) {
+          const k = row.variation ? `${row.name} (${row.variation})` : row.name;
+          nama.set(k, (nama.get(k) ?? 0) + 1);
+        }
+        produk = [...nama.entries()]
+          .map(([k, n]) => (n > 1 ? `${k} ×${n}` : k))
+          .join(", ");
+      }
+    }
+    const resi = payload?.tracking_number ?? "";
+    const statusOrder = (o.statuses ?? []).join(", ");
+    const waktuMs = lazadaTimeMs(o.created_at);
+
+    const { bayarAneka, bayarIds, bayarManualAneka } = biayaAnekaUntuk(resi);
+
+    const estimasiModal = payload?.total_modal ?? 0;
+    const akanDieksekusi =
+      exec && ["menunggu", "berjalan", "gagal", "selesai"].includes(exec.status);
+    const estimasiPacking = akanDieksekusi ? ONGKOS_PACKING : 0;
+
+    const { laba, labaRealisasi } = labaUntuk(
+      Number(o.price ?? 0) || 0,
+      bayarAneka,
+      estimasiModal,
+      estimasiPacking,
+    );
+
+    baris.push({
+      orderId: o.order_id,
+      pasar: "Lazada",
+      waktuMs,
+      produk,
+      qty: o.items_count || 0,
+      omset: Number(o.price ?? 0) || 0,
+      statusOrder,
+      statusExec: exec?.status ?? "",
+      resi,
+      bayarIds,
+      bayarAneka,
+      bayarManualAneka,
+      estimasiModal,
+      estimasiPacking,
+      laba,
+      labaRealisasi,
+    });
+  }
+
   // 6) Ringkasan.
   const dibatalkanStatus = new Set(["UNPAID", "CANCELLED"]);
-  /** Batal = status batal TikTok, atau itemStatus X (Blibli) — paket Blibli
-   *  bisa berstatus campur ("X, D"). */
+  /** Batal = status batal TikTok, itemStatus X (Blibli — bisa campur
+   *  "X, D"), atau status masalah Lazada (canceled/returned/failed/lost). */
   const isBatal = (b: BarisKeuangan) =>
     b.pasar === "Blibli"
       ? b.statusOrder.split(",").some((s) => s.trim() === "X")
-      : dibatalkanStatus.has(b.statusOrder);
+      : b.pasar === "Lazada"
+        ? b.statusOrder
+            .split(",")
+            .some((s) =>
+              ["canceled", "returned", "failed", "lost"].includes(s.trim()),
+            )
+        : dibatalkanStatus.has(b.statusOrder);
   const barisBeromset = baris.filter((b) => !isBatal(b));
   const omset = barisBeromset.reduce((a, b) => a + b.omset, 0);
 

@@ -142,8 +142,26 @@ export const NAV: NavSection[] = [
       {
         title: "Lazada",
         items: [
-          { href: "", label: "Pesanan", Icon: Package, segera: true },
-          { href: "", label: "Produk", Icon: Boxes, segera: true },
+          {
+            href: "/marketplace/lazada/pesanan",
+            label: "Pesanan",
+            Icon: Package,
+          },
+          {
+            href: "/marketplace/lazada/eksekusi",
+            label: "Eksekusi Pesanan",
+            Icon: PlayCircle,
+          },
+          {
+            href: "/marketplace/lazada/pemetaan",
+            label: "Pemetaan Produk",
+            Icon: Link2,
+          },
+          {
+            href: "/marketplace/lazada/produk",
+            label: "Produk",
+            Icon: Boxes,
+          },
         ],
       },
     ],

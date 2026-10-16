@@ -1,6 +1,6 @@
 "use client";
 
-// Panel "Harga Massal" untuk TikTok Shop & Blibli — aturan bertingkat
+// Panel "Harga Massal" untuk TikTok Shop, Blibli & Lazada — aturan bertingkat
 // berbasis profit dari modal Aneka dropship (rentang profit → potong/naik
 // harga Rp/%), pratinjau dengan centang manual per produk, tombol Terapkan,
 // dan Reset Semua ke harga awal (snapshot otomatis sebelum perubahan massal
@@ -22,11 +22,12 @@ import {
   XCircle,
 } from "lucide-react";
 
-type Marketplace = "tiktok" | "blibli";
+type Marketplace = "tiktok" | "blibli" | "lazada";
 
 const INFO: Record<Marketplace, { nama: string; pemetaanUrl: string }> = {
   tiktok: { nama: "TikTok Shop", pemetaanUrl: "/marketplace/tiktok/pemetaan" },
   blibli: { nama: "Blibli", pemetaanUrl: "/marketplace/blibli/pemetaan" },
+  lazada: { nama: "Lazada", pemetaanUrl: "/marketplace/lazada/pemetaan" },
 };
 
 type AturanApi = {

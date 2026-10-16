@@ -17,6 +17,10 @@
       "schedule": "0 5 * * *"
     },
     {
+      "path": "/api/lazada/resi/check",
+      "schedule": "0 6 * * *"
+    },
+    {
       "path": "/api/keuangan/refresh",
       "schedule": "0 23 * * *"
     },

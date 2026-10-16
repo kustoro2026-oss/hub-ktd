@@ -3,9 +3,9 @@
 // Tick penjadwal: selama ada tab admin Hub yang terbuka, komponen ini
 // memanggil endpoint penjadwal setiap menit supaya kampanye terjadwal
 // terkirim tepat waktu walau tidak ada yang membuka halaman Broadcast,
-// dan endpoint pengecekan pesanan TikTok/Blibli baru supaya resi PDF
-// otomatis segera terkirim ke WA pemilik. Endpointnya juga menolak bila
-// sesi login sudah kedaluwarsa — aman.
+// dan endpoint pengecekan pesanan TikTok/Blibli/Lazada baru supaya resi
+// PDF otomatis segera terkirim ke WA pemilik. Endpointnya juga menolak
+// bila sesi login sudah kedaluwarsa — aman.
 import { useEffect } from "react";
 
 const TICK_MS = 60_000;
@@ -27,6 +27,7 @@ export default function SchedulerTick() {
       await postSilently("/api/broadcasts/scheduled/run");
       await postSilently("/api/tiktok/resi/check");
       await postSilently("/api/blibli/resi/check");
+      await postSilently("/api/lazada/resi/check");
     }
 
     tick();

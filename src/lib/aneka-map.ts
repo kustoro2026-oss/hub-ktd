@@ -7,6 +7,7 @@ import { listTiktokShopTokens } from "@/lib/db";
 import { getTiktokOrders } from "@/lib/tiktok";
 import { prepareShop } from "@/lib/tiktok-orders";
 import { blibliProductSku, listBlibliOrders } from "@/lib/blibli";
+import { listLazadaProducts } from "@/lib/lazada-products";
 
 export type AnekaCatalogProduct = {
   id: string;
@@ -182,4 +183,52 @@ export async function getSeenBlibliProducts(): Promise<
     (a, b) => b.last_order_at - a.last_order_at,
   );
   return { ok: true, products };
+}
+
+/** Produk Lazada dari katalog toko (kunci pemetaan: SellerSku). Berbeda
+ *  dari Blibli yang menelusuri pesanan: /orders/get Lazada tidak memuat
+ *  rincian SKU item, jadi katalog GetProducts dipakai sebagai sumber
+ *  daftar produk yang perlu dipetakan. */
+export type SeenLazadaProduct = {
+  lazada_sku: string;
+  seller_sku: string;
+  product_name: string;
+  price: number;
+  quantity: number;
+  status: string;
+};
+
+/** Tarik katalog produk Lazada (maks 200 produk, 50/halaman) — distinct
+ *  per SellerSku. Tanpa kredensial kembalikan ok:false dengan keterangan. */
+export async function getSeenLazadaProducts(): Promise<
+  { ok: true; products: SeenLazadaProduct[] } | { ok: false; detail: string }
+> {
+  const bySku = new Map<string, SeenLazadaProduct>();
+  const pages = 4; // 4 × 50 = 200 produk terbaru
+  for (let page = 0; page < pages; page++) {
+    const r = await listLazadaProducts({
+      filter: "all",
+      offset: page * 50,
+      limit: 50,
+    });
+    if (!r.ok) return { ok: false, detail: r.detail };
+    if (r.data.items.length === 0) break;
+    for (const p of r.data.items) {
+      const name = String(p.attributes?.name ?? "");
+      for (const s of p.skus ?? []) {
+        const key = String(s.SellerSku ?? "");
+        if (!key || bySku.has(key)) continue;
+        bySku.set(key, {
+          lazada_sku: key,
+          seller_sku: key,
+          product_name: name,
+          price: Number(s.price ?? s.special_price ?? 0) || 0,
+          quantity: Number(s.quantity) || 0,
+          status: String(s.Status ?? p.status ?? ""),
+        });
+      }
+    }
+    if (r.data.total <= (page + 1) * 50) break;
+  }
+  return { ok: true, products: [...bySku.values()] };
 }

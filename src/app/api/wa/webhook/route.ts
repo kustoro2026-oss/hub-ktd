@@ -34,7 +34,7 @@ import { SPAM_WINDOW_MINUTES, spamDecision } from "@/lib/spam";
 import { runDueScheduledBroadcasts } from "@/lib/broadcast-send";
 import { checkNewTiktokOrders } from "@/lib/tiktok-resi";
 import { checkNewBlibliOrders } from "@/lib/blibli-resi";
-import { after } from "next/server";
+import { checkNewLazadaOrders } from "@/lib/lazada-resi";
 
 type WaStatusEvent = {
   id?: string;
@@ -52,7 +52,7 @@ type WaEntry = { changes?: { field?: string; value?: WaValue }[] };
 
 /** Waktu pengecekan pesanan marketplace terakhir lewat tick webhook
  *  (epoch ms) — pembatas supaya webhook yang deras (event status kiriman
- *  broadcast) tidak memanggil API TikTok/Blibli pada setiap event. */
+ *  broadcast) tidak memanggil API TikTok/Blibli/Lazada pada setiap event. */
 let lastOrderCheckAt = 0;
 
 export async function GET(request: Request) {
@@ -293,25 +293,34 @@ export async function POST(request: Request) {
   }
 
   // Tick penjadwal: setiap payload webhook juga memeriksa kampanye terjadwal
-  // yang waktunya sudah tiba, dan mengecek pesanan TikTok baru (paling cepat
-  // sekali per menit per instans). Dijalankan lewat after() supaya respon
-  // webhook tetap cepat (Meta mensyaratkan balasan kilat) tanpa membatalkan
-  // tick — jadi pesanan tetap terdeteksi walau tidak ada tab admin terbuka.
-  after(() => {
-    runDueScheduledBroadcasts().catch((e) =>
-      console.error("[wa-webhook] tick jadwal gagal:", e),
-    );
-    const now = Date.now();
-    if (now - lastOrderCheckAt >= 60_000) {
-      lastOrderCheckAt = now;
-      checkNewTiktokOrders().catch((e) =>
-        console.error("[wa-webhook] tick pesanan TikTok gagal:", e),
-      );
-      checkNewBlibliOrders().catch((e) =>
-        console.error("[wa-webhook] tick pesanan Blibli gagal:", e),
-      );
+  // yang waktunya sudah tiba, dan mengecek pesanan TikTok/Blibli/Lazada baru
+  // (paling cepat sekali per menit per instans). DI-AWAIT sinkron — after()
+  // terbukti tidak tereksekusi di produksi pada build Next ini, sehingga
+  // pesanan tetap terdeteksi walau tidak ada tab admin terbuka.
+  try {
+    await runDueScheduledBroadcasts();
+  } catch (e) {
+    console.error("[wa-webhook] tick jadwal gagal:", e);
+  }
+  const now = Date.now();
+  if (now - lastOrderCheckAt >= 60_000) {
+    lastOrderCheckAt = now;
+    try {
+      await checkNewTiktokOrders();
+    } catch (e) {
+      console.error("[wa-webhook] tick pesanan TikTok gagal:", e);
     }
-  });
+    try {
+      await checkNewBlibliOrders();
+    } catch (e) {
+      console.error("[wa-webhook] tick pesanan Blibli gagal:", e);
+    }
+    try {
+      await checkNewLazadaOrders();
+    } catch (e) {
+      console.error("[wa-webhook] tick pesanan Lazada gagal:", e);
+    }
+  }
 
   return new Response("OK", { status: 200 });
 }

@@ -18,12 +18,18 @@ import {
   type BlibliBulkItemUpdate,
 } from "@/lib/blibli-products";
 import {
+  listLazadaProducts,
+  updateLazadaProductsBulk,
+  type LazadaBulkItemUpdate,
+} from "@/lib/lazada-products";
+import {
   deleteHargaSnapshot,
   insertHargaSnapshot,
   listAnekaProductMaps,
   listAturanHarga,
   listBlibliProductMaps,
   listHargaSnapshot,
+  listLazadaProductMaps,
   listTiktokShopTokens,
   type AturanHargaRow,
   type HargaSnapshotRow,
@@ -35,7 +41,7 @@ import {
   type TiktokShopCtx,
 } from "@/lib/tiktok-products";
 
-export type Marketplace = "tiktok" | "blibli";
+export type Marketplace = "tiktok" | "blibli" | "lazada";
 
 /** Satu aturan dalam bentuk yang dikirim/diterima UI. */
 export type AturanSimpan = {
@@ -374,6 +380,73 @@ export async function pratinjauBlibli(): Promise<
   };
 }
 
+/** Pratinjau Lazada: semua SKU produk (filter "all"), satu baris per
+ *  SellerSku — kunci pemetaan tingkat produk (satu SellerSku menaungi
+ *  semua varian). Harga patokan = special_price bila aktif dan lebih murah,
+ *  selain itu price. */
+export async function pratinjauLazada(): Promise<
+  | { ok: true; rows: BarisPratinjau[]; tanpaPemetaan: number; snapshotCount: number }
+  | { ok: false; detail: string }
+> {
+  const [aturan, maps, snapshots] = await Promise.all([
+    listAturanHarga("lazada"),
+    listLazadaProductMaps(),
+    listHargaSnapshot("lazada"),
+  ]);
+  const byMap = new Map(
+    maps.filter((m) => m.enabled === 1).map((m) => [m.lazada_sku, m]),
+  );
+  const snapKeys = new Set(snapshots.map((s) => s.sku_key));
+  const rows: BarisPratinjau[] = [];
+  let tanpaPemetaan = 0;
+  let page = 0;
+  for (;;) {
+    const r = await listLazadaProducts({
+      filter: "all",
+      offset: page * 50,
+      limit: 50,
+    });
+    if (!r.ok) return { ok: false, detail: r.detail };
+    for (const p of r.data.items) {
+      const nama = String(p.attributes?.name ?? "");
+      for (const sku of p.skus ?? []) {
+        const key = String(sku.SellerSku ?? "");
+        if (!key) continue;
+        const price = Number(sku.price ?? 0) || 0;
+        const special = Number(sku.special_price ?? 0);
+        const harga = special > 0 && special < price ? special : price;
+        const map = byMap.get(key);
+        const info = map ? infoModalAneka(map.aneka_product_id) : null;
+        if (!info) tanpaPemetaan++;
+        rows.push(
+          barisPratinjau({
+            skuKey: key,
+            productId: key,
+            skuId: "",
+            productName: nama || key,
+            skuLabel: key,
+            harga,
+            hargaMax: harga,
+            infoModal: info,
+            alasanModal: "Tanpa pemetaan Aneka — petakan dulu di halaman Pemetaan",
+            aturan,
+            punyaSnapshot: snapKeys.has(key),
+          }),
+        );
+      }
+    }
+    if (r.data.items.length < 50 || page >= 40) break;
+    page++;
+  }
+  rows.sort((a, b) => a.productName.localeCompare(b.productName, "id"));
+  return {
+    ok: true,
+    rows,
+    tanpaPemetaan,
+    snapshotCount: snapshots.length,
+  };
+}
+
 // ---------- Terapkan ----------
 
 /** Terapkan aturan ke SKU TikTok terpilih (kunci `productId|skuId`).
@@ -646,6 +719,145 @@ export async function terapkanBlibli(
   };
 }
 
+/** Terapkan aturan ke SellerSku Lazada terpilih. Harga segar dibaca lewat
+ *  sku_seller_list (maks 100 per panggilan) supaya tidak menyapu seluruh
+ *  katalog; stok saat ini ikut dikirim karena UpdatePriceQuantity wajib
+ *  memuat Price + Quantity. Penulisan sinkron seperti TikTok. */
+export async function terapkanLazada(
+  pilihan: string[],
+): Promise<HasilTerapkan> {
+  const gagal: HasilTerapkan["gagal"] = [];
+  if (!Array.isArray(pilihan) || pilihan.length === 0) {
+    return { ok: false, diubah: 0, gagal, detail: "Tidak ada SKU yang dipilih.", catatan: [] };
+  }
+  if (pilihan.length > MAKS_PRODUK_TERAPKAN) {
+    return {
+      ok: false,
+      diubah: 0,
+      gagal,
+      detail: `Maksimal ${MAKS_PRODUK_TERAPKAN} produk per sekali terapkan (dipilih ${pilihan.length}) — terapkan bertahap.`,
+      catatan: [],
+    };
+  }
+  const [aturan, maps] = await Promise.all([
+    listAturanHarga("lazada"),
+    listLazadaProductMaps(),
+  ]);
+  const byMap = new Map(
+    maps.filter((m) => m.enabled === 1).map((m) => [m.lazada_sku, m]),
+  );
+
+  // Harga + stok segar lewat sku_seller_list (kelompok maks 100 SKU).
+  const segar = new Map<
+    string,
+    { harga: number; stok: number; nama: string }
+  >();
+  for (let i = 0; i < pilihan.length; i += 100) {
+    const chunk = pilihan.slice(i, i + 100);
+    const r = await listLazadaProducts({ filter: "all", skuSellerList: chunk });
+    if (!r.ok) {
+      for (const sku of chunk) {
+        gagal.push({ skuKey: sku, label: sku, detail: r.detail });
+      }
+      continue;
+    }
+    for (const p of r.data.items) {
+      const nama = String(p.attributes?.name ?? "");
+      for (const sku of p.skus ?? []) {
+        const key = String(sku.SellerSku ?? "");
+        if (!key || segar.has(key)) continue;
+        const price = Number(sku.price ?? 0) || 0;
+        const special = Number(sku.special_price ?? 0);
+        segar.set(key, {
+          harga: special > 0 && special < price ? special : price,
+          stok: Number(sku.quantity ?? 0) || 0,
+          nama: nama || key,
+        });
+      }
+    }
+  }
+
+  const requests: LazadaBulkItemUpdate[] = [];
+  const berubah: { key: string; label: string }[] = [];
+  for (const sku of pilihan) {
+    const f = segar.get(sku);
+    if (!f) {
+      gagal.push({
+        skuKey: sku,
+        label: sku,
+        detail: "Tidak ditemukan di katalog Lazada (periksa SellerSku).",
+      });
+      continue;
+    }
+    const map = byMap.get(sku);
+    if (!map) {
+      gagal.push({ skuKey: sku, label: sku, detail: "Tanpa pemetaan Aneka — petakan dulu di halaman Pemetaan." });
+      continue;
+    }
+    const info = infoModalAneka(map.aneka_product_id);
+    if (!info) {
+      gagal.push({ skuKey: sku, label: sku, detail: "Harga modal Aneka tidak ditemukan di katalog — refresh snapshot katalog." });
+      continue;
+    }
+    const profit = f.harga - info.modal;
+    const a = cocokAturan(profit, aturan);
+    if (!a) continue; // tidak kena aturan — biarkan (bukan gagal)
+    const baru = hitungHargaBaru(
+      f.harga,
+      a.aksi as "potong" | "naik",
+      a.jenis as "rp" | "persen",
+      a.nilai,
+    );
+    if (baru < 1 || baru === f.harga) {
+      gagal.push({
+        skuKey: sku,
+        label: sku,
+        detail: baru < 1 ? "Harga baru di bawah Rp 1 — dilewati." : "Perubahan kurang dari Rp 1 — dilewati.",
+      });
+      continue;
+    }
+    await insertHargaSnapshot({
+      marketplace: "lazada",
+      sku_key: sku,
+      product_id: sku,
+      sku_id: "",
+      product_name: f.nama,
+      sku_label: sku,
+      harga_regular: f.harga,
+      harga_sale: 0,
+      pickup_point_code: "",
+    });
+    requests.push({ sellerSku: sku, price: baru, quantity: f.stok });
+    berubah.push({ key: sku, label: sku });
+  }
+
+  let diubah = 0;
+  for (let i = 0; i < requests.length; i += 50) {
+    const chunk = requests.slice(i, i + 50);
+    const r = await updateLazadaProductsBulk(chunk);
+    if (!r.ok) {
+      for (const c of chunk) {
+        const b = berubah.find((x) => x.key === c.sellerSku);
+        gagal.push({
+          skuKey: c.sellerSku,
+          label: b?.label ?? c.sellerSku,
+          detail: r.detail,
+        });
+      }
+      continue;
+    }
+    diubah += chunk.length;
+  }
+
+  return {
+    ok: diubah > 0 || gagal.length === 0,
+    diubah,
+    gagal,
+    detail: "",
+    catatan: [],
+  };
+}
+
 // ---------- Reset ke harga awal ----------
 
 /** Pulihkan semua snapshot harga TikTok (satu panggilan per produk) lalu
@@ -727,4 +939,68 @@ export async function resetBlibli(): Promise<HasilReset> {
     catatan.push(`Antrean Blibli diterima (${chunk.length} varian) — harga kembali ke awal beberapa menit lagi.`);
   }
   return { ok: true, dipulihkan, gagal, detail: "", catatan: [...new Set(catatan)] };
+}
+
+/** Pulihkan semua snapshot harga Lazada (kelompok ≤ 50 SellerSku per update
+ *  massal, stok saat ini dikirim ulang apa adanya) lalu hapus snapshot yang
+ *  berhasil — yang gagal tetap tersimpan untuk coba ulang. */
+export async function resetLazada(): Promise<HasilReset> {
+  const gagal: HasilReset["gagal"] = [];
+  const snap = await listHargaSnapshot("lazada");
+  if (snap.length === 0) {
+    return { ok: false, dipulihkan: 0, gagal, detail: "Tidak ada snapshot harga untuk di-reset.", catatan: [] };
+  }
+
+  // Stok saat ini wajib dikirim bersama harga (UpdatePriceQuantity).
+  const kunci = snap.map((s) => s.sku_key);
+  const stok = new Map<string, number>();
+  for (let i = 0; i < kunci.length; i += 100) {
+    const chunk = kunci.slice(i, i + 100);
+    const r = await listLazadaProducts({ filter: "all", skuSellerList: chunk });
+    if (!r.ok) {
+      for (const sku of chunk) stok.set(sku, -1);
+      continue;
+    }
+    for (const p of r.data.items) {
+      for (const sku of p.skus ?? []) {
+        const key = String(sku.SellerSku ?? "");
+        if (!key || stok.has(key)) continue;
+        stok.set(key, Number(sku.quantity ?? 0) || 0);
+      }
+    }
+  }
+
+  let dipulihkan = 0;
+  for (let i = 0; i < snap.length; i += 50) {
+    const chunk = snap.slice(i, i + 50);
+    const reqs: LazadaBulkItemUpdate[] = [];
+    for (const s of chunk) {
+      const q = stok.get(s.sku_key);
+      if (q === undefined || q < 0) {
+        gagal.push({
+          skuKey: s.sku_key,
+          label: s.sku_label || s.sku_key,
+          detail: "Stok saat ini tidak bisa dibaca dari Lazada.",
+        });
+        continue;
+      }
+      reqs.push({ sellerSku: s.sku_key, price: s.harga_regular, quantity: q });
+    }
+    if (reqs.length === 0) continue;
+    const r = await updateLazadaProductsBulk(reqs);
+    if (!r.ok) {
+      for (const c of reqs) {
+        const s = chunk.find((x) => x.sku_key === c.sellerSku);
+        gagal.push({
+          skuKey: c.sellerSku,
+          label: s?.sku_label ?? c.sellerSku,
+          detail: r.detail,
+        });
+      }
+      continue;
+    }
+    for (const c of reqs) await deleteHargaSnapshot("lazada", c.sellerSku);
+    dipulihkan += reqs.length;
+  }
+  return { ok: true, dipulihkan, gagal, detail: "", catatan: [] };
 }
