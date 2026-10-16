@@ -155,7 +155,8 @@ export default function BulkHargaClient({
   const [dipilih, setDipilih] = useState<Set<string>>(new Set());
 
   // ---------- Operasi ----------
-  const [sibuk, setSibuk] = useState<"" | "terapkan" | "reset">("");
+  // Nilai kosong = senggang; "terapkan N/M" = progres terapkan bertahap.
+  const [sibuk, setSibuk] = useState<string>("");
   const [hasil, setHasil] = useState<HasilOperasi | null>(null);
 
   // ---------- Toast notifikasi (pertanda operasi berhasil/gagal) ----------
@@ -319,27 +320,56 @@ export default function BulkHargaClient({
     setSibuk("terapkan");
     setHasil(null);
     try {
-      const r = await fetch(`/api/bulk-harga`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          marketplace,
-          op: "terapkan",
-          pilihan: [...dipilih],
-        }),
-      });
-      const data = (await r.json()) as HasilOperasi;
-      setHasil(data);
-      if (data.ok) {
+      // Server membatasi 60 produk per permintaan (serverless 60 detik) —
+      // pilihan besar dipecah otomatis bertahap dengan indikator progres.
+      const MAKS_PER_TAHAP = 60;
+      const semua = [...dipilih];
+      const totalTahap = Math.ceil(semua.length / MAKS_PER_TAHAP);
+      let diubah = 0;
+      const gagal: NonNullable<HasilOperasi["gagal"]> = [];
+      const catatan: string[] = [];
+      let errorTahap = "";
+      for (let i = 0; i < semua.length; i += MAKS_PER_TAHAP) {
+        const tahap = Math.floor(i / MAKS_PER_TAHAP) + 1;
+        setSibuk(`terapkan ${tahap}/${totalTahap}`);
+        const r = await fetch(`/api/bulk-harga`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            marketplace,
+            op: "terapkan",
+            pilihan: semua.slice(i, i + MAKS_PER_TAHAP),
+          }),
+        });
+        const data = (await r.json()) as HasilOperasi;
+        diubah += data.diubah ?? 0;
+        if (Array.isArray(data.gagal)) gagal.push(...data.gagal);
+        if (Array.isArray(data.catatan)) catatan.push(...data.catatan);
+        // detail berisi = kegagalan keras (kredensial/jaringan pasar) —
+        // hentikan, tahap berikutnya pasti gagal dengan alasan yang sama.
+        if (!data.ok && data.detail) {
+          errorTahap = data.detail;
+          break;
+        }
+      }
+      const hasilGabung: HasilOperasi = {
+        ok: errorTahap ? false : diubah > 0 || gagal.length === 0,
+        diubah,
+        gagal,
+        detail: errorTahap,
+        catatan: [...new Set(catatan)],
+      };
+      setHasil(hasilGabung);
+      if (hasilGabung.ok) {
         munculkanToast(
           true,
           marketplace === "blibli"
-            ? `${data.diubah ?? 0} varian dikirim ke antrean Blibli — harga berubah dalam beberapa menit.`
-            : `Harga ${data.diubah ?? 0} SKU berhasil diperbarui di ${info.nama}.`,
+            ? `${hasilGabung.diubah ?? 0} varian dikirim ke antrean Blibli — harga berubah dalam beberapa menit.`
+            : `Harga ${hasilGabung.diubah ?? 0} SKU berhasil diperbarui di ${info.nama}.`,
         );
         await loadPratinjau();
       } else {
-        munculkanToast(false, data.detail ?? "Terapkan gagal.");
+        munculkanToast(false, hasilGabung.detail || "Terapkan gagal.");
       }
     } catch {
       setHasil({
@@ -601,12 +631,12 @@ export default function BulkHargaClient({
               disabled={dipilih.size === 0 || sibuk !== ""}
               className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-emerald-800 disabled:opacity-60"
             >
-              {sibuk === "terapkan" ? (
+              {sibuk.startsWith("terapkan") ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Save className="h-4 w-4" />
               )}
-              Terapkan ke {dipilih.size} Terpilih
+              {sibuk.startsWith("terapkan ") ? sibuk : `Terapkan ke ${dipilih.size} Terpilih`}
             </button>
             <button
               type="button"
