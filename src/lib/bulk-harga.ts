@@ -809,21 +809,23 @@ export async function terapkanLazada(
     maps.filter((m) => m.enabled === 1).map((m) => [m.lazada_sku, m]),
   );
 
-  // Harga + stok segar lewat sku_seller_list (kelompok maks 100 SKU).
+  // Harga + stok segar lewat sku_seller_list (kelompok maks 50 SKU —
+  // /products/get membatasi hasil 50 baris, jadi kelompok lebih besar bisa
+  // kehilangan SKU dan dianggap "tidak ditemukan").
   const segar = new Map<
     string,
     { harga: number; stok: number; nama: string; skuId: string; itemId: string }
   >();
-  for (let i = 0; i < pilihan.length; i += 100) {
-    const chunk = pilihan.slice(i, i + 100);
-    let r = await listLazadaProducts({ filter: "all", skuSellerList: chunk });
+  for (let i = 0; i < pilihan.length; i += 50) {
+    const chunk = pilihan.slice(i, i + 50);
+    let r = await listLazadaProducts({ filter: "all", skuSellerList: chunk, limit: 50 });
     for (
       let ulang = 0;
       !r.ok && /ApiCallLimit|E901/.test(r.detail) && ulang < 3;
       ulang++
     ) {
       await tunda(1500 * (ulang + 1));
-      r = await listLazadaProducts({ filter: "all", skuSellerList: chunk });
+      r = await listLazadaProducts({ filter: "all", skuSellerList: chunk, limit: 50 });
     }
     if (!r.ok) {
       for (const sku of chunk) {
