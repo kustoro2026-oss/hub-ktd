@@ -1113,11 +1113,31 @@ export async function resetLazada(): Promise<HasilReset> {
   }
 
   // Stok saat ini wajib dikirim bersama harga (UpdatePriceQuantity).
+  // /products/get hanya mengembalikan maks 50 baris per panggilan —
+  // sku_seller_list lebih dari 50 membuat SKU sisanya hilang dari hasil
+  // (kejadian nyata saat massal: KTDCGK-2145 dkk "Tidak ditemukan").
   const kunci = snap.map((s) => s.sku_key);
   const stok = new Map<string, number>();
-  for (let i = 0; i < kunci.length; i += 100) {
-    const chunk = kunci.slice(i, i + 100);
-    const r = await listLazadaProducts({ filter: "all", skuSellerList: chunk });
+  for (let i = 0; i < kunci.length; i += 50) {
+    const chunk = kunci.slice(i, i + 50);
+    let r = await listLazadaProducts({
+      filter: "all",
+      skuSellerList: chunk,
+      limit: 50,
+    });
+    // ApiCallLimit/E901 = batas frekuensi Lazada yang sementara — coba lagi.
+    for (
+      let ulang = 0;
+      !r.ok && /ApiCallLimit|E901/.test(r.detail) && ulang < 3;
+      ulang++
+    ) {
+      await new Promise((res) => setTimeout(res, 1500 * (ulang + 1)));
+      r = await listLazadaProducts({
+        filter: "all",
+        skuSellerList: chunk,
+        limit: 50,
+      });
+    }
     if (!r.ok) {
       for (const sku of chunk) stok.set(sku, -1);
       continue;
@@ -1129,6 +1149,7 @@ export async function resetLazada(): Promise<HasilReset> {
         stok.set(key, Number(sku.quantity ?? 0) || 0);
       }
     }
+    await new Promise((res) => setTimeout(res, 600)); // jeda antarpanggilan
   }
 
   let dipulihkan = 0;
