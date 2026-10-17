@@ -323,6 +323,12 @@ export async function prepareLazadaExec(
   if (existing?.status === "menunggu" && !opts.resendNotice) {
     return { ok: true, detail: "Sudah menunggu persetujuan" };
   }
+  // Pesanan yang SUDAH selesai tidak boleh di-antre ulang — route
+  // prepare-ulang/tick tidak boleh membangkitkan notif Setuju baru untuk
+  // pesanan yang sudah terbayar (barisnya menimpa status + payload).
+  if (existing?.status === "selesai") {
+    return { ok: true, detail: "Pesanan sudah selesai dieksekusi" };
+  }
 
   const check = await checkLazadaExecutable(pkg.items);
   if (!check.ok) return { ok: false, detail: check.detail };
