@@ -92,6 +92,9 @@ export type LazadaExecPayload = {
   order_item_ids: string[];
   store_name: string;
   customer_name: string;
+  /** Alamat pengiriman pembeli (dari address_shipping pesanan) — dipakai
+   *  resi PDF cadangan supaya label bisa langsung ditempel di paket. */
+  alamat_pembeli?: string;
   tracking_number: string;
   /** Kosong saat persiapan — diisi label PDF hasil pemenuhan (pack → rts →
    *  document) pada saat eksekusi. */
@@ -238,6 +241,23 @@ export async function buatResiFallback(
     year: "numeric",
   });
 
+  // Pecah teks panjang menjadi baris-baris selebar maksimal maxChars
+  // (dipotong di spasi) supaya alamat tidak keluar dari halaman A6.
+  const wrap = (s: string, maxChars: number): string[] => {
+    const out: string[] = [];
+    let cur = "";
+    for (const w of s.split(/\s+/).filter(Boolean)) {
+      if ((cur + " " + w).trim().length > maxChars) {
+        if (cur) out.push(cur);
+        cur = w;
+      } else {
+        cur = (cur + " " + w).trim();
+      }
+    }
+    if (cur) out.push(cur);
+    return out;
+  };
+
   teks(tengah, 372, payload.store_name.toUpperCase(), 14, { bold: true });
   teks(tengah, 352, "RESI PENGIRIMAN", 10);
   page.drawLine({
@@ -254,11 +274,31 @@ export async function buatResiFallback(
     thickness: 1,
     color: rgb(0, 0, 0),
   });
-  teks(tengah, 210, "Pesanan Lazada", 10);
-  teks(tengah, 188, payload.order_id, 13, { bold: true });
-  teks(tengah, 156, "Pembeli", 10);
-  teks(tengah, 134, payload.customer_name, 12, { bold: true });
-  teks(tengah, 100, tgl, 10, { miring: true });
+
+  // Blok alamat pembeli — bila tersedia, label bisa langsung ditempel
+  // ke paket tanpa membuka aplikasi lain.
+  let yBawah = 244;
+  if (payload.alamat_pembeli) {
+    teks(tengah, 212, "Dikirim ke", 9, { miring: true });
+    teks(tengah, 190, payload.customer_name, 13, { bold: true });
+    const baris = wrap(payload.alamat_pembeli, 52).slice(0, 6);
+    let y = 168;
+    for (const ln of baris) {
+      teks(tengah, y, ln, 10);
+      y -= 13;
+    }
+    yBawah = y + 13;
+  } else {
+    teks(tengah, 210, "Pesanan Lazada", 10);
+    teks(tengah, 188, payload.order_id, 13, { bold: true });
+    teks(tengah, 156, "Pembeli", 10);
+    teks(tengah, 134, payload.customer_name, 12, { bold: true });
+    yBawah = 134;
+  }
+
+  const yInfo = Math.min(yBawah, 134) - 18;
+  teks(tengah, yInfo, `Pesanan Lazada ${payload.order_id}`, 10);
+  teks(tengah, yInfo - 22, tgl, 10, { miring: true });
   return Buffer.from(await doc.save());
 }
 
@@ -274,6 +314,7 @@ export async function prepareLazadaExec(
     order_item_ids: string[];
     store_name: string;
     customer_name: string;
+    customer_address?: string;
     items: LazadaExecSourceItem[];
   },
   opts: { resendNotice?: boolean } = {},
@@ -292,6 +333,7 @@ export async function prepareLazadaExec(
     order_item_ids: pkg.order_item_ids,
     store_name: pkg.store_name,
     customer_name: pkg.customer_name,
+    alamat_pembeli: pkg.customer_address ?? "",
     tracking_number: lazadaTrackingNumber(pkg.order_id),
     label_pdf_base64: "",
     items: check.items,

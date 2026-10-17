@@ -644,6 +644,28 @@ async function runCheckNewLazadaOrders(): Promise<LazadaResiCheckResult> {
         .filter((n) => n && n.trim() !== "")
         .join(" ")
         .trim();
+      // Alamat lengkap untuk resi PDF cadangan (label resmi Lazada tidak
+      // selalu tersedia lewat API untuk pesanan own-logistics).
+      const alamatJalan = [
+        address?.address1,
+        address?.address2,
+        address?.address3,
+        address?.address4,
+        address?.address5,
+      ]
+        .filter((x) => x && x.trim() !== "")
+        .join(", ");
+      const kota = [address?.city, address?.post_code]
+        .filter((x) => x && x.trim() !== "")
+        .join(" ");
+      const customerAddress = [
+        alamatJalan,
+        kota,
+        address?.country,
+      ]
+        .filter((x) => x !== "")
+        .join(", ") +
+        (address?.phone ? ` — Telp ${address.phone}` : "");
 
       if (execCheck.ok) {
         const prep = await prepareLazadaExec(
@@ -652,6 +674,7 @@ async function runCheckNewLazadaOrders(): Promise<LazadaResiCheckResult> {
             order_item_ids: items.map((x) => x.order_item_id),
             store_name: LAZADA_STORE_NAME,
             customer_name: customerName,
+            customer_address: customerAddress,
             items: srcItems,
           },
           // Percobaan ulang setelah kegagalan: antrean "menunggu" mungkin

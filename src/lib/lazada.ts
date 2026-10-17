@@ -589,7 +589,12 @@ export async function getLazadaDocument(
     document?: { file?: string; mime_type?: string };
   }>("/order/document/get", {
     doc_type: docType,
-    order_item_ids: JSON.stringify(orderItemIds),
+    // Format resmi (docs Open Platform, contoh Java/CURL): daftar id dalam
+    // kurung siku TANPA tanda kutip — "[279709, 279709]". JSON.stringify
+    // menambah tanda kutip di sekitar id, membuat Lazada gagal parse
+    // (code 6 "For input string: \"...\"") atau membalas file kosong
+    // (peristiwa 17 Okt 2026: label shippingLabel 1 byte, invoice code 6).
+    order_item_ids: "[" + orderItemIds.join(", ") + "]",
   });
   if (!r.ok) return r;
   const doc = r.data.document ?? {};
