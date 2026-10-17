@@ -613,12 +613,21 @@ type LazadaLabelPdf = { pdf: Buffer; pageCount: number; docType: string };
  *  membalas 1 byte, label itu diteruskan ke pembayaran Aneka lalu ditolak
  *  situs PADAHAL saldo/varian/stock aman. Validasi di sini memastikan
  *  kegagalan label terjadi SEBELUM saldo dipindahkan, bukan sesudah.
- *  Dicoba sampai 3 ronde dengan jeda, tiap ronde mencoba doc_type
- *  shippingLabel lalu invoice. */
+ *  Dicoba sampai 3 ronde dengan jeda; tiap ronde mencoba beberapa
+ *  doc_type — shippingLabel dulu (label standar), lalu thermalPrintedLabel
+ *  (format thermal 10x15 yang diminta Aneka), airWayBill, invoice, dan
+ *  carInvoice. Pesanan own-logistics kadang hanya punya sebagian jenis
+ *  dokumen, jadi mencoba banyak jenis menaikkan peluang dapat label. */
 export async function getLazadaLabelPdf(
   orderItemIds: string[],
 ): Promise<LazadaResult<LazadaLabelPdf>> {
-  const docTypes = ["shippingLabel", "invoice"];
+  const docTypes = [
+    "shippingLabel",
+    "thermalPrintedLabel",
+    "airWayBill",
+    "invoice",
+    "carInvoice",
+  ];
   const keterangan: string[] = [];
   for (let attempt = 1; attempt <= 3; attempt++) {
     for (const docType of docTypes) {
@@ -630,7 +639,9 @@ export async function getLazadaLabelPdf(
       try {
         const pdf = Buffer.from(doc.data.base64, "base64");
         if (pdf.length < 5 || pdf.subarray(0, 5).toString("ascii") !== "%PDF-") {
-          keterangan.push(`${docType}: bukan PDF valid (${pdf.length} byte)`);
+          keterangan.push(
+            `${docType}: bukan PDF valid (${pdf.length} byte, mime ${doc.data.mimeType || "?"})`,
+          );
           continue;
         }
         let pageCount = 1;
