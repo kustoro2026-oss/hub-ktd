@@ -671,8 +671,11 @@ export async function getLazadaLabelPdf(
  *  pack → ready-to-ship dengan nomor resi penjual → unduh label PDF.
  *  Penyedia pengiriman: env LAZADA_SHIPMENT_PROVIDER bila diatur, kalau
  *  tidak penyedia ber-is_default dari GetShipmentProviders, kalau tidak
- *  penyedia pertama. Nomor resi = LAZADA_TRACKING_PREFIX (default "KT") +
- *  order_id — unik per pesanan dan bisa dicocokkan di riwayat Aneka.
+ *  penyedia pertama. Nomor resi awal = LAZADA_TRACKING_PREFIX (default
+ *  "KT") + order_id — tetapi untuk kurir TERINTEGRASI (mis. LEX ID)
+ *  Lazada membuat AWB sendiri dan mengabaikan nomor penjual, jadi setelah
+ *  rts nomor resi dibaca ulang dari tracking_code item (peristiwa 17 Okt
+ *  2026: rts pakai KT... tetapi pesanan ber-AWB LXAD-...).
  *  Dipakai lazada-resi.ts (jalur kirim resi ke WA) dan lazada-exec.ts
  *  (pemenuhan saat pemilik menyetujui eksekusi). */
 export async function fulfillLazadaOrderForItems(
@@ -680,7 +683,7 @@ export async function fulfillLazadaOrderForItems(
   orderId: string,
 ): Promise<
   | { ok: true; pdf: Buffer; pageCount: number; trackingNumber: string }
-  | { ok: false; detail: string; rtsDone?: boolean }
+  | { ok: false; detail: string; rtsDone?: boolean; trackingNumber?: string }
 > {
   if (orderItemIds.length === 0) {
     return { ok: false, detail: "Daftar item pesanan kosong — tidak bisa diproses" };
@@ -717,14 +720,34 @@ export async function fulfillLazadaOrderForItems(
       detail: `${awal}gagal ready-to-ship (resi ${tracking}): ${rts.detail}`,
     };
   }
+  // Kurir terintegrasi membuat AWB sendiri — baca nomor resi ASLI dari item
+  // supaya label/Aneka cocok dengan pelacakan Lazada; bila kosong (kurir
+  // non-integrated), nomor resi penjual di atas tetap dipakai.
+  let trackingFinal = tracking;
+  try {
+    const its = await getLazadaOrderItems(orderId);
+    if (its.ok) {
+      const asli = its.data
+        .map((x) => (x.tracking_code ?? "").trim())
+        .find((x) => x !== "");
+      if (asli) trackingFinal = asli;
+    }
+  } catch {
+    // Biarkan — nomor resi penjual tetap sah sebagai cadangan.
+  }
   const doc = await getLazadaLabelPdf(orderItemIds);
   if (!doc.ok) {
     // rts SUDAH berhasil — pesanan siap kirim, hanya label resmi yang
     // tidak tersedia. rtsDone memberi tahu pemanggil bahwa boleh memakai
     // resi PDF buatan sendiri (dropship own-logistics).
-    return { ok: false, detail: `Gagal unduh label: ${doc.detail}`, rtsDone: true };
+    return {
+      ok: false,
+      detail: `Gagal unduh label: ${doc.detail}`,
+      rtsDone: true,
+      trackingNumber: trackingFinal,
+    };
   }
-  return { ok: true, pdf: doc.data.pdf, pageCount: doc.data.pageCount, trackingNumber: tracking };
+  return { ok: true, pdf: doc.data.pdf, pageCount: doc.data.pageCount, trackingNumber: trackingFinal };
 }
 
 // ---------- Produk ----------

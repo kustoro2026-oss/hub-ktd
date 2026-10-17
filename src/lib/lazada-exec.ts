@@ -876,6 +876,12 @@ export async function executeLazadaOrder(
       // checkout Aneka tetap bisa diselesaikan. Bila rts sendiri gagal,
       // JANGAN nekat membayar: pesanan belum siap kirim.
       if (fulf.rtsDone) {
+        // Kurir terintegrasi (mis. LEX ID) membuat AWB sendiri — nomor
+        // resi asli dari fulfill menggantikan KT... supaya label cadangan
+        // dan nomor resi Aneka cocok dengan pelacakan Lazada.
+        if (fulf.trackingNumber && fulf.trackingNumber !== payload.tracking_number) {
+          payload = { ...payload, tracking_number: fulf.trackingNumber };
+        }
         const fallback = await buatResiFallback(payload).catch(() => null);
         if (fallback) {
           pdfBuffer = fallback;

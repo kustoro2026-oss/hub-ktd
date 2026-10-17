@@ -308,6 +308,8 @@ export async function GET(request: Request) {
         seller_sku: it.seller_sku,
         shop_sku: it.shop_sku,
         variation: it.variation,
+        tracking_code: it.tracking_code,
+        shipment_provider: it.shipment_provider,
         cancelled,
         ...(seen
           ? {
