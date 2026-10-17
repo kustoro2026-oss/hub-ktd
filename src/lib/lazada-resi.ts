@@ -33,6 +33,7 @@
 // (sudah dipenuhi), canceled/returned/failed/lost (pembatalan/pengembalian).
 import {
   countSeenLazadaOrders,
+  getLazadaOrderExec,
   listLazadaOrderExecs,
   listSeenLazadaOrders,
   markLazadaOrderSeen,
@@ -40,9 +41,12 @@ import {
   touchLazadaOrderSeen,
 } from "@/lib/db";
 import {
+  buatResiFallback,
   cancelLazadaExec,
   checkLazadaExecutable,
+  lazadaTrackingNumber,
   prepareLazadaExec,
+  type LazadaExecPayload,
   type LazadaExecSourceItem,
 } from "@/lib/lazada-exec";
 import {
@@ -121,7 +125,14 @@ export type LazadaResiCheckResult = {
 
 /** Dokumen label resmi satu pesanan — hasil pemenuhan Lazada. */
 export type LazadaOfficialResiResult =
-  | { ok: true; pdf: Buffer; tracking_number: string }
+  | {
+      ok: true;
+      pdf: Buffer;
+      tracking_number: string;
+      /** true bila label resmi tidak tersedia lewat API dan PDF yang
+       *  dikembalikan adalah resi cadangan buatan sendiri. */
+      fallback?: boolean;
+    }
   | { ok: false; detail: string };
 
 /** Kirim label resmi satu pesanan ke nomor admin; kembalikan hasil untuk
@@ -173,9 +184,94 @@ async function sendOwnerNotice(msg: string): Promise<string> {
   return `gagal: ${free.error ?? "teks ditolak"} | template: ${tpl.error ?? "ditolak"}`;
 }
 
+/** Ambil nama + alamat pembeli dari address_shipping dengan bagian
+ *  tersamar disaring. Lazada menyamarkan data pelanggan di API — nama
+ *  "S**o", jalan "k***a", telp "6**7" (peristiwa 17 Okt 2026) — jadi
+ *  HANYA bagian yang tidak tersamar yang ikut dicetak; bila semua
+ *  tersamar, blok alamat kosong supaya label tidak menampilkan deretan
+ *  bintang yang membingungkan seller. */
+function pelangganDariAlamat(
+  address?: LazadaOrderRow["address_shipping"],
+): { customerName: string; customerAddress: string } {
+  const customerName = [address?.first_name, address?.last_name]
+    .filter((n) => n && n.trim() !== "")
+    .join(" ")
+    .trim();
+  const tidakTersamar = (x?: string): x is string =>
+    !!x && x.trim() !== "" && !x.includes("*");
+  const alamatJalan = [
+    address?.address1,
+    address?.address2,
+    address?.address3,
+    address?.address4,
+    address?.address5,
+  ]
+    .filter(tidakTersamar)
+    .join(", ");
+  const kota = [address?.city, address?.post_code]
+    .filter(tidakTersamar)
+    .join(" ");
+  const customerAddress =
+    [alamatJalan, kota, address?.country].filter(tidakTersamar).join(", ") +
+    (tidakTersamar(address?.phone) ? ` — Telp ${address.phone}` : "");
+  return { customerName, customerAddress };
+}
+
+/** Buat resi PDF cadangan (A6) dengan nomor resi asli — dipakai ketika
+ *  pemenuhan berhasil (pack + rts) tetapi label resmi tidak bisa diunduh
+ *  lewat API (pesanan kurir terintegrasi; AWB hanya ada di Seller Center).
+ *  Nama/alamat diambil dari antrean eksekusi, lalu dari data pesanan
+ *  (tersamar) bila kosong. */
+async function buatResiCadangan(
+  orderId: string,
+  tracking: string,
+): Promise<Buffer> {
+  const row = await getLazadaOrderExec(orderId);
+  let customerName = "";
+  let alamatPembeli = "";
+  if (row) {
+    try {
+      const pl = JSON.parse(row.payload) as Partial<LazadaExecPayload>;
+      customerName = (pl.customer_name ?? "").trim();
+      alamatPembeli = (pl.alamat_pembeli ?? "").trim();
+    } catch {
+      // payload rusak — biarkan kosong.
+    }
+  }
+  if (!customerName) {
+    const orders = await getLazadaOrders({
+      created_after: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
+      sort_by: "updated_at",
+      sort_direction: "DESC",
+      offset: 0,
+      limit: 100,
+    });
+    const addr = orders.ok
+      ? orders.data.orders.find((o) => o.order_id === orderId)
+          ?.address_shipping
+      : undefined;
+    const bersih = pelangganDariAlamat(addr);
+    customerName = bersih.customerName;
+    alamatPembeli = bersih.customerAddress;
+  }
+  return buatResiFallback({
+    order_id: orderId,
+    order_item_ids: [],
+    store_name: LAZADA_STORE_NAME,
+    customer_name: customerName,
+    alamat_pembeli: alamatPembeli,
+    tracking_number: tracking,
+    label_pdf_base64: "",
+    items: [],
+    total_modal: 0,
+  });
+}
+
 /** Ambil label RESMI Lazada untuk satu pesanan (pemenuhan penuh: pack →
  *  rts → document) — tanpa mengirim WA. Dipakai route cetak resi (dibuka
- *  di tab baru dari halaman Pesanan) dan tombol "Kirim Resi". */
+ *  di tab baru dari halaman Pesanan) dan tombol "Kirim Resi". Bila label
+ *  resmi tidak tersedia lewat API, dikembalikan resi cadangan (fallback)
+ *  dengan nomor resi asli. */
 export async function getLazadaResiPdf(
   orderId: string,
 ): Promise<LazadaOfficialResiResult> {
@@ -199,7 +295,23 @@ export async function getLazadaResiPdf(
     items.data.map((i) => i.order_item_id),
     orderId,
   );
-  if (!fulf.ok) return { ok: false, detail: fulf.detail };
+  if (!fulf.ok) {
+    // Pemenuhan (pack + rts) berhasil tetapi label resmi tidak tersedia
+    // lewat API (pesanan kurir terintegrasi — AWB hanya ada di Seller
+    // Center). Buat resi cadangan dengan nomor resi ASLI supaya halaman
+    // Pesanan tetap bisa mencetak dokumen yang sah untuk ditempel.
+    if (fulf.rtsDone) {
+      const tracking = fulf.trackingNumber ?? lazadaTrackingNumber(orderId);
+      const pdf = await buatResiCadangan(orderId, tracking);
+      return {
+        ok: true,
+        pdf,
+        tracking_number: tracking,
+        fallback: true,
+      };
+    }
+    return { ok: false, detail: fulf.detail };
+  }
   return { ok: true, pdf: fulf.pdf, tracking_number: fulf.trackingNumber };
 }
 
@@ -639,36 +751,11 @@ async function runCheckNewLazadaOrders(): Promise<LazadaResiCheckResult> {
           }
         : await checkLazadaExecutable(srcItems);
 
-      const address = orderRowMap.get(orderId)?.address_shipping;
-      const customerName = [address?.first_name, address?.last_name]
-        .filter((n) => n && n.trim() !== "")
-        .join(" ")
-        .trim();
-      // Alamat untuk resi PDF cadangan (label resmi Lazada tidak selalu
-      // tersedia lewat API untuk pesanan own-logistics). Lazada menyamarkan
-      // data pelanggan di API — nama "S**o", jalan "k***a", telp "6**7"
-      // (peristiwa 17 Okt 2026) — jadi HANYA bagian yang tidak tersamar
-      // yang ikut dicetak; bila semua tersamar, blok alamat kosong supaya
-      // label tidak menampilkan deretan bintang yang membingungkan seller.
-      const tidakTersamar = (x?: string): x is string =>
-        !!x && x.trim() !== "" && !x.includes("*");
-      const alamatJalan = [
-        address?.address1,
-        address?.address2,
-        address?.address3,
-        address?.address4,
-        address?.address5,
-      ]
-        .filter(tidakTersamar)
-        .join(", ");
-      const kota = [address?.city, address?.post_code]
-        .filter(tidakTersamar)
-        .join(" ");
-      const customerAddress =
-        [alamatJalan, kota, address?.country]
-          .filter(tidakTersamar)
-          .join(", ") +
-        (tidakTersamar(address?.phone) ? ` — Telp ${address.phone}` : "");
+      // Nama/alamat untuk resi PDF cadangan (label resmi Lazada tidak
+      // selalu tersedia lewat API untuk pesanan own-logistics/terintegrasi).
+      const { customerName, customerAddress } = pelangganDariAlamat(
+        orderRowMap.get(orderId)?.address_shipping,
+      );
 
       if (execCheck.ok) {
         const prep = await prepareLazadaExec(

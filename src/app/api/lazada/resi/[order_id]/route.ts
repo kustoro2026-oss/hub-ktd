@@ -29,7 +29,11 @@ export async function GET(
   if (url.searchParams.get("debug") === "1") {
     return Response.json(
       res.ok
-        ? { ok: true, tracking_number: res.tracking_number }
+        ? {
+            ok: true,
+            tracking_number: res.tracking_number,
+            ...(res.fallback ? { fallback: true } : {}),
+          }
         : { ok: false, detail: res.detail },
     );
   }
