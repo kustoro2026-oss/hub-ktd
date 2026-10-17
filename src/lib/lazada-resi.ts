@@ -644,8 +644,14 @@ async function runCheckNewLazadaOrders(): Promise<LazadaResiCheckResult> {
         .filter((n) => n && n.trim() !== "")
         .join(" ")
         .trim();
-      // Alamat lengkap untuk resi PDF cadangan (label resmi Lazada tidak
-      // selalu tersedia lewat API untuk pesanan own-logistics).
+      // Alamat untuk resi PDF cadangan (label resmi Lazada tidak selalu
+      // tersedia lewat API untuk pesanan own-logistics). Lazada menyamarkan
+      // data pelanggan di API — nama "S**o", jalan "k***a", telp "6**7"
+      // (peristiwa 17 Okt 2026) — jadi HANYA bagian yang tidak tersamar
+      // yang ikut dicetak; bila semua tersamar, blok alamat kosong supaya
+      // label tidak menampilkan deretan bintang yang membingungkan seller.
+      const tidakTersamar = (x?: string): x is string =>
+        !!x && x.trim() !== "" && !x.includes("*");
       const alamatJalan = [
         address?.address1,
         address?.address2,
@@ -653,19 +659,16 @@ async function runCheckNewLazadaOrders(): Promise<LazadaResiCheckResult> {
         address?.address4,
         address?.address5,
       ]
-        .filter((x) => x && x.trim() !== "")
+        .filter(tidakTersamar)
         .join(", ");
       const kota = [address?.city, address?.post_code]
-        .filter((x) => x && x.trim() !== "")
+        .filter(tidakTersamar)
         .join(" ");
-      const customerAddress = [
-        alamatJalan,
-        kota,
-        address?.country,
-      ]
-        .filter((x) => x !== "")
-        .join(", ") +
-        (address?.phone ? ` — Telp ${address.phone}` : "");
+      const customerAddress =
+        [alamatJalan, kota, address?.country]
+          .filter(tidakTersamar)
+          .join(", ") +
+        (tidakTersamar(address?.phone) ? ` — Telp ${address.phone}` : "");
 
       if (execCheck.ok) {
         const prep = await prepareLazadaExec(
