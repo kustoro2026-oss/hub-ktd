@@ -346,6 +346,13 @@ function migrateSqlite(db: DatabaseSync) {
       updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
 
+    CREATE TABLE IF NOT EXISTS lazada_web_sessions (
+      seller_id TEXT PRIMARY KEY,
+      cookie_text TEXT NOT NULL DEFAULT '',
+      tk_expires_at TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
     CREATE TABLE IF NOT EXISTS tiktok_order_seen (
       order_id TEXT PRIMARY KEY,
       shop_id TEXT NOT NULL DEFAULT '',
@@ -799,6 +806,13 @@ async function migratePg(pool: Pool) {
       refresh_token TEXT NOT NULL DEFAULT '',
       expires_at TEXT NOT NULL DEFAULT '',
       refresh_expires_at TEXT NOT NULL DEFAULT '',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS lazada_web_sessions (
+      seller_id TEXT PRIMARY KEY,
+      cookie_text TEXT NOT NULL DEFAULT '',
+      tk_expires_at TEXT NOT NULL DEFAULT '',
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
@@ -2978,6 +2992,44 @@ export async function updateLazadaOrderExecPayload(
     "UPDATE lazada_order_exec SET payload = ? WHERE order_id = ?",
     [payload, orderId],
   );
+}
+
+// ---------- Sesi web Seller Center (cetak AWB via mtop) ----------
+
+export type LazadaWebSession = {
+  seller_id: string;
+  cookie_text: string;
+  tk_expires_at: string;
+  updated_at: string;
+};
+
+/** Simpan/timpa cookie sesi web Seller Center satu seller — dipakai memanggil
+ *  API mtop internal (cetak AWB pesanan kurir terintegrasi) dari server.
+ *  Cookie berisi token sesi sensitif; hanya route admin yang menulisnya. */
+export async function saveLazadaWebSession(
+  sellerId: string,
+  cookieText: string,
+  tkExpiresAt = "",
+): Promise<void> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  await queryRun(
+    `INSERT INTO lazada_web_sessions (seller_id, cookie_text, tk_expires_at, updated_at)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT (seller_id) DO UPDATE SET cookie_text = excluded.cookie_text,
+       tk_expires_at = excluded.tk_expires_at, updated_at = excluded.updated_at`,
+    [sellerId, cookieText, tkExpiresAt, nowUtc],
+  );
+}
+
+/** Ambil sesi web tersimpan satu seller (null bila belum pernah disimpan). */
+export async function getLazadaWebSession(
+  sellerId: string,
+): Promise<LazadaWebSession | null> {
+  const rows = await queryAll<LazadaWebSession>(
+    "SELECT * FROM lazada_web_sessions WHERE seller_id = ?",
+    [sellerId],
+  );
+  return rows[0] ?? null;
 }
 
 /** Simpan/timpa baris eksekusi (upsert — persiapan ulang menimpa baris

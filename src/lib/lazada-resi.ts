@@ -39,6 +39,7 @@ import {
   markLazadaOrderSeen,
   recordLazadaOrderFailure,
   touchLazadaOrderSeen,
+  updateLazadaOrderExecPayload,
 } from "@/lib/db";
 import {
   buatResiFallback,
@@ -58,6 +59,7 @@ import {
   type LazadaOrderRow,
 } from "@/lib/lazada";
 import { LAZADA_STORE_NAME } from "@/lib/lazada-orders";
+import { getLazadaResmiAWB } from "@/lib/lazada-mtop";
 import {
   NOTIF_TEMPLATE,
   ownerNumber,
@@ -135,6 +137,9 @@ export type LazadaOfficialResiResult =
       /** true bila PDF berasal dari unggahan pemilik — dokumen resmi yang
        *  diunduh dari Seller Center (bukan hasil API Open Platform). */
       unggahan?: boolean;
+      /** true bila PDF dicetak otomatis lewat sesi web Seller Center (mtop
+       *  print) — dokumen AWB resmi Lazada, bukan unggahan atau tiruan. */
+      resmi?: boolean;
     }
   | { ok: false; detail: string };
 
@@ -343,6 +348,38 @@ export async function getLazadaResiPdf(
     // Pesanan tetap bisa mencetak dokumen yang sah untuk ditempel.
     if (fulf.rtsDone) {
       const tracking = fulf.trackingNumber ?? lazadaTrackingNumber(orderId);
+      // Prioritas: cetak AWB RESMI otomatis lewat sesi web Seller Center
+      // (mtop print) — dokumen asli Lazada, bukan tiruan. Hasilnya
+      // disimpan ke payload supaya pemanggilan berikutnya langsung pakai
+      // cache (sama seperti label unggahan).
+      const awb = await getLazadaResmiAWB(
+        orderId,
+        items.data.map((i) => i.order_item_id),
+      );
+      if (awb.ok) {
+        try {
+          const baris = await getLazadaOrderExec(orderId);
+          let payload: Record<string, unknown> = {};
+          if (baris) {
+            try {
+              payload = JSON.parse(baris.payload) as Record<string, unknown>;
+            } catch {
+              payload = {};
+            }
+          }
+          payload.label_pdf_base64 = awb.pdf.toString("base64");
+          payload.tracking_number = tracking;
+          await updateLazadaOrderExecPayload(orderId, JSON.stringify(payload));
+        } catch {
+          // cache gagal — PDF tetap dikembalikan untuk cetak kali ini.
+        }
+        return {
+          ok: true,
+          pdf: awb.pdf,
+          tracking_number: tracking,
+          resmi: true,
+        };
+      }
       const pdf = await buatResiCadangan(orderId, tracking);
       return {
         ok: true,

@@ -34,6 +34,7 @@ export async function GET(
             tracking_number: res.tracking_number,
             ...(res.fallback ? { fallback: true } : {}),
             ...(res.unggahan ? { unggahan: true } : {}),
+            ...(res.resmi ? { resmi: true } : {}),
           }
         : { ok: false, detail: res.detail },
     );
