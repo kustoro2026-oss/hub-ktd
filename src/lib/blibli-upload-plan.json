@@ -1,0 +1,454 @@
+{
+  "description": "Rencana pickup point Blibli per seller-location. name/telpon untuk form Tambah Alamat Pengambilan; search = query peta utama; fallback = query cadangan bila search gagal; rt/rw = nilai field RT/RW setelah simpan pin (001/001 default bila tidak diketahui).",
+  "phone": "085171157938",
+  "existing": [
+    {
+      "location": [
+        "Jakarta Barat",
+        "all"
+      ],
+      "ppCode": "PP-3587819",
+      "name": "Ruko Garden Maisonette Blok C102 Cengkareng Timur Jakarta Barat 11720"
+    },
+    {
+      "location": [
+        "Bandung",
+        "Kota Bandung"
+      ],
+      "ppCode": "PP-3587884",
+      "name": "Kujangsari, Bandung"
+    }
+  ],
+  "new": [
+    {
+      "location": [
+        "Pekalongan"
+      ],
+      "ppCode": "PP-3587885",
+      "name": "Pekalongan Kota, Pekalongan",
+      "search": "Kota Pekalongan, Jawa Tengah",
+      "fallback": "Pekalongan",
+      "rt": "001",
+      "rw": "001",
+      "note": "alamat spesifik tidak tersedia - pin level kota"
+    },
+    {
+      "location": [
+        "Jombang",
+        "Kab Jombang"
+      ],
+      "ppCode": "PP-3587886",
+      "name": "Sawahan, Jombang",
+      "search": "Sawahan Gang I No.11, Jombang, Jawa Timur",
+      "fallback": "Sawahan, Jombang",
+      "rt": "001",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Sidoarjo"
+      ],
+      "ppCode": "PP-3587887",
+      "name": "Balongbendo, Sidoarjo",
+      "search": "Desa Penambangan, Balongbendo, Sidoarjo",
+      "fallback": "Balongbendo, Sidoarjo",
+      "rt": "009",
+      "rw": "002",
+      "note": "17 produk hanya ber-badge sidoarjo"
+    },
+    {
+      "location": [
+        "Malang",
+        "Malang Jatim",
+        "Sukun Malang"
+      ],
+      "ppCode": "PP-3587888",
+      "name": "Sukun, Malang",
+      "search": "Jl. Tebo Selatan No.41, Sukun, Malang",
+      "fallback": "Tebo Selatan, Malang",
+      "rt": "001",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Jakarta Utara"
+      ],
+      "ppCode": "PP-3587889",
+      "name": "Kelapa Gading, Jakarta Utara",
+      "search": "Kelapa Gading, Jakarta Utara",
+      "fallback": "Kelapa Gading",
+      "rt": "001",
+      "rw": "001",
+      "note": "curated origin: mayoritas KOTA JAKARTA UTARA -> Kelapa Gading"
+    },
+    {
+      "location": [
+        "Tangerang"
+      ],
+      "ppCode": "PP-3587890",
+      "name": "Periuk, Tangerang",
+      "search": "Villa Mutiara Pluit Blok B1 No.48, Periuk, Tangerang",
+      "fallback": "Periuk, Tangerang",
+      "rt": "001",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Tangerang Selatan"
+      ],
+      "ppCode": "PP-3587891",
+      "name": "Serpong, Tangerang Selatan",
+      "search": "Jl. Vinca IV G7 No.10, Serpong, Tangerang Selatan",
+      "fallback": "Serpong Utara, Tangerang Selatan",
+      "rt": "001",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Mojokerto",
+        "Sooko Mojokerto"
+      ],
+      "ppCode": "PP-3587892",
+      "name": "Mojokerto Kota, Mojokerto",
+      "search": "Kota Mojokerto, Jawa Timur",
+      "fallback": "Mojokerto",
+      "rt": "001",
+      "rw": "001",
+      "note": "alamat spesifik tidak tersedia - pin level kota"
+    },
+    {
+      "location": [
+        "Madiun"
+      ],
+      "ppCode": "PP-3587893",
+      "name": "Taman, Madiun",
+      "search": "Jalan Mangga No.9, Kejuron, Taman, Madiun",
+      "fallback": "Kejuron, Taman, Madiun",
+      "rt": "001",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Jawa Tengah",
+        "Sragen"
+      ],
+      "ppCode": "PP-3587894",
+      "name": "Sidoharjo, Sragen",
+      "search": "Mungkung, Jetak, Sidoharjo, Sragen",
+      "fallback": "Mungkung, Sidoharjo, Sragen",
+      "rt": "006",
+      "rw": "010"
+    },
+    {
+      "location": [
+        "Jakarta Pusat"
+      ],
+      "ppCode": "PP-3587895",
+      "name": "Sawah Besar, Jakarta Pusat",
+      "search": "Jl. F Karang Anyar No.25, Sawah Besar, Jakarta Pusat",
+      "fallback": "Karang Anyar, Sawah Besar",
+      "rt": "012",
+      "rw": "006"
+    },
+    {
+      "location": [
+        "Sukoharjo"
+      ],
+      "ppCode": "PP-3587896",
+      "name": "Weru, Sukoharjo",
+      "search": "Kauman, Karanganyar, Weru, Sukoharjo",
+      "fallback": "Weru, Sukoharjo",
+      "rt": "001",
+      "rw": "007"
+    },
+    {
+      "location": [
+        "Salatiga"
+      ],
+      "ppCode": "PP-3587907",
+      "name": "Tingkir, Salatiga",
+      "search": "Jl. Tirtoyoso No.49, Nanggulan, Tingkir, Salatiga",
+      "fallback": "Tirtoyoso, Salatiga",
+      "rt": "006",
+      "rw": "006"
+    },
+    {
+      "location": [
+        "Wiyung Surabaya"
+      ],
+      "ppCode": "PP-3587908",
+      "name": "Wiyung, Surabaya",
+      "search": "Wiyung, Surabaya",
+      "fallback": "Wiyung",
+      "rt": "001",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Ngawi"
+      ],
+      "ppCode": "PP-3587909",
+      "name": "Mantingan, Ngawi",
+      "search": "Jl. Sieng, Mantingan, Ngawi",
+      "fallback": "Mantingan, Ngawi",
+      "rt": "003",
+      "rw": "007"
+    },
+    {
+      "location": [
+        "Kab Pekalongan"
+      ],
+      "ppCode": "PP-3587910",
+      "name": "Bojong, Pekalongan",
+      "search": "Bojong Minggir, Bojong, Pekalongan",
+      "fallback": "Bojong, Kabupaten Pekalongan",
+      "rt": "014",
+      "rw": "007"
+    },
+    {
+      "location": [
+        "Surabaya"
+      ],
+      "ppCode": "PP-3587911",
+      "name": "Tandes, Surabaya",
+      "search": "Jl. Tandes Lor Gg.2 No.45, Tandes, Surabaya",
+      "fallback": "Tandes Lor, Surabaya",
+      "rt": "003",
+      "rw": "008"
+    },
+    {
+      "location": [
+        "Cilacap"
+      ],
+      "ppCode": "PP-3587912",
+      "name": "Sampang, Cilacap",
+      "search": "Sampang, Cilacap, Jawa Tengah",
+      "fallback": "Sampang, Cilacap",
+      "rt": "001",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Cirebon"
+      ],
+      "ppCode": "PP-3587913",
+      "name": "Losari, Cirebon",
+      "search": "Jalan Gatot Subroto No.27, Losari Kidul, Cirebon",
+      "fallback": "Losari, Kabupaten Cirebon",
+      "rt": "001",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Bogor"
+      ],
+      "ppCode": "PP-3587914",
+      "name": "Cibinong, Bogor",
+      "search": "Jalan Raya Sukahati, Cibinong, Bogor",
+      "fallback": "Sukahati, Cibinong",
+      "rt": "001",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Jakarta Selatan"
+      ],
+      "ppCode": "PP-3587915",
+      "name": "Pasar Minggu, Jakarta Selatan",
+      "search": "Jalan Kemang Timur XV No.5, Pejaten Barat, Pasar Minggu, Jakarta Selatan",
+      "fallback": "Pejaten Barat, Jakarta Selatan",
+      "rt": "007",
+      "rw": "003"
+    },
+    {
+      "location": [
+        "Jawa Barat"
+      ],
+      "ppCode": "PP-3587916",
+      "name": "Margahayu, Bandung",
+      "search": "Margahayu Selatan, Bandung",
+      "fallback": "Margahayu, Bandung",
+      "rt": "001",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Bekasi"
+      ],
+      "ppCode": "PP-3587917",
+      "name": "Babelan, Bekasi",
+      "search": "Kedung Jaya, Babelan, Bekasi",
+      "fallback": "Babelan, Bekasi",
+      "rt": "002",
+      "rw": "023"
+    },
+    {
+      "location": [
+        "Balikpapan"
+      ],
+      "ppCode": "PP-3587918",
+      "name": "Balikpapan Selatan, Balikpapan",
+      "search": "Gunung Bahagia, Balikpapan Selatan",
+      "fallback": "Gunung Bahagia, Balikpapan",
+      "rt": "001",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Jambi"
+      ],
+      "ppCode": "PP-3587921",
+      "name": "Jambi Selatan, Jambi",
+      "search": "Jalan Tarmizi Kadir No.20, Pakuan Baru, Jambi Selatan",
+      "fallback": "Pakuan Baru, Jambi",
+      "rt": "012",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Ampel Boyolali"
+      ],
+      "ppCode": "PP-3587922",
+      "name": "Ampel, Boyolali",
+      "search": "Sidomulyo, Ampel, Boyolali",
+      "fallback": "Ampel, Boyolali",
+      "rt": "002",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Jakarta Timur"
+      ],
+      "ppCode": "PP-3587924",
+      "name": "Kramat Jati, Jakarta Timur",
+      "search": "Jalan Dewi Sartika No.184, Cawang, Kramat Jati, Jakarta Timur",
+      "fallback": "Cawang, Kramat Jati",
+      "rt": "001",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Semarang"
+      ],
+      "ppCode": "PP-3587931",
+      "name": "Gayamsari, Semarang",
+      "search": "Jalan Medoho III No.38, Siwalan, Gayamsari, Semarang",
+      "fallback": "Medoho, Gayamsari, Semarang",
+      "rt": "002",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Klaten"
+      ],
+      "ppCode": "PP-3587932",
+      "name": "Klaten Utara, Klaten",
+      "search": "Plosorejo, Sekarsuli, Klaten Utara",
+      "fallback": "Sekarsuli, Klaten",
+      "rt": "003",
+      "rw": "005"
+    },
+    {
+      "location": [
+        "Bantul"
+      ],
+      "ppCode": "PP-3587933",
+      "name": "Banguntapan, Bantul",
+      "search": "Banguntapan, Bantul, Yogyakarta",
+      "fallback": "Banguntapan, Bantul",
+      "rt": "001",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Lampung Barat"
+      ],
+      "ppCode": "PP-3587935",
+      "name": "Sekincau, Lampung Barat",
+      "search": "Sekincau, Lampung Barat",
+      "fallback": "Sekincau",
+      "rt": "001",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Istimewa Yogyakarta",
+        "Sleman",
+        "Sleman Yogyakarta"
+      ],
+      "ppCode": "PP-3587939",
+      "name": "Sewon, Bantul",
+      "search": "Jalan Bantul Km 5, Panggungharjo, Sewon, Bantul",
+      "fallback": "Panggungharjo, Sewon",
+      "rt": "004",
+      "rw": "001",
+      "note": "badge Sleman digabung ke PP DIY terdekat"
+    },
+    {
+      "location": [
+        "Brebes"
+      ],
+      "ppCode": "PP-3587941",
+      "name": "Larangan, Brebes",
+      "search": "Slatri, Larangan, Brebes",
+      "fallback": "Larangan, Brebes",
+      "rt": "012",
+      "rw": "002"
+    },
+    {
+      "location": [
+        "Jember"
+      ],
+      "ppCode": "PP-3587942",
+      "name": "Bangsalsari, Jember",
+      "search": "Perum Bangsalsari Land, Bangsalsari, Jember",
+      "fallback": "Bangsalsari, Jember",
+      "rt": "001",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Di Yogyakarta"
+      ],
+      "ppCode": "PP-3587943",
+      "name": "Panjatan, Kulon Progo",
+      "search": "Bangmalang, Cerme, Panjatan, Kulon Progo",
+      "fallback": "Panjatan, Kulon Progo",
+      "rt": "024",
+      "rw": "012"
+    },
+    {
+      "location": [
+        "Gedangan Sidoarjo"
+      ],
+      "ppCode": "PP-3587945",
+      "name": "Gedangan, Sidoarjo",
+      "search": "Perum Griya Permata Gedangan, Keboan Sikep, Gedangan, Sidoarjo",
+      "fallback": "Gedangan, Sidoarjo",
+      "rt": "001",
+      "rw": "001"
+    },
+    {
+      "location": [
+        "Jawa Timur"
+      ],
+      "ppCode": "PP-3587946",
+      "name": "Kupang, Sidoarjo",
+      "search": "Desa Wonokupang, Kupang Baru, Sidoarjo",
+      "fallback": "Wonokupang, Sidoarjo",
+      "rt": "012",
+      "rw": "002"
+    },
+    {
+      "location": [
+        "Majalengka"
+      ],
+      "ppCode": "PP-3587947",
+      "name": "Kasokandel, Majalengka",
+      "search": "Perumahan Giri Jaya Asri, Leuwikidang, Kasokandel, Majalengka",
+      "fallback": "Kasokandel, Majalengka",
+      "rt": "001",
+      "rw": "001"
+    }
+  ]
+}

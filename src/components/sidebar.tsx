@@ -32,6 +32,9 @@ import {
   AlertTriangle,
   SlidersHorizontal,
   Terminal,
+  RefreshCw,
+  ShieldAlert,
+  Upload,
 } from "lucide-react";
 
 export type NavItem = {
@@ -89,6 +92,36 @@ export const NAV: NavSection[] = [
   {
     title: "Marketplace",
     groups: [
+      {
+        title: "Aneka",
+        items: [
+          {
+            href: "/marketplace/aneka/produk",
+            label: "Produk",
+            Icon: Boxes,
+          },
+          {
+            href: "/marketplace/aneka/harga",
+            label: "Sinkron Harga",
+            Icon: RefreshCw,
+          },
+          {
+            href: "/marketplace/aneka/stok",
+            label: "Sinkron Stok",
+            Icon: Package,
+          },
+          {
+            href: "/marketplace/aneka/aturan",
+            label: "Cek Aturan",
+            Icon: ShieldAlert,
+          },
+          {
+            href: "/marketplace/aneka/upload",
+            label: "Upload Baru",
+            Icon: Upload,
+          },
+        ],
+      },
       {
         title: "KTD Store",
         items: [
@@ -259,6 +292,7 @@ export default function Sidebar() {
   // Grup marketplace yang sedang dibuka — TikTok Shop dan Blibli dibuka
   // sejak awal karena sudah aktif; grup lain tertutup sampai fiturnya hadir.
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({
+    Aneka: true,
     "KTD Store": true,
     "TikTok Shop": true,
     Blibli: true,

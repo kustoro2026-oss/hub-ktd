@@ -28,6 +28,8 @@ export default function SchedulerTick() {
       await postSilently("/api/tiktok/resi/check");
       await postSilently("/api/blibli/resi/check");
       await postSilently("/api/lazada/resi/check");
+      // Tahap 4: order selesai → kurangi stok di semua kanal lain.
+      await postSilently("/api/aneka/stok/check");
     }
 
     tick();

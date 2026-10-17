@@ -153,6 +153,9 @@ export type BarisPratinjau = {
   /** Kunci pilihan: TikTok `productId|skuId`, Blibli productSku. */
   skuKey: string;
   productId: string;
+  /** Id produk Aneka dari pemetaan ("" = belum dipetakan) — dasar
+   *  pengelompokan lintas kanal di halaman Sinkron Harga. */
+  anekaId: string;
   /** TikTok: sku id; Blibli: "" (tingkat produk). */
   skuId: string;
   productName: string;
@@ -197,6 +200,7 @@ export type HasilReset = {
 function barisPratinjau(opts: {
   skuKey: string;
   productId: string;
+  anekaId: string;
   skuId: string;
   productName: string;
   skuLabel: string;
@@ -210,6 +214,7 @@ function barisPratinjau(opts: {
   const dasar: BarisPratinjau = {
     skuKey: opts.skuKey,
     productId: opts.productId,
+    anekaId: opts.anekaId,
     skuId: opts.skuId,
     productName: opts.productName,
     skuLabel: opts.skuLabel,
@@ -307,6 +312,7 @@ export async function pratinjauTiktok(): Promise<
           barisPratinjau({
             skuKey: `${p.id}|${sku.id}`,
             productId: p.id,
+            anekaId: map?.aneka_product_id ?? "",
             skuId: sku.id,
             productName: p.title,
             skuLabel: sku.sellerSku || sku.id,
@@ -366,6 +372,7 @@ export async function pratinjauBlibli(): Promise<
         barisPratinjau({
           skuKey: sku,
           productId: sku,
+          anekaId: map?.aneka_product_id ?? "",
           skuId: "",
           productName: p.product.name,
           skuLabel: sku,
@@ -446,6 +453,7 @@ export async function pratinjauLazada(): Promise<
           barisPratinjau({
             skuKey: key,
             productId: key,
+            anekaId: map?.aneka_product_id ?? "",
             skuId: "",
             productName: nama || key,
             skuLabel: key,
@@ -497,6 +505,7 @@ export async function pratinjauKtdStore(): Promise<
       barisPratinjau({
         skuKey: id,
         productId: id,
+        anekaId: id,
         skuId: "",
         productName: p.name,
         skuLabel: `Aneka #${id}`,

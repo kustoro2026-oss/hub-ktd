@@ -459,6 +459,17 @@ function migrateSqlite(db: DatabaseSync) {
       updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
 
+    CREATE TABLE IF NOT EXISTS aneka_upload (
+      id TEXT PRIMARY KEY,
+      channel TEXT NOT NULL DEFAULT 'blibli',
+      nama_file TEXT NOT NULL DEFAULT '',
+      jumlah_produk INTEGER NOT NULL DEFAULT 0,
+      jumlah_baris INTEGER NOT NULL DEFAULT 0,
+      daftar_id TEXT NOT NULL DEFAULT '',
+      keterangan TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
     CREATE TABLE IF NOT EXISTS harga_snapshot (
       marketplace TEXT NOT NULL DEFAULT '',
       sku_key TEXT NOT NULL DEFAULT '',
@@ -484,6 +495,30 @@ function migrateSqlite(db: DatabaseSync) {
       harga INTEGER NOT NULL DEFAULT 0,
       updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
+
+    CREATE TABLE IF NOT EXISTS ktd_store_stok (
+      aneka_id TEXT PRIMARY KEY,
+      stok INTEGER NOT NULL DEFAULT 0,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS stok_penyesuaian (
+      id TEXT PRIMARY KEY,
+      channel TEXT NOT NULL DEFAULT '',
+      order_id TEXT NOT NULL DEFAULT '',
+      sku_key TEXT NOT NULL DEFAULT '',
+      aneka_id TEXT NOT NULL DEFAULT '',
+      nama TEXT NOT NULL DEFAULT '',
+      qty INTEGER NOT NULL DEFAULT 0,
+      tiktok_done INTEGER NOT NULL DEFAULT 0,
+      blibli_done INTEGER NOT NULL DEFAULT 0,
+      lazada_done INTEGER NOT NULL DEFAULT 0,
+      ktd_done INTEGER NOT NULL DEFAULT 0,
+      detail TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_stok_penyesuaian_created
+      ON stok_penyesuaian (created_at DESC);
 
     CREATE TABLE IF NOT EXISTS topup_orders (
       id TEXT PRIMARY KEY,
@@ -878,6 +913,17 @@ async function migratePg(pool: Pool) {
       nilai INTEGER NOT NULL DEFAULT 0,
       aktif INTEGER NOT NULL DEFAULT 1,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS aneka_upload (
+      id TEXT PRIMARY KEY,
+      channel TEXT NOT NULL DEFAULT 'blibli',
+      nama_file TEXT NOT NULL DEFAULT '',
+      jumlah_produk INTEGER NOT NULL DEFAULT 0,
+      jumlah_baris INTEGER NOT NULL DEFAULT 0,
+      daftar_id TEXT NOT NULL DEFAULT '',
+      keterangan TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
     CREATE TABLE IF NOT EXISTS harga_snapshot (
@@ -3046,6 +3092,61 @@ export async function replaceAturanHarga(
   }
 }
 
+// ---------- Log pembuatan file upload produk baru (Tahap 6) ----------
+
+export type AnekaUploadRow = {
+  id: string;
+  channel: string;
+  nama_file: string;
+  jumlah_produk: number;
+  jumlah_baris: number;
+  daftar_id: string;
+  keterangan: string;
+  created_at: string;
+};
+
+/** Riwayat pembuatan file upload, terbaru dulu. */
+export async function listAnekaUploads(limit = 30): Promise<AnekaUploadRow[]> {
+  return queryAll<AnekaUploadRow>(
+    "SELECT * FROM aneka_upload ORDER BY created_at DESC, id DESC LIMIT ?",
+    [limit],
+  );
+}
+
+/** Satu entri riwayat berdasarkan id (untuk unduh ulang). */
+export async function getAnekaUploadById(
+  id: string,
+): Promise<AnekaUploadRow | undefined> {
+  return queryOne<AnekaUploadRow>("SELECT * FROM aneka_upload WHERE id = ?", [
+    id,
+  ]);
+}
+
+/** Catat pembuatan file (dipanggil route setelah file berhasil dibangun). */
+export async function insertAnekaUpload(r: {
+  id: string;
+  channel: string;
+  nama_file: string;
+  jumlah_produk: number;
+  jumlah_baris: number;
+  daftar_id: string;
+  keterangan: string;
+}): Promise<void> {
+  await queryRun(
+    `INSERT INTO aneka_upload (id, channel, nama_file, jumlah_produk, jumlah_baris, daftar_id, keterangan)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [
+      r.id,
+      r.channel,
+      r.nama_file,
+      r.jumlah_produk,
+      r.jumlah_baris,
+      r.daftar_id,
+      r.keterangan,
+    ],
+  );
+}
+
 // ---------- Snapshot harga awal (dasar tombol Reset Semua) ----------
 
 export type HargaSnapshotRow = {
@@ -3177,4 +3278,151 @@ export async function deleteKtdStoreHarga(ids: string[]): Promise<void> {
       chunk,
     );
   }
+}
+
+// ---------- Stok KTD Store (override stok katalog Aneka) ----------
+
+export type KtdStoreStokRow = {
+  aneka_id: string;
+  stok: number;
+  updated_at: string;
+};
+
+/** Semua override stok KTD Store (biasanya hanya produk yang terjual). */
+export async function listKtdStoreStok(): Promise<KtdStoreStokRow[]> {
+  return queryAll<KtdStoreStokRow>(
+    "SELECT * FROM ktd_store_stok ORDER BY LOWER(aneka_id) ASC",
+  );
+}
+
+/** Simpan/timpa override stok (upsert per aneka_id). */
+export async function upsertKtdStoreStok(
+  rows: { aneka_id: string; stok: number }[],
+): Promise<void> {
+  if (rows.length === 0) return;
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  for (const r of rows) {
+    await queryRun(
+      `INSERT INTO ktd_store_stok (aneka_id, stok, updated_at)
+       VALUES (?, ?, ?)
+       ON CONFLICT (aneka_id) DO UPDATE SET stok = excluded.stok, updated_at = excluded.updated_at`,
+      [r.aneka_id, r.stok, nowUtc],
+    );
+  }
+}
+
+/** Hapus override stok (tampilan kembali ke stok katalog Aneka). */
+export async function deleteKtdStoreStok(ids: string[]): Promise<void> {
+  for (let i = 0; i < ids.length; i += 100) {
+    const chunk = ids.slice(i, i + 100);
+    const marks = chunk.map(() => "?").join(", ");
+    await queryRun(
+      `DELETE FROM ktd_store_stok WHERE aneka_id IN (${marks})`,
+      chunk,
+    );
+  }
+}
+
+// ---------- Penyesuaian stok otomatis (order selesai → kurangi) ----------
+
+export type StokPenyesuaianRow = {
+  id: string;
+  channel: string;
+  order_id: string;
+  sku_key: string;
+  aneka_id: string;
+  nama: string;
+  qty: number;
+  tiktok_done: number;
+  blibli_done: number;
+  lazada_done: number;
+  ktd_done: number;
+  detail: string;
+  created_at: string;
+};
+
+/** Kanalkanal tempat stok bisa dikurangi otomatis. */
+export type StokKanal = "tiktok" | "blibli" | "lazada" | "ktd";
+
+/** Sisipkan satu kejadian penjualan selesai (idempoten — baris yang sudah
+ *  ada tidak diubah). Kembalikan true bila baris ini baru. */
+export async function insertStokPenyesuaian(row: {
+  id: string;
+  channel: string;
+  order_id: string;
+  sku_key: string;
+  aneka_id: string;
+  nama: string;
+  qty: number;
+}): Promise<boolean> {
+  if (dbMode() === "pg") {
+    const r = await (
+      await pgPool()
+    ).query(
+      `INSERT INTO stok_penyesuaian
+       (id, channel, order_id, sku_key, aneka_id, nama, qty)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (id) DO NOTHING`,
+      [row.id, row.channel, row.order_id, row.sku_key, row.aneka_id, row.nama, row.qty],
+    );
+    return (r.rowCount ?? 0) > 0;
+  }
+  const r = (await sqliteDb())
+    .prepare(
+      `INSERT OR IGNORE INTO stok_penyesuaian
+       (id, channel, order_id, sku_key, aneka_id, nama, qty)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      row.id,
+      row.channel,
+      row.order_id,
+      row.sku_key,
+      row.aneka_id,
+      row.nama,
+      row.qty,
+    );
+  return Number(r.changes) > 0;
+}
+
+/** Kejadian yang masih punya kanal belum diterapkan (terlama lebih dulu) —
+ *  antrean kerja hook order selesai. */
+export async function listStokPenyesuaianTerbuka(
+  limit = 100,
+): Promise<StokPenyesuaianRow[]> {
+  return queryAll<StokPenyesuaianRow>(
+    `SELECT * FROM stok_penyesuaian
+     WHERE tiktok_done = 0 OR blibli_done = 0 OR lazada_done = 0 OR ktd_done = 0
+     ORDER BY created_at ASC, id ASC
+     LIMIT ?`,
+    [limit],
+  );
+}
+
+/** Riwayat terbaru untuk halaman Sinkron Stok. */
+export async function listStokPenyesuaianTerbaru(
+  limit = 100,
+): Promise<StokPenyesuaianRow[]> {
+  return queryAll<StokPenyesuaianRow>(
+    `SELECT * FROM stok_penyesuaian ORDER BY created_at DESC, id DESC LIMIT ?`,
+    [limit],
+  );
+}
+
+/** Tandai satu kanal sudah diterapkan untuk satu kejadian. `catatan` opsional
+ *  ditambahkan ke kolom detail (ringkas, maks 500 karakter). */
+export async function tandaiStokKanalSelesai(
+  id: string,
+  kanal: StokKanal,
+  catatan = "",
+): Promise<void> {
+  const kolom = `${kanal}_done`;
+  await queryRun(
+    `UPDATE stok_penyesuaian
+     SET ${kolom} = 1,
+         detail = CASE WHEN ? = '' THEN detail
+                       ELSE substr(detail || ' | ' || ?, 1, 500) END
+     WHERE id = ?`,
+    [catatan, catatan, id],
+  );
 }
