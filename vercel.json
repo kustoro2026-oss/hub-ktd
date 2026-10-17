@@ -21,10 +21,6 @@
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/aneka/stok/check",
-      "schedule": "*/15 * * * *"
-    },
-    {
       "path": "/api/keuangan/refresh",
       "schedule": "0 23 * * *"
     },
