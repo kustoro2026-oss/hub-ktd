@@ -2967,6 +2967,19 @@ export async function setLazadaOrderExecPayment(
   );
 }
 
+/** Timpa kolom payload baris eksekusi — dipakai menyimpan label resmi yang
+ *  diunggah pemilik (diunduh dari Seller Center) tanpa menyentuh status,
+ *  jejak pembayaran, maupun log. */
+export async function updateLazadaOrderExecPayload(
+  orderId: string,
+  payload: string,
+): Promise<void> {
+  await queryRun(
+    "UPDATE lazada_order_exec SET payload = ? WHERE order_id = ?",
+    [payload, orderId],
+  );
+}
+
 /** Simpan/timpa baris eksekusi (upsert — persiapan ulang menimpa baris
  *  lama, mis. "gagal" → "menunggu" setelah percobaan berikutnya).
  *  aneka_payment_id / aneka_order_id HANYA ditimpa bila nilai baru tidak

@@ -33,6 +33,7 @@ export async function GET(
             ok: true,
             tracking_number: res.tracking_number,
             ...(res.fallback ? { fallback: true } : {}),
+            ...(res.unggahan ? { unggahan: true } : {}),
           }
         : { ok: false, detail: res.detail },
     );

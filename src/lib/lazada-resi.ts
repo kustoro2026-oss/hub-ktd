@@ -132,6 +132,9 @@ export type LazadaOfficialResiResult =
       /** true bila label resmi tidak tersedia lewat API dan PDF yang
        *  dikembalikan adalah resi cadangan buatan sendiri. */
       fallback?: boolean;
+      /** true bila PDF berasal dari unggahan pemilik — dokumen resmi yang
+       *  diunduh dari Seller Center (bukan hasil API Open Platform). */
+      unggahan?: boolean;
     }
   | { ok: false; detail: string };
 
@@ -291,6 +294,44 @@ export async function getLazadaResiPdf(
         .join(", ")}) — tidak bisa dicetak resinya`,
     };
   }
+  // Label resmi yang diunggah pemilik (diunduh dari Seller Center — AWB
+  // pesanan kurir terintegrasi tidak bisa diambil lewat Open Platform)
+  // punya prioritas tertinggi: dokumen asli Lazada, bukan hasil API atau
+  // tiruan. Disimpan di payload antrean eksekusi.
+  const row = await getLazadaOrderExec(orderId);
+  let labelUnggahan: Buffer | null = null;
+  let trackingUnggahan = "";
+  if (row) {
+    try {
+      const pl = JSON.parse(row.payload) as Partial<LazadaExecPayload>;
+      const b64 = (pl.label_pdf_base64 ?? "").trim();
+      if (b64) {
+        const dec = Buffer.from(b64, "base64");
+        if (
+          dec.length >= 5 &&
+          dec.subarray(0, 5).toString("latin1") === "%PDF-"
+        ) {
+          labelUnggahan = dec;
+          trackingUnggahan = pl.tracking_number ?? "";
+        }
+      }
+    } catch {
+      // payload rusak — lanjut alur biasa.
+    }
+  }
+  if (labelUnggahan) {
+    const asli = items.data
+      .map((x) => (x.tracking_code ?? "").trim())
+      .find((x) => x !== "");
+    return {
+      ok: true,
+      pdf: labelUnggahan,
+      tracking_number:
+        asli || trackingUnggahan || lazadaTrackingNumber(orderId),
+      unggahan: true,
+    };
+  }
+
   const fulf = await fulfillLazadaOrderForItems(
     items.data.map((i) => i.order_item_id),
     orderId,

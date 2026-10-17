@@ -9,6 +9,7 @@ import type { LazadaStoreOrders } from "@/lib/lazada-orders";
 import type { LazadaOrderRow } from "@/lib/lazada";
 import LazadaResiSendButton from "@/components/lazada-resi-send-button";
 import LazadaResiShipButton from "@/components/lazada-resi-ship-button";
+import LazadaResiLabelButton from "@/components/lazada-resi-label-button";
 
 // Label + warna badge per status pesanan resmi Lazada (statuses[] di
 // /orders/get berisi sub-status pengiriman).
@@ -198,6 +199,7 @@ export default function LazadaOrdersClient({
                         >
                           Cetak Resi
                         </a>
+                        <LazadaResiLabelButton orderId={o.order_id} />
                         <LazadaResiSendButton orderId={o.order_id} />
                       </div>
                     </td>

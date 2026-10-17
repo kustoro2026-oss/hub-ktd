@@ -346,6 +346,19 @@ export async function prepareLazadaExec(
     total_modal: total,
   };
 
+  // Label resmi yang diunggah pemilik jangan hilang saat persiapan ulang —
+  // dokumen asli Lazada tetap jadi label yang disajikan Cetak Resi.
+  if (existing) {
+    try {
+      const lama = JSON.parse(existing.payload) as Partial<LazadaExecPayload>;
+      if (lama.label_pdf_base64) {
+        payload.label_pdf_base64 = lama.label_pdf_base64;
+      }
+    } catch {
+      // payload lama rusak — biarkan kosong.
+    }
+  }
+
   // Persiapan ulang = antrean baru. Jejak pembayaran percobaan lama
   // DIPERTAHANKAN (aneka_payment_id/aneka_order_id + log) — bahan pengaman
   // anti-dobel bila baris ini dieksekusi lagi.
