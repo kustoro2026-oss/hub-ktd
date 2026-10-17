@@ -1117,7 +1117,7 @@ export async function resetLazada(): Promise<HasilReset> {
   // sku_seller_list lebih dari 50 membuat SKU sisanya hilang dari hasil
   // (kejadian nyata saat massal: KTDCGK-2145 dkk "Tidak ditemukan").
   const kunci = snap.map((s) => s.sku_key);
-  const stok = new Map<string, number>();
+  const info = new Map<string, { stok: number; skuId: string; itemId: string }>();
   for (let i = 0; i < kunci.length; i += 50) {
     const chunk = kunci.slice(i, i + 50);
     let r = await listLazadaProducts({
@@ -1139,14 +1139,18 @@ export async function resetLazada(): Promise<HasilReset> {
       });
     }
     if (!r.ok) {
-      for (const sku of chunk) stok.set(sku, -1);
+      for (const sku of chunk) info.set(sku, { stok: -1, skuId: "", itemId: "" });
       continue;
     }
     for (const p of r.data.items) {
       for (const sku of p.skus ?? []) {
         const key = String(sku.SellerSku ?? "");
-        if (!key || stok.has(key)) continue;
-        stok.set(key, Number(sku.quantity ?? 0) || 0);
+        if (!key || info.has(key)) continue;
+        info.set(key, {
+          stok: Number(sku.quantity ?? 0) || 0,
+          skuId: String(sku.SkuId ?? ""),
+          itemId: String(p.item_id ?? ""),
+        });
       }
     }
     await new Promise((res) => setTimeout(res, 600)); // jeda antarpanggilan
@@ -1157,8 +1161,8 @@ export async function resetLazada(): Promise<HasilReset> {
     const chunk = snap.slice(i, i + 50);
     const reqs: LazadaBulkItemUpdate[] = [];
     for (const s of chunk) {
-      const q = stok.get(s.sku_key);
-      if (q === undefined || q < 0) {
+      const f = info.get(s.sku_key);
+      if (!f || f.stok < 0) {
         gagal.push({
           skuKey: s.sku_key,
           label: s.sku_label || s.sku_key,
@@ -1166,7 +1170,15 @@ export async function resetLazada(): Promise<HasilReset> {
         });
         continue;
       }
-      reqs.push({ sellerSku: s.sku_key, price: s.harga_regular, quantity: q });
+      // UpdatePriceQuantity menolak payload tanpa SkuId (E501: Update
+      // product failed) — sertakan SkuId/ItemId seperti alur terapkan.
+      reqs.push({
+        sellerSku: s.sku_key,
+        price: s.harga_regular,
+        quantity: f.stok,
+        skuId: f.skuId || undefined,
+        itemId: f.itemId || undefined,
+      });
     }
     if (reqs.length === 0) continue;
     const r = await updateLazadaProductsBulk(reqs);
