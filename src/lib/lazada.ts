@@ -391,6 +391,12 @@ export async function getLazadaOrders(
       count: Number(r.data.count ?? 0),
       orders: (r.data.orders ?? []).map((o) => ({
         ...o,
+        // API mengembalikan order_id/order_number sebagai ANGKA — kolom
+        // tabel seen menyimpannya sebagai teks. Tanpa normalisasi ke string,
+        // perbandingan `seen.order_id === orderId` selalu gagal dan setiap
+        // ronde pengecekan menganggap pesanan itu baru (notif WA berulang).
+        order_id: String(o.order_id ?? ""),
+        order_number: String(o.order_number ?? ""),
         statuses: Array.isArray(o.statuses) ? o.statuses : [],
         items_count: Number(o.items_count ?? 0),
         // API Lazada ID mengembalikan waktu lokal ber-offset (mis.
@@ -444,7 +450,10 @@ export type LazadaOrderItemRow = {
 };
 
 /** GET /order/items/get — rincian item satu pesanan (data langsung berupa
- *  array order item). */
+ *  array order item). Semua kolom dinormalisasi ke string karena API
+ *  mengembalikan id numerik (order_item_id/order_id) — kunci tabel
+ *  lazada_order_seen berupa teks, perbandingan number vs string selalu
+ *  salah dan membuat notif pesanan baru terkirim berulang-ulang. */
 export async function getLazadaOrderItems(
   orderId: string,
 ): Promise<LazadaResult<LazadaOrderItemRow[]>> {
@@ -453,7 +462,29 @@ export async function getLazadaOrderItems(
   });
   if (!r.ok) return r;
   if (!Array.isArray(r.data)) return { ok: true, data: [] };
-  return { ok: true, data: r.data as LazadaOrderItemRow[] };
+  const toStr = (v: unknown): string =>
+    v === null || v === undefined ? "" : String(v);
+  const raw = r.data as Record<string, unknown>[];
+  return {
+    ok: true,
+    data: raw.map((it) => ({
+      order_item_id: toStr(it.order_item_id),
+      order_id: toStr(it.order_id),
+      name: toStr(it.name),
+      sku: toStr(it.sku),
+      shop_sku: toStr(it.shop_sku),
+      seller_sku: toStr(it.seller_sku),
+      item_price: toStr(it.item_price),
+      paid_price: toStr(it.paid_price),
+      status: toStr(it.status),
+      variation: toStr(it.variation),
+      order_type: toStr(it.order_type),
+      shipping_type: toStr(it.shipping_type),
+      shipment_provider: toStr(it.shipment_provider),
+      tracking_code: toStr(it.tracking_code),
+      sla_time_stamp: toStr(it.sla_time_stamp),
+    })),
+  };
 }
 
 // ---------- Fulfillment (pack → rts → label) ----------

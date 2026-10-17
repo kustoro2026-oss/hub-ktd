@@ -232,11 +232,25 @@ export async function sendResiForLazadaOrder(
   return { ok: result.startsWith("ok"), result };
 }
 
+/** Kunci serialisasi antar panggilan berbarengan dalam satu instans —
+ *  pemicu (webhook tick, pinger, tab admin) bisa mendarat bersamaan, dan
+ *  tanpa kunci dua ronde bisa sama-sama membaca tabel sebelum baris seen
+ *  ditulis lalu mengirim notif ganda. */
+let gRun: Promise<LazadaResiCheckResult> | null = null;
+
 /** Jalankan satu ronde pengecekan pesanan Lazada baru toko KTD STORE.
  *  Idempoten — tabel lazada_order_seen mencegah kirim ganda. Satu pesanan
  *  diproses SATU kali (dipicu item pending pertama yang melewati masa
  *  tunggu); item anggota lain ikut ditandai hasil yang sama. */
 export async function checkNewLazadaOrders(): Promise<LazadaResiCheckResult> {
+  if (gRun) return gRun;
+  gRun = runCheckNewLazadaOrders().finally(() => {
+    gRun = null;
+  });
+  return gRun;
+}
+
+async function runCheckNewLazadaOrders(): Promise<LazadaResiCheckResult> {
   const owner = ownerNumber();
   if (!owner) {
     return { ok: false, detail: "OWNER_WA_NUMBER belum diatur" };
@@ -606,8 +620,11 @@ export async function checkNewLazadaOrders(): Promise<LazadaResiCheckResult> {
       // mangkrak). Pesanan dengan item dibatalkan sebagian TIDAK dieksekusi
       // otomatis — proses manual.
       const srcItems: LazadaExecSourceItem[] = aktif.map((d) => ({
-        // Kunci pemetaan = SellerSku; shop_sku untuk tampilan.
-        lazada_sku: d.seller_sku,
+        // Kunci pemetaan = SellerSku; API /order/items/get kadang
+        // mengembalikannya sebagai kolom "sku" (seller_sku kosong) —
+        // pakai fallback supaya pemetaan tetap cocok. shop_sku untuk
+        // tampilan.
+        lazada_sku: d.seller_sku || d.sku,
         seller_sku: d.shop_sku,
         item_name: d.name,
         variant_name: d.variation ?? "",

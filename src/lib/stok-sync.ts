@@ -1127,7 +1127,9 @@ async function kumpulkanKejadianLazada(): Promise<number | string> {
     const perSku = new Map<string, number>();
     for (const it of items.data) {
       if ((it.status ?? "").toLowerCase() !== "delivered") continue;
-      const sku = String(it.seller_sku ?? "");
+      // Kunci pemetaan = SellerSku; API kadang mengembalikannya sebagai
+      // kolom "sku" (seller_sku kosong) — fallback supaya tetap cocok.
+      const sku = String(it.seller_sku || it.sku || "");
       if (!sku) continue;
       perSku.set(sku, (perSku.get(sku) ?? 0) + 1);
     }

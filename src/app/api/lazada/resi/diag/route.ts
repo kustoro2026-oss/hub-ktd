@@ -70,8 +70,10 @@ function itemToSource(d: LazadaOrderItemRow): {
   const st = String(d.status ?? "").toLowerCase();
   return {
     src: {
-      // Kunci pemetaan = SellerSku; shop_sku untuk tampilan.
-      lazada_sku: String(d.seller_sku ?? ""),
+      // Kunci pemetaan = SellerSku; API kadang mengembalikannya sebagai
+      // kolom "sku" (seller_sku kosong) — fallback seperti produksi.
+      // shop_sku untuk tampilan.
+      lazada_sku: String(d.seller_sku || d.sku || ""),
       seller_sku: String(d.shop_sku ?? ""),
       item_name: String(d.name ?? ""),
       variant_name: String(d.variation ?? ""),
