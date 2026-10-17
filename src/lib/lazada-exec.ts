@@ -32,6 +32,7 @@ import {
   type AnekaSession,
 } from "@/lib/aneka-checkout";
 import { buildAnekaCartItems } from "@/lib/aneka-exec";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
   appendLazadaOrderExecLog,
   claimLazadaOrderExecRunning,
@@ -197,6 +198,68 @@ export async function checkLazadaExecutable(
  *  (resi WA + eksekusi) supaya mudah dicocokkan di riwayat Aneka. */
 export function lazadaTrackingNumber(orderId: string): string {
   return `${(process.env.LAZADA_TRACKING_PREFIX ?? "KT").trim()}${orderId}`;
+}
+
+/** Label resi PDF buatan sendiri (A6) untuk pesanan dropship
+ *  own-logistics — dipakai bila label resmi Lazada tidak tersedia lewat
+ *  API (peristiwa 17 Okt 2026: document/get membalas file 1 byte padahal
+ *  code 0). Nomor resi penjual (KT...) adalah identitas kiriman, jadi
+ *  label sederhana ini sah untuk diunggah ke Aneka dan ditempel di paket. */
+export async function buatResiFallback(
+  payload: LazadaExecPayload,
+): Promise<Buffer> {
+  const doc = await PDFDocument.create();
+  const page = doc.addPage([298, 420]); // A6 ≈ 105×148 mm
+  const font = await doc.embedFont(StandardFonts.Helvetica);
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const tengah = 149;
+  const teks = (
+    x: number,
+    y: number,
+    s: string,
+    size: number,
+    opts: { bold?: boolean; miring?: boolean } = {},
+  ) => {
+    const f = opts.bold ? bold : font;
+    const w = f.widthOfTextAtSize(s, size);
+    page.drawText(s, {
+      x: x - w / 2,
+      y,
+      size,
+      font: f,
+      color: opts.miring ? rgb(0.35, 0.35, 0.35) : rgb(0, 0, 0),
+    });
+  };
+
+  const tanggal = new Date();
+  const tgl = tanggal.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+
+  teks(tengah, 372, payload.store_name.toUpperCase(), 14, { bold: true });
+  teks(tengah, 352, "RESI PENGIRIMAN", 10);
+  page.drawLine({
+    start: { x: 30, y: 336 },
+    end: { x: 268, y: 336 },
+    thickness: 1,
+    color: rgb(0, 0, 0),
+  });
+  teks(tengah, 300, "No. Resi", 10);
+  teks(tengah, 268, payload.tracking_number, 20, { bold: true });
+  page.drawLine({
+    start: { x: 30, y: 244 },
+    end: { x: 268, y: 244 },
+    thickness: 1,
+    color: rgb(0, 0, 0),
+  });
+  teks(tengah, 210, "Pesanan Lazada", 10);
+  teks(tengah, 188, payload.order_id, 13, { bold: true });
+  teks(tengah, 156, "Pembeli", 10);
+  teks(tengah, 134, payload.customer_name, 12, { bold: true });
+  teks(tengah, 100, tgl, 10, { miring: true });
+  return Buffer.from(await doc.save());
 }
 
 /** PERSIAPAN: simpan rincian produk sebagai antrean eksekusi "menunggu" dan
@@ -671,10 +734,13 @@ export async function executeLazadaOrder(
   }
 
   const gagal = async (detail: string) => {
+    // Payload TERBARU disimpan (bukan row.payload) — bila pemenuhan sudah
+    // berhasil, label_pdf_base64 harus tetap tersimpan supaya coba ulang
+    // tidak memanggil ulang pack/rts/document (dan kehilangan jejak label).
     await saveLazadaOrderExec({
       order_id: orderId,
       status: "gagal",
-      payload: row.payload,
+      payload: JSON.stringify(payload),
       detail,
     });
     await sendExecNotice(
@@ -749,31 +815,69 @@ export async function executeLazadaOrder(
   //    berhasil), pakai ulang tanpa memanggil API pemenuhan lagi.
   let pdfBuffer: Buffer | null = null;
   if (payload.label_pdf_base64) {
-    pdfBuffer = Buffer.from(payload.label_pdf_base64, "base64");
-  } else {
+    const tersimpan = Buffer.from(payload.label_pdf_base64, "base64");
+    // Label tersimpan hanya dipakai bila benar-benar PDF valid — mencegah
+    // file rusak dari percobaan lama diunggah lagi ke pembayaran.
+    pdfBuffer =
+      tersimpan.length >= 5 && tersimpan.subarray(0, 5).toString("ascii") === "%PDF-"
+        ? tersimpan
+        : null;
+  }
+  if (!pdfBuffer) {
     const fulf = await fulfillLazadaOrderForItems(
       payload.order_item_ids,
       payload.order_id,
     );
     if (!fulf.ok) {
-      await logStep("fulfill", `GAGAL — ${fulf.detail}`);
-      return gagal(fulf.detail);
+      // rts sudah berhasil (rtsDone) = pesanan siap kirim, hanya label
+      // resmi yang tidak tersedia — pakai resi PDF buatan sendiri supaya
+      // checkout Aneka tetap bisa diselesaikan. Bila rts sendiri gagal,
+      // JANGAN nekat membayar: pesanan belum siap kirim.
+      if (fulf.rtsDone) {
+        const fallback = await buatResiFallback(payload).catch(() => null);
+        if (fallback) {
+          pdfBuffer = fallback;
+          payload = {
+            ...payload,
+            label_pdf_base64: fallback.toString("base64"),
+          };
+          await saveLazadaOrderExec({
+            order_id: orderId,
+            status: "berjalan",
+            payload: JSON.stringify(payload),
+          });
+          await logStep(
+            "fulfill",
+            `label resmi tidak tersedia (${fulf.detail}) — dipakai resi PDF buatan sendiri (resi ${payload.tracking_number})`,
+          );
+        } else {
+          await logStep(
+            "fulfill",
+            `GAGAL — ${fulf.detail} (resi PDF buatan sendiri juga gagal)`,
+          );
+          return gagal(fulf.detail);
+        }
+      } else {
+        await logStep("fulfill", `GAGAL — ${fulf.detail}`);
+        return gagal(fulf.detail);
+      }
+    } else {
+      pdfBuffer = fulf.pdf;
+      payload = {
+        ...payload,
+        tracking_number: fulf.trackingNumber,
+        label_pdf_base64: fulf.pdf.toString("base64"),
+      };
+      await saveLazadaOrderExec({
+        order_id: orderId,
+        status: "berjalan",
+        payload: JSON.stringify(payload),
+      });
+      await logStep(
+        "fulfill",
+        `berhasil — pack + rts + label (resi ${fulf.trackingNumber})`,
+      );
     }
-    pdfBuffer = fulf.pdf;
-    payload = {
-      ...payload,
-      tracking_number: fulf.trackingNumber,
-      label_pdf_base64: fulf.pdf.toString("base64"),
-    };
-    await saveLazadaOrderExec({
-      order_id: orderId,
-      status: "berjalan",
-      payload: JSON.stringify(payload),
-    });
-    await logStep(
-      "fulfill",
-      `berhasil — pack + rts + label (resi ${fulf.trackingNumber})`,
-    );
   }
 
   // PENGAMAN ANTI-DOBEL: sebelum membayar, pastikan percobaan-percobaan

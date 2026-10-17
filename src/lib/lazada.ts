@@ -7,6 +7,7 @@
 // query param bertanda tangan, app_secret hanya menjadi kunci HMAC.
 
 import { createHmac } from "crypto";
+import { PDFDocument } from "pdf-lib";
 
 import { listLazadaSellerTokens, saveLazadaSellerToken } from "@/lib/db";
 
@@ -599,6 +600,57 @@ export async function getLazadaDocument(
   return { ok: true, data: { base64, mimeType: String(doc.mime_type ?? "") } };
 }
 
+/** Label PDF yang sudah dipastikan valid (bukan file rusak/kosong). */
+type LazadaLabelPdf = { pdf: Buffer; pageCount: number; docType: string };
+
+/** Unduh label pengiriman dan PASTIKAN PDF valid. API kadang membalas
+ *  code 0 dengan file rusak/kosong — peristiwa 17 Okt 2026: document/get
+ *  membalas 1 byte, label itu diteruskan ke pembayaran Aneka lalu ditolak
+ *  situs PADAHAL saldo/varian/stock aman. Validasi di sini memastikan
+ *  kegagalan label terjadi SEBELUM saldo dipindahkan, bukan sesudah.
+ *  Dicoba sampai 3 ronde dengan jeda, tiap ronde mencoba doc_type
+ *  shippingLabel lalu invoice. */
+export async function getLazadaLabelPdf(
+  orderItemIds: string[],
+): Promise<LazadaResult<LazadaLabelPdf>> {
+  const docTypes = ["shippingLabel", "invoice"];
+  const keterangan: string[] = [];
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    for (const docType of docTypes) {
+      const doc = await getLazadaDocument(orderItemIds, docType);
+      if (!doc.ok) {
+        keterangan.push(`${docType}: ${doc.detail}`);
+        continue;
+      }
+      try {
+        const pdf = Buffer.from(doc.data.base64, "base64");
+        if (pdf.length < 5 || pdf.subarray(0, 5).toString("ascii") !== "%PDF-") {
+          keterangan.push(`${docType}: bukan PDF valid (${pdf.length} byte)`);
+          continue;
+        }
+        let pageCount = 1;
+        try {
+          const parsed = await PDFDocument.load(pdf, { ignoreEncryption: true });
+          pageCount = parsed.getPageCount();
+        } catch {
+          // Header PDF valid tetapi badan tidak bisa dibaca — tetap pakai;
+          // hanya jumlah halaman yang tidak diketahui.
+        }
+        return { ok: true, data: { pdf, pageCount, docType } };
+      } catch (e) {
+        keterangan.push(
+          `${docType}: gagal membaca file (${e instanceof Error ? e.message : "tidak dikenal"})`,
+        );
+      }
+    }
+    if (attempt < 3) await new Promise((r) => setTimeout(r, 2000));
+  }
+  return {
+    ok: false,
+    detail: `Label pengiriman tidak valid (${keterangan.join("; ")})`,
+  };
+}
+
 /** Rantai fulfill satu paket pesanan Lazada (own-logistics dropship):
  *  pack → ready-to-ship dengan nomor resi penjual → unduh label PDF.
  *  Penyedia pengiriman: env LAZADA_SHIPMENT_PROVIDER bila diatur, kalau
@@ -611,8 +663,8 @@ export async function fulfillLazadaOrderForItems(
   orderItemIds: string[],
   orderId: string,
 ): Promise<
-  | { ok: true; pdf: Buffer; trackingNumber: string }
-  | { ok: false; detail: string }
+  | { ok: true; pdf: Buffer; pageCount: number; trackingNumber: string }
+  | { ok: false; detail: string; rtsDone?: boolean }
 > {
   if (orderItemIds.length === 0) {
     return { ok: false, detail: "Daftar item pesanan kosong — tidak bisa diproses" };
@@ -649,16 +701,14 @@ export async function fulfillLazadaOrderForItems(
       detail: `${awal}gagal ready-to-ship (resi ${tracking}): ${rts.detail}`,
     };
   }
-  const doc = await getLazadaDocument(orderItemIds);
+  const doc = await getLazadaLabelPdf(orderItemIds);
   if (!doc.ok) {
-    return { ok: false, detail: `Gagal unduh label: ${doc.detail}` };
+    // rts SUDAH berhasil — pesanan siap kirim, hanya label resmi yang
+    // tidak tersedia. rtsDone memberi tahu pemanggil bahwa boleh memakai
+    // resi PDF buatan sendiri (dropship own-logistics).
+    return { ok: false, detail: `Gagal unduh label: ${doc.detail}`, rtsDone: true };
   }
-  try {
-    const pdf = Buffer.from(doc.data.base64, "base64");
-    return { ok: true, pdf, trackingNumber: tracking };
-  } catch {
-    return { ok: false, detail: "Label pengiriman rusak (bukan PDF base64 valid)" };
-  }
+  return { ok: true, pdf: doc.data.pdf, pageCount: doc.data.pageCount, trackingNumber: tracking };
 }
 
 // ---------- Produk ----------
