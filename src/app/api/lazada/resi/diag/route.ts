@@ -289,6 +289,9 @@ export async function GET(request: Request) {
         ]
           .filter(Boolean)
           .join(" "),
+        // Alamat utuh (dipakai resi cadangan) — dipakai juga untuk
+        // memeriksa apakah Lazada menyamarkan data pelanggan di API.
+        alamat: orderRow.address_shipping ?? null,
         created_at: orderRow.created_at,
       }
     : null;
