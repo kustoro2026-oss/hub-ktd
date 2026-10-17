@@ -5,10 +5,18 @@
 //
 // Meniru panggilan tombol "Cetak AWB" di web Seller Center:
 //   POST https://acs-m.lazada.co.id/h5/mtop.lazada.seller.order.package.print/1.0/
-//   query: appKey=4272 (appKey web), t=epoch ms, sign=MD5(token&t&appKey&body)
+//   query: appKey=12574478 (appKey default subDomain lazada; 4272 hanya
+//          waptest — diverifikasi dari source lib-mtop 2.6.1),
+//          t=epoch ms, sign=MD5(token&t&appKey&body)
 //   cookie: sesi web seller tersimpan di tabel lazada_web_sessions
 //   token = nilai _m_h5_tk cookie (bagian sebelum "_").
 // Respons sukses memuat URL PDF di OSS — diunduh lalu dipakai sebagai label.
+//
+// CATATAN 17 Okt 2026: panggilan dari server selalu ditolak
+// FAIL_SYS_SESSION_EXPIRED meski cookie segar + sign benar — sesi web Seller
+// Center terikat sidik-jari browser (risk-control). Jalur utama resmi kini
+// dikerjakan engine jembatan yang berjalan DI DALAM browser login (lihat
+// lazada-awb.ts); modul ini tetap dicoba sebagai usaha terbaik.
 //
 // Token _m_h5_tk diputar gateway secara berkala; setiap respons membawa
 // token baru lewat Set-Cookie sehingga sesi tersimpan ikut diperbarui.
@@ -16,7 +24,7 @@ import { createHash } from "node:crypto";
 import { getLazadaWebSession, saveLazadaWebSession } from "@/lib/db";
 
 const MTOP_HOST = "https://acs-m.lazada.co.id";
-const APP_KEY = "4272";
+const APP_KEY = "12574478";
 const PRINT_API = "mtop.lazada.seller.order.package.print";
 const RENEW_API = "mtop.taobao.wireless.mtop.token.renew";
 
@@ -24,7 +32,7 @@ const RENEW_API = "mtop.taobao.wireless.mtop.token.renew";
 const SELLER_SHORT_CODE = "ID69LJAH8J";
 
 const UA =
-  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36";
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) QoderIDE/1.31.2 Chrome/148.0.7778.97 Electron/42.2.0 Safari/537.36";
 
 export type LazadaMtopAwbResult =
   | { ok: true; pdf: Buffer; sumber: "mtop-awb" }
@@ -96,7 +104,8 @@ function absorbSetCookie(
   }
 }
 
-/** Panggil satu API mtop dengan sesi tersimpan (POST JSON, sign MD5). */
+/** Panggil satu API mtop dengan sesi tersimpan (POST form-urlencoded
+ *  data=<JSON urlencoded>, sign MD5) — sama persis dengan lib-mtop web. */
 async function callMtop(
   api: string,
   data: Record<string, unknown>,
@@ -125,12 +134,12 @@ async function callMtop(
     method: "POST",
     headers: {
       Cookie: cookieText,
-      "Content-Type": "application/json",
+      "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
       "User-Agent": UA,
       Referer: "https://sellercenter.lazada.co.id/",
       Origin: "https://sellercenter.lazada.co.id",
     },
-    body,
+    body: `data=${encodeURIComponent(body)}`,
   });
   const txt = await res.text();
   let parsed: unknown = txt;
@@ -185,12 +194,12 @@ async function renewMtopToken(cookieText: string): Promise<string | null> {
       method: "POST",
       headers: {
         Cookie: cookieText,
-        "Content-Type": "application/json",
+        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
         "User-Agent": UA,
         Referer: "https://sellercenter.lazada.co.id/",
         Origin: "https://sellercenter.lazada.co.id",
       },
-      body,
+      body: `data=${encodeURIComponent(body)}`,
     });
     const setCookies = res.headers.getSetCookie?.() ?? [];
     const tk = setCookies.find((c) => c.startsWith("_m_h5_tk="));
@@ -258,7 +267,8 @@ export async function getLazadaResmiAWB(
   // sekali. Bila perpanjangan ditolak, sesi SSO kemungkinan mati.
   const retTxt = call.ret.join(" ");
   const tokenExpired =
-    /TOKEN/i.test(retTxt) && /EXPIRE|EXOIRED|INVALID|EMPTY/i.test(retTxt);
+    (/TOKEN/i.test(retTxt) && /EXPIRE|EXOIRED|INVALID|EMPTY/i.test(retTxt)) ||
+    /SESSION_EXPIRED|Session/i.test(retTxt);
   if (tokenExpired) {
     const baru = await renewMtopToken(cookies);
     if (baru) {

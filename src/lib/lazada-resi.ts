@@ -60,6 +60,7 @@ import {
 } from "@/lib/lazada";
 import { LAZADA_STORE_NAME } from "@/lib/lazada-orders";
 import { getLazadaResmiAWB } from "@/lib/lazada-mtop";
+import { awbCachedPdf, awbEnqueue } from "@/lib/lazada-awb";
 import {
   NOTIF_TEMPLATE,
   ownerNumber,
@@ -337,6 +338,21 @@ export async function getLazadaResiPdf(
     };
   }
 
+  // AWB resmi hasil jembatan browser (dicetak otomatis engine di halaman
+  // Seller Center yang login) — prioritas setara unggahan, di bawahnya.
+  const awbCache = await awbCachedPdf(orderId);
+  if (awbCache) {
+    const asliAwb = items.data
+      .map((x) => (x.tracking_code ?? "").trim())
+      .find((x) => x !== "");
+    return {
+      ok: true,
+      pdf: awbCache,
+      tracking_number: asliAwb || lazadaTrackingNumber(orderId),
+      resmi: true,
+    };
+  }
+
   const fulf = await fulfillLazadaOrderForItems(
     items.data.map((i) => i.order_item_id),
     orderId,
@@ -380,6 +396,17 @@ export async function getLazadaResiPdf(
           resmi: true,
         };
       }
+      // Antrekan cetak AWB lewat jembatan browser (engine di halaman Seller
+      // Center yang login) — panggilan mtop dari server ditolak risk-control,
+      // jadi jalur resmi otomatisnya lewat browser. Label resmi tersedia pada
+      // Cetak Resi berikutnya setelah engine selesai; sementara itu resi
+      // cadangan tetap dikembalikan supaya ada dokumen yang bisa dipakai.
+      void awbEnqueue(
+        orderId,
+        items.data.map((i) => i.order_item_id),
+      ).catch(() => {
+        // antrean gagal — tidak fatal; resi cadangan tetap dikembalikan.
+      });
       const pdf = await buatResiCadangan(orderId, tracking);
       return {
         ok: true,

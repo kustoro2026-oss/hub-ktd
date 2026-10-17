@@ -353,6 +353,24 @@ function migrateSqlite(db: DatabaseSync) {
       updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
 
+    CREATE TABLE IF NOT EXISTS lazada_awb_jobs (
+      order_id TEXT PRIMARY KEY,
+      order_item_ids TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'pending',
+      pdf_base64 TEXT NOT NULL DEFAULT '',
+      error TEXT NOT NULL DEFAULT '',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS lazada_bridge_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      heartbeat_at TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
     CREATE TABLE IF NOT EXISTS tiktok_order_seen (
       order_id TEXT PRIMARY KEY,
       shop_id TEXT NOT NULL DEFAULT '',
@@ -813,6 +831,24 @@ async function migratePg(pool: Pool) {
       seller_id TEXT PRIMARY KEY,
       cookie_text TEXT NOT NULL DEFAULT '',
       tk_expires_at TEXT NOT NULL DEFAULT '',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS lazada_awb_jobs (
+      order_id TEXT PRIMARY KEY,
+      order_item_ids TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'pending',
+      pdf_base64 TEXT NOT NULL DEFAULT '',
+      error TEXT NOT NULL DEFAULT '',
+      attempts INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS lazada_bridge_state (
+      id INTEGER PRIMARY KEY CHECK (id = 1),
+      heartbeat_at TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT '',
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
@@ -3028,6 +3064,121 @@ export async function getLazadaWebSession(
   const rows = await queryAll<LazadaWebSession>(
     "SELECT * FROM lazada_web_sessions WHERE seller_id = ?",
     [sellerId],
+  );
+  return rows[0] ?? null;
+}
+
+// ---------- Pekerjaan cetak AWB resmi lewat jembatan browser ----------
+
+export type LazadaAwbJob = {
+  order_id: string;
+  order_item_ids: string;
+  status: string; // pending | done | gagal
+  pdf_base64: string;
+  error: string;
+  attempts: number;
+  created_at: string;
+  updated_at: string;
+};
+
+/** Simpan/timpa baris pekerjaan cetak AWB (status diatur pemanggil). */
+async function saveLazadaAwbJob(
+  orderId: string,
+  orderItemIds: string,
+  status: string,
+  pdfBase64: string,
+  error: string,
+  attempts: number,
+): Promise<void> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  await queryRun(
+    `INSERT INTO lazada_awb_jobs (order_id, order_item_ids, status, pdf_base64, error, attempts, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT (order_id) DO UPDATE SET order_item_ids = excluded.order_item_ids,
+       status = excluded.status, pdf_base64 = excluded.pdf_base64,
+       error = excluded.error, attempts = excluded.attempts,
+       updated_at = excluded.updated_at`,
+    [orderId, orderItemIds, status, pdfBase64, error, attempts, nowUtc],
+  );
+}
+
+/** Antrekan pekerjaan cetak AWB (status pending). */
+export async function enqueueLazadaAwbJob(
+  orderId: string,
+  orderItemIds: string[],
+  attempts = 1,
+): Promise<void> {
+  await saveLazadaAwbJob(
+    orderId,
+    JSON.stringify(orderItemIds),
+    "pending",
+    "",
+    "",
+    attempts,
+  );
+}
+
+/** Ambil satu pekerjaan cetak AWB (null bila belum pernah dibuat). */
+export async function getLazadaAwbJob(
+  orderId: string,
+): Promise<LazadaAwbJob | null> {
+  const rows = await queryAll<LazadaAwbJob>(
+    "SELECT * FROM lazada_awb_jobs WHERE order_id = ?",
+    [orderId],
+  );
+  return rows[0] ?? null;
+}
+
+/** Daftar pekerjaan menunggu cetak — dikerjakan engine jembatan browser. */
+export async function listLazadaAwbJobsPending(): Promise<LazadaAwbJob[]> {
+  return queryAll<LazadaAwbJob>(
+    "SELECT * FROM lazada_awb_jobs WHERE status = 'pending' ORDER BY created_at ASC LIMIT 10",
+  );
+}
+
+/** Tandai pekerjaan selesai beserta PDF AWB (base64). */
+export async function completeLazadaAwbJob(
+  orderId: string,
+  pdfBase64: string,
+): Promise<void> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  await queryRun(
+    `UPDATE lazada_awb_jobs SET status = 'done', pdf_base64 = ?, error = '', updated_at = ? WHERE order_id = ?`,
+    [pdfBase64, nowUtc, orderId],
+  );
+}
+
+/** Tandai pekerjaan gagal beserta alasannya. */
+export async function failLazadaAwbJob(
+  orderId: string,
+  error: string,
+): Promise<void> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  await queryRun(
+    `UPDATE lazada_awb_jobs SET status = 'gagal', error = ?, updated_at = ? WHERE order_id = ?`,
+    [error.slice(0, 500), nowUtc, orderId],
+  );
+}
+
+/** Sentuh detak jembatan browser (kapan terakhir engine online). */
+export async function touchLazadaBridge(status: string): Promise<void> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  await queryRun(
+    `INSERT INTO lazada_bridge_state (id, heartbeat_at, status, updated_at)
+     VALUES (1, ?, ?, ?)
+     ON CONFLICT (id) DO UPDATE SET heartbeat_at = excluded.heartbeat_at,
+       status = excluded.status, updated_at = excluded.updated_at`,
+    [nowUtc, status.slice(0, 100), nowUtc],
+  );
+}
+
+/** Baca detak jembatan browser terakhir. */
+export async function getLazadaBridgeState(): Promise<{
+  heartbeat_at: string;
+  status: string;
+} | null> {
+  const rows = await queryAll<{ heartbeat_at: string; status: string }>(
+    "SELECT heartbeat_at, status FROM lazada_bridge_state WHERE id = 1",
   );
   return rows[0] ?? null;
 }
