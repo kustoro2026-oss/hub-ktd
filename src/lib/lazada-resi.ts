@@ -55,6 +55,7 @@ import {
   getLazadaCtx,
   getLazadaOrderItems,
   getLazadaOrders,
+  printLazadaAwbPdf,
   type LazadaOrderItemRow,
   type LazadaOrderRow,
 } from "@/lib/lazada";
@@ -364,14 +365,47 @@ export async function getLazadaResiPdf(
     // Pesanan tetap bisa mencetak dokumen yang sah untuk ditempel.
     if (fulf.rtsDone) {
       const tracking = fulf.trackingNumber ?? lazadaTrackingNumber(orderId);
+      const itemIds = items.data.map((i) => i.order_item_id);
+
+      // Prioritas 1 — cetak AWB RESMI lewat Open Platform (PrintAWB):
+      // dokumen asli Lazada TANPA login browser, pakai package_id hasil
+      // pack pada pemenuhan ini. Bila tersedia, hasilnya disimpan ke
+      // payload supaya pemanggilan berikutnya langsung pakai cache (sama
+      // seperti label unggahan).
+      if (fulf.packageId) {
+        const awbApi = await printLazadaAwbPdf(fulf.packageId);
+        if (awbApi.ok) {
+          try {
+            const baris = await getLazadaOrderExec(orderId);
+            let payload: Record<string, unknown> = {};
+            if (baris) {
+              try {
+                payload = JSON.parse(baris.payload) as Record<string, unknown>;
+              } catch {
+                payload = {};
+              }
+            }
+            payload.label_pdf_base64 = awbApi.data.toString("base64");
+            payload.tracking_number = tracking;
+            payload.package_id = fulf.packageId;
+            await updateLazadaOrderExecPayload(orderId, JSON.stringify(payload));
+          } catch {
+            // cache gagal — PDF tetap dikembalikan untuk cetak kali ini.
+          }
+          return {
+            ok: true,
+            pdf: awbApi.data,
+            tracking_number: tracking,
+            resmi: true,
+          };
+        }
+      }
+
       // Prioritas: cetak AWB RESMI otomatis lewat sesi web Seller Center
       // (mtop print) — dokumen asli Lazada, bukan tiruan. Hasilnya
       // disimpan ke payload supaya pemanggilan berikutnya langsung pakai
       // cache (sama seperti label unggahan).
-      const awb = await getLazadaResmiAWB(
-        orderId,
-        items.data.map((i) => i.order_item_id),
-      );
+      const awb = await getLazadaResmiAWB(orderId, itemIds);
       if (awb.ok) {
         try {
           const baris = await getLazadaOrderExec(orderId);

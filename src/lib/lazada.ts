@@ -605,6 +605,73 @@ export async function getLazadaDocument(
   return { ok: true, data: { base64, mimeType: String(doc.mime_type ?? "") } };
 }
 
+/** GET /order/document/awb/html/get — dokumen AWB RESMI pesanan dalam
+ *  bentuk HTML (selalu doc_type shippingLabel; tidak ada param doc_type).
+ *  Jalur API murni untuk label kurir terintegrasi (LEX) yang selama ini
+ *  hanya bisa dicetak lewat web Seller Center. Param order_item_ids pakai
+ *  format kurung siku polos tanpa tanda kutip — "[id, id]" — sama seperti
+ *  document/get. Syarat: item sudah packed/RTS (error 30012 bila belum). */
+export async function getLazadaAwbHtml(
+  orderItemIds: string[],
+): Promise<LazadaResult<{ base64: string; mimeType: string }>> {
+  const r = await callLazadaApi<{
+    document?: { file?: string; mime_type?: string; document_type?: string };
+  }>("/order/document/awb/html/get", {
+    order_item_ids: "[" + orderItemIds.join(", ") + "]",
+  });
+  if (!r.ok) return r;
+  const doc = r.data.document ?? {};
+  const base64 = String(doc.file ?? "");
+  if (base64 === "") {
+    return { ok: false, detail: "AWB HTML tidak dikembalikan server (file kosong)" };
+  }
+  return { ok: true, data: { base64, mimeType: String(doc.mime_type ?? "text/html") } };
+}
+
+/** GET /order/package/document/get (PrintAWB) — cetak label RESMI per
+ *  package_id (hasil /order/pack), batch maks 20 paket. doc_type "PDF"
+ *  mengembalikan file PDF base64 (atau pdf_url) — bentuk persis label AWB
+ *  kurir terintegrasi. getDocumentReq adalah objek kompleks yang dikirim
+ *  sebagai JSON string (konvensi param kompleks Lazada). */
+export async function printLazadaAwbPdf(
+  packageId: string,
+): Promise<LazadaResult<Buffer>> {
+  const getDocumentReq = JSON.stringify({
+    doc_type: "PDF",
+    packages: [{ package_id: packageId }],
+  });
+  const r = await callLazadaApi<{
+    file?: string;
+    pdf_url?: string;
+    doc_type?: string;
+  }>("/order/package/document/get", { getDocumentReq });
+  if (!r.ok) return r;
+  let buf: Buffer | null = null;
+  const b64 = String(r.data.file ?? "");
+  if (b64) {
+    try {
+      buf = Buffer.from(b64, "base64");
+    } catch {
+      buf = null;
+    }
+  }
+  if (!buf && r.data.pdf_url) {
+    try {
+      const res = await fetch(String(r.data.pdf_url));
+      if (res.ok) buf = Buffer.from(await res.arrayBuffer());
+    } catch {
+      buf = null;
+    }
+  }
+  if (buf && buf.length >= 5 && buf.subarray(0, 5).toString("latin1") === "%PDF-") {
+    return { ok: true, data: buf };
+  }
+  return {
+    ok: false,
+    detail: "PrintAWB tidak mengembalikan PDF valid (file/pdf_url kosong)",
+  };
+}
+
 /** Label PDF yang sudah dipastikan valid (bukan file rusak/kosong). */
 type LazadaLabelPdf = { pdf: Buffer; pageCount: number; docType: string };
 
@@ -682,8 +749,14 @@ export async function fulfillLazadaOrderForItems(
   orderItemIds: string[],
   orderId: string,
 ): Promise<
-  | { ok: true; pdf: Buffer; pageCount: number; trackingNumber: string }
-  | { ok: false; detail: string; rtsDone?: boolean; trackingNumber?: string }
+  | { ok: true; pdf: Buffer; pageCount: number; trackingNumber: string; packageId?: string }
+  | {
+      ok: false;
+      detail: string;
+      rtsDone?: boolean;
+      trackingNumber?: string;
+      packageId?: string;
+    }
 > {
   if (orderItemIds.length === 0) {
     return { ok: false, detail: "Daftar item pesanan kosong — tidak bisa diproses" };
@@ -706,6 +779,7 @@ export async function fulfillLazadaOrderForItems(
 
   const pack = await packLazadaOrder(orderItemIds, provider);
   let packErr = "";
+  const packageId = pack.ok ? pack.data.packageId : "";
   if (!pack.ok) {
     // Percobaan ulang setelah pack sudah pernah berhasil akan ditolak
     // (item tidak lagi Pending) — jangan langsung gagal: coba lanjut ke
@@ -745,9 +819,16 @@ export async function fulfillLazadaOrderForItems(
       detail: `Gagal unduh label: ${doc.detail}`,
       rtsDone: true,
       trackingNumber: trackingFinal,
+      packageId: packageId || undefined,
     };
   }
-  return { ok: true, pdf: doc.data.pdf, pageCount: doc.data.pageCount, trackingNumber: trackingFinal };
+  return {
+    ok: true,
+    pdf: doc.data.pdf,
+    pageCount: doc.data.pageCount,
+    trackingNumber: trackingFinal,
+    packageId: packageId || undefined,
+  };
 }
 
 // ---------- Produk ----------
