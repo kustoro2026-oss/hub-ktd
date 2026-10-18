@@ -102,6 +102,7 @@ export async function GET(request: Request): Promise<Response> {
         ok: true,
         mime: html.data.mimeType,
         ukuran_base64: html.data.base64.length,
+        kepala_base64: html.data.base64.slice(0, 60),
         ukuran_decode: dec.length,
         awalan: dec.subarray(0, 160).toString("utf8"),
       };
@@ -132,13 +133,35 @@ export async function GET(request: Request): Promise<Response> {
 
   if (packageId) {
     // Variasi serialisasi param untuk menemukan format yang diterima.
-    const varian: Record<string, string> = {
-      getDocumentReq_json:
-        '{"doc_type":"PDF","packages":[{"package_id":"' + packageId + '"}]}',
-      packages_json: '[{"package_id":"' + packageId + '"}]',
-    };
-    for (const [nama, nilai] of Object.entries(varian)) {
-      const r = await callRaw("/order/package/document/get", { [nama]: nilai });
+    const varian: Array<[string, Record<string, string>]> = [
+      [
+        "getDocumentReq",
+        {
+          getDocumentReq:
+            '{"doc_type":"PDF","packages":[{"package_id":"' + packageId + '"}]}',
+        },
+      ],
+      [
+        "getDocumentReq_kurung",
+        {
+          getDocumentReq:
+            '{"doc_type":"PDF","packages":[{"package_id":["' + packageId + '"]}]}',
+        },
+      ],
+      [
+        "packages_terpisah",
+        {
+          packages: '[{"package_id":"' + packageId + '"}]',
+          doc_type: "PDF",
+        },
+      ],
+      [
+        "package_id_datar",
+        { package_id: packageId, doc_type: "PDF" },
+      ],
+    ];
+    for (const [nama, params] of varian) {
+      const r = await callRaw("/order/package/document/get", params);
       hasil["printawb_" + nama] = {
         code: r.code,
         message: r.message ?? "",
