@@ -1,10 +1,10 @@
 "use client";
 
-// Sidebar desktop KTD Hub — bisa diciutkan jadi kolom ikon lewat tombol
-// ikon kecil di pojok kanan atas header (pola umum aplikasi profesional);
-// saat terciut muncul tombol ikon "buka" tepat di bawah logo. Pilihan
-// tersimpan di localStorage. Di layar kecil sidebar disembunyikan dan
-// diganti drawer MobileNav.
+// Sidebar desktop KTD Hub — bisa diciutkan jadi kolom ikon. Tombol
+// buka/tutup selalu berada DI JUDUL (header): ikon kecil di pojok kanan
+// atas saat melebar, dan ikon "buka" di bawah logo saat terciut — posisi
+// yang sama agar konsisten. Pilihan tersimpan di localStorage. Di layar
+// kecil sidebar disembunyikan dan diganti drawer MobileNav.
 import { useEffect, useState } from "react";
 import { PanelLeftClose, PanelLeftOpen, Store } from "lucide-react";
 import SidebarNav from "@/components/sidebar-nav";
@@ -44,18 +44,29 @@ export default function Sidebar() {
     >
       <div
         className={`flex border-b border-slate-800 py-4 ${
-          isCollapsed ? "justify-center px-2" : "items-center gap-2.5 px-4"
+          isCollapsed ? "flex-col items-center gap-2 px-2" : "items-center gap-2.5 px-4"
         }`}
       >
         {isCollapsed ? (
-          <button
-            type="button"
-            onClick={() => setCollapsedPersist(false)}
-            title="Buka menu"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 transition hover:bg-emerald-500/25"
-          >
-            <Store className="h-5 w-5 text-emerald-400" />
-          </button>
+          <>
+            <button
+              type="button"
+              onClick={() => setCollapsedPersist(false)}
+              title="Buka menu"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15 transition hover:bg-emerald-500/25"
+            >
+              <Store className="h-5 w-5 text-emerald-400" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setCollapsedPersist(false)}
+              title="Buka menu"
+              aria-label="Buka menu"
+              className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-800 hover:text-white"
+            >
+              <PanelLeftOpen className="h-4 w-4" />
+            </button>
+          </>
         ) : (
           <>
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/15">
@@ -79,19 +90,6 @@ export default function Sidebar() {
           </>
         )}
       </div>
-      {isCollapsed && (
-        <div className="flex justify-center py-3">
-          <button
-            type="button"
-            onClick={() => setCollapsedPersist(false)}
-            title="Buka menu"
-            aria-label="Buka menu"
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-300 transition hover:bg-slate-800 hover:text-white"
-          >
-            <PanelLeftOpen className="h-4 w-4" />
-          </button>
-        </div>
-      )}
       <SidebarNav
         collapsed={isCollapsed}
         onExpand={() => setCollapsedPersist(false)}
