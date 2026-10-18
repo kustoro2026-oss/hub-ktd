@@ -21,7 +21,10 @@ export default function DashboardMain({
     );
   }
   return (
-    <main className="flex-1 px-4 py-5 sm:px-6 lg:px-10">
+    // min-w-0 + overflow-x-auto: konten yang lebih lebar dari layar
+    // digulirkan DI DALAM area konten ini, bukan seluruh halaman — jadi
+    // sidebar (sibling-nya) tidak ikut bergeser saat scroll ke samping.
+    <main className="min-w-0 flex-1 overflow-x-auto px-4 py-5 sm:px-6 lg:px-10">
       <div className="mx-auto w-full max-w-6xl">{children}</div>
     </main>
   );

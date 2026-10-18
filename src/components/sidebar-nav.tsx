@@ -35,6 +35,7 @@ import {
   RefreshCw,
   ShieldAlert,
   Upload,
+  ShoppingBag,
 } from "lucide-react";
 
 export type NavItem = {
@@ -239,29 +240,36 @@ function NavLink({
   item,
   active,
   onNavigate,
+  collapsed,
 }: {
   item: NavItem;
   active: boolean;
   onNavigate?: () => void;
+  /** Mode ikon-saja saat sidebar diciutkan: label disembunyikan dan
+   *  nama item muncul sebagai tooltip. */
+  collapsed?: boolean;
 }) {
   const Icon = item.Icon;
   const content = (
     <>
       <Icon className="h-4 w-4 shrink-0" />
-      <span className="truncate">{item.label}</span>
-      {item.segera ? (
+      {collapsed ? null : <span className="truncate">{item.label}</span>}
+      {!collapsed && item.segera ? (
         <span className="ml-auto rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
           Segera
         </span>
       ) : null}
     </>
   );
+  const baseCls = `flex items-center rounded-lg py-2 text-sm transition ${
+    collapsed ? "justify-center px-0" : "gap-3 px-3"
+  }`;
 
   if (item.segera || item.href === "") {
     return (
       <div
-        title="Fitur segera hadir"
-        className="flex cursor-not-allowed items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-500 opacity-70"
+        title={collapsed ? item.label : "Fitur segera hadir"}
+        className={`${baseCls} cursor-not-allowed text-slate-500 opacity-70`}
       >
         {content}
       </div>
@@ -276,7 +284,8 @@ function NavLink({
       // masuk viewport) membanjiri fungsi server saat berpindah halaman.
       prefetch={false}
       onClick={onNavigate}
-      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm ${
+      title={collapsed ? item.label : undefined}
+      className={`${baseCls} ${
         active
           ? "bg-emerald-600 font-medium text-white"
           : "text-slate-300 hover:bg-slate-800 hover:text-white"
@@ -289,9 +298,16 @@ function NavLink({
 
 export default function SidebarNav({
   onNavigate,
+  collapsed,
+  onExpand,
 }: {
   /** Dipanggil setiap kali link diklik — dipakai drawer HP untuk menutup. */
   onNavigate?: () => void;
+  /** Mode ikon-saja (sidebar desktop diciutkan). */
+  collapsed?: boolean;
+  /** Dipanggil saat menu butuh sidebar dibuka kembali (mis. klik grup
+   *  marketplace dalam mode ikon-saja). */
+  onExpand?: () => void;
 }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -320,9 +336,13 @@ export default function SidebarNav({
       <nav className="flex-1 space-y-4 overflow-y-auto px-2 py-4">
         {NAV.map((section) => (
           <div key={section.title}>
-            <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-              {section.title}
-            </div>
+            {collapsed ? (
+              <div className="mx-2 border-t border-slate-800" />
+            ) : (
+              <div className="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                {section.title}
+              </div>
+            )}
 
             {"items" in section ? (
               <div className="space-y-0.5">
@@ -332,6 +352,7 @@ export default function SidebarNav({
                     item={item}
                     active={isActive(pathname, item.href)}
                     onNavigate={onNavigate}
+                    collapsed={collapsed}
                   />
                 ))}
               </div>
@@ -347,32 +368,53 @@ export default function SidebarNav({
                   return (
                     <div key={group.title}>
                       <button
-                        onClick={() =>
-                          setOpenGroups((s) => ({
-                            ...s,
-                            [group.title]: !open,
-                          }))
-                        }
-                        className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm ${
-                          hasActiveChild
-                            ? "font-medium text-white"
-                            : "text-slate-300 hover:bg-slate-800 hover:text-white"
+                        onClick={() => {
+                          if (collapsed) {
+                            // Mode ikon-saja: buka sidebar + buka grup ini
+                            // sekaligus supaya tujuan langsung terlihat.
+                            setOpenGroups((s) => ({
+                              ...s,
+                              [group.title]: true,
+                            }));
+                            onExpand?.();
+                          } else {
+                            setOpenGroups((s) => ({
+                              ...s,
+                              [group.title]: !open,
+                            }));
+                          }
+                        }}
+                        title={collapsed ? group.title : undefined}
+                        className={`flex w-full items-center rounded-lg py-2 text-sm transition ${
+                          collapsed ? "justify-center px-0" : "gap-2 px-3"
+                        } ${
+                          collapsed && hasActiveChild
+                            ? "bg-emerald-600 text-white"
+                            : hasActiveChild
+                              ? "font-medium text-white"
+                              : "text-slate-300 hover:bg-slate-800 hover:text-white"
                         }`}
                       >
-                        <ChevronDown
-                          className={`h-3.5 w-3.5 shrink-0 transition-transform ${
-                            open ? "" : "-rotate-90"
-                          }`}
-                        />
-                        <span className="truncate">{group.title}</span>
-                        {allSegera ? (
-                          <span className="ml-auto rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
-                            Segera
-                          </span>
-                        ) : null}
+                        {collapsed ? (
+                          <ShoppingBag className="h-4 w-4 shrink-0" />
+                        ) : (
+                          <>
+                            <ChevronDown
+                              className={`h-3.5 w-3.5 shrink-0 transition-transform ${
+                                open ? "" : "-rotate-90"
+                              }`}
+                            />
+                            <span className="truncate">{group.title}</span>
+                            {allSegera ? (
+                              <span className="ml-auto rounded bg-slate-800 px-1.5 py-0.5 text-[10px] font-medium text-slate-400">
+                                Segera
+                              </span>
+                            ) : null}
+                          </>
+                        )}
                       </button>
 
-                      {open ? (
+                      {!collapsed && open ? (
                         <div className="ml-4 mt-0.5 space-y-0.5 border-l border-slate-700 pl-2">
                           {group.items.map((item) => (
                             <NavLink
@@ -397,10 +439,13 @@ export default function SidebarNav({
         <button
           onClick={logout}
           disabled={busy}
-          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+          title={collapsed ? "Keluar" : undefined}
+          className={`flex w-full items-center rounded-lg py-2 text-sm text-slate-300 transition hover:bg-slate-800 disabled:opacity-50 ${
+            collapsed ? "justify-center px-0" : "gap-3 px-3"
+          }`}
         >
           <LogOut className="h-4 w-4" />
-          Keluar
+          {collapsed ? null : "Keluar"}
         </button>
       </div>
     </>
