@@ -1,11 +1,11 @@
 "use client";
 
 // Sidebar desktop KTD Hub — bisa diciutkan jadi kolom ikon lewat tombol
-// panel di header; pilihan tersimpan di localStorage. Logo di atas,
-// navigasi bersama (SidebarNav), dan tombol keluar di bawah. Di layar
-// kecil sidebar ini disembunyikan dan diganti drawer yang dibuka MobileNav.
+// "Ciutkan menu" berlabel di bagian bawah; pilihan tersimpan di localStorage.
+// Logo di atas, navigasi bersama (SidebarNav), dan tombol keluar di bawah.
+// Di layar kecil sidebar ini disembunyikan dan diganti drawer MobileNav.
 import { useEffect, useState } from "react";
-import { PanelLeftClose, Store } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Store } from "lucide-react";
 import SidebarNav from "@/components/sidebar-nav";
 
 // Re-export tipe & NAV agar import lama tidak rusak.
@@ -66,14 +66,6 @@ export default function Sidebar() {
                 toko.kustoro2026.com
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setCollapsedPersist(true)}
-              title="Ciutkan menu"
-              className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-800 hover:text-white"
-            >
-              <PanelLeftClose className="h-4 w-4" />
-            </button>
           </>
         )}
       </div>
@@ -81,6 +73,28 @@ export default function Sidebar() {
         collapsed={isCollapsed}
         onExpand={() => setCollapsedPersist(false)}
       />
+      {/* Tombol buka/tutup berlabel di posisi tetap — saat terciut berubah
+          menjadi ikon "buka" yang jelas di tempat yang sama, jadi menu
+          tidak pernah terasa hilang. */}
+      <div className="border-t border-slate-800 p-2">
+        <button
+          type="button"
+          onClick={() => setCollapsedPersist(!isCollapsed)}
+          title={isCollapsed ? "Buka menu" : undefined}
+          className={`flex w-full items-center rounded-lg py-2 text-sm text-slate-300 transition hover:bg-slate-800 hover:text-white ${
+            isCollapsed ? "justify-center px-0" : "gap-3 px-3"
+          }`}
+        >
+          {isCollapsed ? (
+            <PanelLeftOpen className="h-4 w-4" />
+          ) : (
+            <>
+              <PanelLeftClose className="h-4 w-4" />
+              Ciutkan menu
+            </>
+          )}
+        </button>
+      </div>
     </aside>
   );
 }
