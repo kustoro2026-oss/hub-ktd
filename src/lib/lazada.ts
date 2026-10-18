@@ -440,6 +440,7 @@ export type LazadaOrderItemRow = {
   shop_sku: string;
   seller_sku: string;
   item_price: string;
+  package_id: string;
   paid_price: string;
   status: string;
   variation: string;
@@ -471,6 +472,7 @@ export async function getLazadaOrderItems(
     data: raw.map((it) => ({
       order_item_id: toStr(it.order_item_id),
       order_id: toStr(it.order_id),
+      package_id: toStr(it.package_id),
       name: toStr(it.name),
       sku: toStr(it.sku),
       shop_sku: toStr(it.shop_sku),
@@ -605,34 +607,13 @@ export async function getLazadaDocument(
   return { ok: true, data: { base64, mimeType: String(doc.mime_type ?? "") } };
 }
 
-/** GET /order/document/awb/html/get — dokumen AWB RESMI pesanan dalam
- *  bentuk HTML (selalu doc_type shippingLabel; tidak ada param doc_type).
- *  Jalur API murni untuk label kurir terintegrasi (LEX) yang selama ini
- *  hanya bisa dicetak lewat web Seller Center. Param order_item_ids pakai
- *  format kurung siku polos tanpa tanda kutip — "[id, id]" — sama seperti
- *  document/get. Syarat: item sudah packed/RTS (error 30012 bila belum). */
-export async function getLazadaAwbHtml(
-  orderItemIds: string[],
-): Promise<LazadaResult<{ base64: string; mimeType: string }>> {
-  const r = await callLazadaApi<{
-    document?: { file?: string; mime_type?: string; document_type?: string };
-  }>("/order/document/awb/html/get", {
-    order_item_ids: "[" + orderItemIds.join(", ") + "]",
-  });
-  if (!r.ok) return r;
-  const doc = r.data.document ?? {};
-  const base64 = String(doc.file ?? "");
-  if (base64 === "") {
-    return { ok: false, detail: "AWB HTML tidak dikembalikan server (file kosong)" };
-  }
-  return { ok: true, data: { base64, mimeType: String(doc.mime_type ?? "text/html") } };
-}
-
 /** GET /order/package/document/get (PrintAWB) — cetak label RESMI per
- *  package_id (hasil /order/pack), batch maks 20 paket. doc_type "PDF"
- *  mengembalikan file PDF base64 (atau pdf_url) — bentuk persis label AWB
- *  kurir terintegrasi. getDocumentReq adalah objek kompleks yang dikirim
- *  sebagai JSON string (konvensi param kompleks Lazada). */
+ *  package_id (hasil /order/pack atau field package_id di items/get),
+ *  batch maks 20 paket. doc_type "PDF" mengembalikan pdf_url bertanda
+ *  tangan OSS (BISA diunduh tanpa sesi browser — terbukti 18 Okt 2026:
+ *  PDF 154 KB, %PDF-1.4) — bentuk persis label AWB kurir terintegrasi.
+ *  getDocumentReq adalah objek kompleks yang dikirim sebagai JSON string
+ *  (konvensi param kompleks Lazada). */
 export async function printLazadaAwbPdf(
   packageId: string,
 ): Promise<LazadaResult<Buffer>> {
@@ -641,23 +622,18 @@ export async function printLazadaAwbPdf(
     packages: [{ package_id: packageId }],
   });
   const r = await callLazadaApi<{
-    file?: string;
-    pdf_url?: string;
-    doc_type?: string;
+    result?: {
+      data?: { file?: string; pdf_url?: string; doc_type?: string };
+      success?: boolean;
+    };
   }>("/order/package/document/get", { getDocumentReq });
   if (!r.ok) return r;
+  const d = r.data.result?.data ?? {};
+  const pdfUrl = String(d.pdf_url ?? "").trim();
   let buf: Buffer | null = null;
-  const b64 = String(r.data.file ?? "");
-  if (b64) {
+  if (pdfUrl) {
     try {
-      buf = Buffer.from(b64, "base64");
-    } catch {
-      buf = null;
-    }
-  }
-  if (!buf && r.data.pdf_url) {
-    try {
-      const res = await fetch(String(r.data.pdf_url));
+      const res = await fetch(pdfUrl);
       if (res.ok) buf = Buffer.from(await res.arrayBuffer());
     } catch {
       buf = null;
@@ -668,7 +644,7 @@ export async function printLazadaAwbPdf(
   }
   return {
     ok: false,
-    detail: "PrintAWB tidak mengembalikan PDF valid (file/pdf_url kosong)",
+    detail: "PrintAWB tidak mengembalikan PDF valid (pdf_url kosong/gagal diunduh)",
   };
 }
 

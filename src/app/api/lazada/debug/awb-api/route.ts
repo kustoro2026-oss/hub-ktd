@@ -1,18 +1,12 @@
 // Rute debug admin (READ-ONLY): uji jalur API MURNI cetak AWB resmi —
-//   /order/document/awb/html/get (HTML) dan /order/package/document/get
-//   (PrintAWB, PDF) — untuk satu pesanan. Membantu menentukan format
-//   parameter yang benar sebelum jalur ini dipasang permanen.
+//   /order/package/document/get (PrintAWB, PDF) — untuk satu pesanan.
+//   Memastikan format parameter dan struktur respons tetap dikenali.
 //
-// Dipakai: GET /api/lazada/debug/awb-api?order_id=...&debug_awb=1
+// Dipakai: GET /api/lazada/debug/awb-api?order_id=...
 //   (cookie admin). TIDAK mengubah data pesanan/payload apa pun.
 import { isAuthed } from "@/lib/auth";
 import { getLazadaOrderExec } from "@/lib/db";
-import {
-  API_HOST,
-  getLazadaAwbHtml,
-  getLazadaCtx,
-  signLazada,
-} from "@/lib/lazada";
+import { API_HOST, getLazadaCtx, signLazada } from "@/lib/lazada";
 
 export const dynamic = "force-dynamic";
 
@@ -88,26 +82,8 @@ export async function GET(request: Request): Promise<Response> {
     .map((x) => String((x as Record<string, unknown>)?.order_item_id ?? ""))
     .filter((x) => x !== "");
 
-  // 2) AWB HTML resmi (awb/html/get) — tanpa package_id.
-  if (itemIds.length > 0) {
-    const html = await getLazadaAwbHtml(itemIds);
-    if (html.ok) {
-      const dec = Buffer.from(html.data.base64, "base64");
-      hasil.awb_html = {
-        ok: true,
-        mime: html.data.mimeType,
-        ukuran_base64: html.data.base64.length,
-        kepala_base64: html.data.base64.slice(0, 60),
-        ukuran_decode: dec.length,
-        awalan: dec.subarray(0, 160).toString("utf8"),
-      };
-    } else {
-      hasil.awb_html = { ok: false, detail: html.detail };
-    }
-  }
-
-  // 3) PrintAWB — butuh package_id. Cari di payload antrean dulu, lalu di
-  //    item mentah (bila ada).
+  // PrintAWB — butuh package_id. Cari di payload antrean dulu, lalu di
+  // item mentah (bila ada).
   let packageId = "";
   const row = await getLazadaOrderExec(orderId);
   if (row) {

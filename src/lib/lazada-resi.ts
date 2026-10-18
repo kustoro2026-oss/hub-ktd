@@ -368,12 +368,18 @@ export async function getLazadaResiPdf(
       const itemIds = items.data.map((i) => i.order_item_id);
 
       // Prioritas 1 — cetak AWB RESMI lewat Open Platform (PrintAWB):
-      // dokumen asli Lazada TANPA login browser, pakai package_id hasil
-      // pack pada pemenuhan ini. Bila tersedia, hasilnya disimpan ke
-      // payload supaya pemanggilan berikutnya langsung pakai cache (sama
-      // seperti label unggahan).
-      if (fulf.packageId) {
-        const awbApi = await printLazadaAwbPdf(fulf.packageId);
+      // dokumen asli Lazada TANPA login browser. package_id diambil dari
+      // hasil pack pemenuhan ini, atau dari items/get (pesanan yang sudah
+      // dikemas sebelumnya). Bila tersedia, hasilnya disimpan ke payload
+      // supaya pemanggilan berikutnya langsung pakai cache (sama seperti
+      // label unggahan).
+      const packageId =
+        fulf.packageId ??
+        items.data
+          .map((i) => (i.package_id ?? "").trim())
+          .find((x) => x !== "");
+      if (packageId) {
+        const awbApi = await printLazadaAwbPdf(packageId);
         if (awbApi.ok) {
           try {
             const baris = await getLazadaOrderExec(orderId);
@@ -387,7 +393,7 @@ export async function getLazadaResiPdf(
             }
             payload.label_pdf_base64 = awbApi.data.toString("base64");
             payload.tracking_number = tracking;
-            payload.package_id = fulf.packageId;
+            payload.package_id = packageId;
             await updateLazadaOrderExecPayload(orderId, JSON.stringify(payload));
           } catch {
             // cache gagal — PDF tetap dikembalikan untuk cetak kali ini.

@@ -45,6 +45,7 @@ import {
   fulfillLazadaOrderForItems,
   getLazadaCtx,
   getLazadaOrderItems,
+  printLazadaAwbPdf,
 } from "@/lib/lazada";
 import { LAZADA_STORE_NAME } from "@/lib/lazada-orders";
 import {
@@ -99,6 +100,9 @@ export type LazadaExecPayload = {
   /** Kosong saat persiapan — diisi label PDF hasil pemenuhan (pack → rts →
    *  document) pada saat eksekusi. */
   label_pdf_base64: string;
+  /** package_id paket Lazada (hasil /order/pack) — bahan PrintAWB untuk
+   *  cetak AWB resmi lewat Open Platform. */
+  package_id?: string;
   items: LazadaExecItem[];
   total_modal: number;
 };
@@ -901,12 +905,30 @@ export async function executeLazadaOrder(
         if (fulf.trackingNumber && fulf.trackingNumber !== payload.tracking_number) {
           payload = { ...payload, tracking_number: fulf.trackingNumber };
         }
-        const fallback = await buatResiFallback(payload).catch(() => null);
-        if (fallback) {
-          pdfBuffer = fallback;
+        // Cetak AWB RESMI lewat Open Platform (PrintAWB) — dokumen asli
+        // Lazada TANPA login browser (package_id dari pack pemenuhan ini
+        // atau items/get). Bila berhasil, label resmi yang diunggah ke
+        // Aneka; bila tidak, resi PDF buatan sendiri.
+        const awbPkg = fulf.packageId
+          ? fulf.packageId
+          : await (async () => {
+              const its = await getLazadaOrderItems(payload.order_id).catch(
+                () => null,
+              );
+              if (!its || !its.ok) return "";
+              return (
+                its.data
+                  .map((i) => (i.package_id ?? "").trim())
+                  .find((x) => x !== "") ?? ""
+              );
+            })();
+        const awbApi = awbPkg ? await printLazadaAwbPdf(awbPkg) : null;
+        if (awbApi && awbApi.ok) {
+          pdfBuffer = awbApi.data;
           payload = {
             ...payload,
-            label_pdf_base64: fallback.toString("base64"),
+            package_id: awbPkg,
+            label_pdf_base64: awbApi.data.toString("base64"),
           };
           await saveLazadaOrderExec({
             order_id: orderId,
@@ -915,14 +937,32 @@ export async function executeLazadaOrder(
           });
           await logStep(
             "fulfill",
-            `label resmi tidak tersedia (${fulf.detail}) — dipakai resi PDF buatan sendiri (resi ${payload.tracking_number})`,
+            `rts berhasil + AWB RESMI lewat Open Platform (PrintAWB, package ${awbPkg}) — label asli Lazada dipakai untuk Aneka`,
           );
         } else {
-          await logStep(
-            "fulfill",
-            `GAGAL — ${fulf.detail} (resi PDF buatan sendiri juga gagal)`,
-          );
-          return gagal(fulf.detail);
+          const fallback = await buatResiFallback(payload).catch(() => null);
+          if (fallback) {
+            pdfBuffer = fallback;
+            payload = {
+              ...payload,
+              label_pdf_base64: fallback.toString("base64"),
+            };
+            await saveLazadaOrderExec({
+              order_id: orderId,
+              status: "berjalan",
+              payload: JSON.stringify(payload),
+            });
+            await logStep(
+              "fulfill",
+              `label resmi tidak tersedia (${fulf.detail}) — dipakai resi PDF buatan sendiri (resi ${payload.tracking_number})`,
+            );
+          } else {
+            await logStep(
+              "fulfill",
+              `GAGAL — ${fulf.detail} (resi PDF buatan sendiri juga gagal)`,
+            );
+            return gagal(fulf.detail);
+          }
         }
       } else {
         await logStep("fulfill", `GAGAL — ${fulf.detail}`);
