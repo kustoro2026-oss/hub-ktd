@@ -551,7 +551,7 @@ async function pulihkanSelesai(
     `${nowUtc} | pemulihan | pembayaran sebelumnya terverifikasi — ${bukti.keterangan}`,
   );
   const notif = await sendExecNoticeTerkonfirmasi(
-    `Eksekusi Aneka BERHASIL untuk pesanan ${orderId} (dipulihkan dari percobaan sebelumnya).\n${bukti.keterangan}${bukti.paymentId ? `\nID pembayaran Aneka: ${bukti.paymentId}` : ""}${bukti.orderCode ? ` (kode pesanan: ${bukti.orderCode})` : ""}\nDetail: https://anekadropship.id/payment-history`,
+    `Eksekusi Aneka BERHASIL untuk pesanan TikTok ${orderId} (dipulihkan dari percobaan sebelumnya).\n${bukti.keterangan}${bukti.paymentId ? `\nID pembayaran Aneka: ${bukti.paymentId}` : ""}${bukti.orderCode ? ` (kode pesanan: ${bukti.orderCode})` : ""}\nDetail: https://anekadropship.id/payment-history`,
   );
   await appendTiktokOrderExecLog(
     orderId,
@@ -586,7 +586,7 @@ async function blokirCekManual(
     detail: `[PERLU CEK MANUAL] ${detail}${tunggu}`,
   });
   await sendExecNotice(
-    `Eksekusi Aneka DITAHAN untuk pesanan ${orderId}: ${detail}${tunggu}\nPeriksa riwayat pembayaran Aneka (https://anekadropship.id/payment-history) — bila pesanan ini BELUM terbayar di sana, gunakan tombol "Sudah dicek manual — bayar ulang" di halaman Eksekusi.`,
+    `Eksekusi Aneka DITAHAN untuk pesanan TikTok ${orderId}: ${detail}${tunggu}\nPeriksa riwayat pembayaran Aneka (https://anekadropship.id/payment-history) — bila pesanan ini BELUM terbayar di sana, gunakan tombol "Sudah dicek manual — bayar ulang" di halaman Eksekusi.`,
   );
   return { ok: false, detail: `[PERLU CEK MANUAL] ${detail}${tunggu}` };
 }
@@ -698,7 +698,7 @@ export async function executeAnekaOrder(
       detail,
     });
     await sendExecNotice(
-      `Eksekusi Aneka GAGAL untuk pesanan ${orderId}: ${detail}\nCoba lagi: ${EKSEKUSI_URL}?order=${orderId}\nCatatan: periksa dulu riwayat pembayaran Aneka (https://anekadropship.id/payment-history) — pastikan saldo belum terpotong sebelum mencoba lagi.`,
+      `Eksekusi Aneka GAGAL untuk pesanan TikTok ${orderId}: ${detail}\nCoba lagi: ${EKSEKUSI_URL}?order=${orderId}\nCatatan: periksa dulu riwayat pembayaran Aneka (https://anekadropship.id/payment-history) — pastikan saldo belum terpotong sebelum mencoba lagi.`,
     );
     return { ok: false, detail };
   };
@@ -744,7 +744,7 @@ export async function executeAnekaOrder(
       executed_at: nowUtc,
     });
     await sendExecNotice(
-      `Eksekusi Aneka DIBATALKAN untuk pesanan ${orderId}: ${aktif.detail}`,
+      `Eksekusi Aneka DIBATALKAN untuk pesanan TikTok ${orderId}: ${aktif.detail}`,
     );
     return { ok: false, detail: aktif.detail };
   }
@@ -963,7 +963,7 @@ export async function executeAnekaOrder(
   // Notif BERHASIL diwajibkan sampai: hasil kirim dicek + dicoba ulang,
   // dan hasilnya dicatat ke log supaya kegagalan WA tidak lagi senyap.
   const notif = await sendExecNoticeTerkonfirmasi(
-    `Eksekusi Aneka BERHASIL untuk pesanan ${orderId}.\nID pembayaran Aneka: ${pay.paymentId}${anekaId ? ` (kode pesanan: ${anekaId})` : ""}\nDetail: https://anekadropship.id/payment-history/finish?payment_id=${pay.paymentId}&status=success`,
+    `Eksekusi Aneka BERHASIL untuk pesanan TikTok ${orderId}.\nID pembayaran Aneka: ${pay.paymentId}${anekaId ? ` (kode pesanan: ${anekaId})` : ""}\nDetail: https://anekadropship.id/payment-history/finish?payment_id=${pay.paymentId}&status=success`,
   );
   await logStep(
     "notif",
