@@ -259,11 +259,20 @@ export async function getLazadaCtx(): Promise<LazadaCtx> {
 
 /** Panggil business API Lazada: tandatangani semua param (app_key, timestamp,
  *  access_token, ...) dengan HMAC-SHA256 lalu GET (default) atau POST form.
- *  Kembalikan `data` bila kode respons "0". */
+ *  Kembalikan `data` bila kode respons "0".
+ *
+ *  `payloadMode`: kebanyakan endpoint membungkus hasilnya di `data` (default
+ *  "data") — tetapi sebagian (mis. PrintAWB /order/package/document/get)
+ *  meletakkan hasilnya di `result` PADA LEVEL ATAS body tanpa field `data`
+ *  sama sekali, sehingga `body.data` adalah undefined. Untuk endpoint itu
+ *  pakai "full" supaya seluruh body dikembalikan (peristiwa 18 Okt 2026:
+ *  "Cannot read properties of undefined (reading 'result')" pada cetak resi
+ *  order baru padahal PrintAWB sendiri membalas code 0). */
 async function callLazadaApi<T>(
   apiPath: string,
   params: Record<string, string>,
   method: "GET" | "POST" = "GET",
+  payloadMode: "data" | "full" = "data",
 ): Promise<LazadaResult<T>> {
   const ctx = await getLazadaCtx();
   if (!ctx.ok) return { ok: false, detail: ctx.detail };
@@ -305,7 +314,10 @@ async function callLazadaApi<T>(
         code: code || String(res.status),
       };
     }
-    return { ok: true, data: data.data as T };
+    return {
+      ok: true,
+      data: (payloadMode === "full" ? data : data.data) as T,
+    };
   } catch (e) {
     return {
       ok: false,
@@ -626,7 +638,7 @@ export async function printLazadaAwbPdf(
       data?: { file?: string; pdf_url?: string; doc_type?: string };
       success?: boolean;
     };
-  }>("/order/package/document/get", { getDocumentReq });
+  }>("/order/package/document/get", { getDocumentReq }, "GET", "full");
   if (!r.ok) return r;
   const d = r.data.result?.data ?? {};
   const pdfUrl = String(d.pdf_url ?? "").trim();
