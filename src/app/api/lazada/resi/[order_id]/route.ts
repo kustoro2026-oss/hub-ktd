@@ -7,7 +7,10 @@
 // pemenuhan dijalankan dulu otomatis (pack → rts → document) baru label
 // diambil — label bisa dicetak ulang kapan saja.
 import { isAuthed } from "@/lib/auth";
-import { getLazadaResiPdf } from "@/lib/lazada-resi";
+import {
+  getLazadaResiPdf,
+  type LazadaOfficialResiResult,
+} from "@/lib/lazada-resi";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -20,12 +23,31 @@ export async function GET(
     return Response.json({ error: "Belum masuk" }, { status: 401 });
   }
   const { order_id } = await params;
+  const url = new URL(_request.url);
 
-  const res = await getLazadaResiPdf(order_id);
+  let res: LazadaOfficialResiResult;
+  try {
+    res = await getLazadaResiPdf(order_id);
+  } catch (e) {
+    console.error("resi/" + order_id + " error:", e);
+    // Mode debug: kembalikan pesan error asli supaya kegagalan bisa
+    // didiagnosis tanpa melihat log Vercel.
+    if (url.searchParams.get("debug") === "1") {
+      const msg =
+        e instanceof Error ? (e.stack ?? e.message) : String(e);
+      return Response.json(
+        { ok: false, detail: "INTERNAL: " + msg },
+        { status: 500 },
+      );
+    }
+    res = {
+      ok: false,
+      detail: "Kesalahan internal server — silakan coba lagi beberapa saat.",
+    };
+  }
 
   // Mode diagnostik (?debug=1): kembalikan JSON ringkasan hasil cetak +
   // alasan API — tanpa isi PDF (untuk memeriksa hasil cetak).
-  const url = new URL(_request.url);
   if (url.searchParams.get("debug") === "1") {
     return Response.json(
       res.ok
