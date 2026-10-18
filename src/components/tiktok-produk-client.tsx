@@ -6,6 +6,7 @@
 // segarkan daftar untuk melihat nilai baru.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Search, SlidersHorizontal, X } from "lucide-react";
+import TableScrollArrows from "@/components/table-scroll-arrows";
 
 type SkuRow = {
   id: string;
@@ -127,6 +128,8 @@ export default function TiktokProdukClient() {
   const [scanned, setScanned] = useState(0);
   const [shopName, setShopName] = useState("");
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Wadah tabel utama — digulirkan ke kiri/kanan lewat TableScrollArrows.
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(
     async (state: string, query: string, token: string) => {
@@ -381,7 +384,11 @@ export default function TiktokProdukClient() {
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <div
+            ref={tableRef}
+            className="overflow-x-auto rounded-xl border border-slate-200 bg-white"
+          >
+            <TableScrollArrows targetRef={tableRef} />
             <table className="w-full min-w-[860px] text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">

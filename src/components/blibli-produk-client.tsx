@@ -6,6 +6,7 @@
 // akhir bisa dilihat beberapa menit setelah request sukses.
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Search, SlidersHorizontal, X } from "lucide-react";
+import TableScrollArrows from "@/components/table-scroll-arrows";
 
 type ProductRow = {
   product: {
@@ -100,6 +101,8 @@ export default function BlibliProdukClient() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Wadah tabel utama — digulirkan ke kiri/kanan lewat TableScrollArrows.
+  const tableRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async (state: string, query: string, p: number) => {
     setLoading(true);
@@ -316,7 +319,11 @@ export default function BlibliProdukClient() {
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+          <div
+            ref={tableRef}
+            className="overflow-x-auto rounded-xl border border-slate-200 bg-white"
+          >
+            <TableScrollArrows targetRef={tableRef} />
             <table className="w-full min-w-[860px] text-left text-sm">
               <thead>
                 <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">

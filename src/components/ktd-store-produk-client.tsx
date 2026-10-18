@@ -4,8 +4,9 @@
 // toko, modal, dan profit per produk. Data disiapkan server-side; komponen
 // ini hanya menyaring & merender.
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Search, SlidersHorizontal } from "lucide-react";
+import TableScrollArrows from "@/components/table-scroll-arrows";
 
 export type BarisProdukToko = {
   id: string;
@@ -32,6 +33,8 @@ export default function KtdStoreProdukClient({
   generatedAt: string;
 }) {
   const [q, setQ] = useState("");
+  // Wadah tabel utama — digulirkan ke kiri/kanan lewat TableScrollArrows.
+  const tableRef = useRef<HTMLDivElement>(null);
   const tersaring = useMemo(() => {
     const kueri = q.trim().toLowerCase();
     if (!kueri) return rows;
@@ -83,7 +86,11 @@ export default function KtdStoreProdukClient({
         </Link>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <div
+        ref={tableRef}
+        className="overflow-x-auto rounded-xl border border-slate-200 bg-white"
+      >
+        <TableScrollArrows targetRef={tableRef} />
         <table className="w-full min-w-[860px] text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">

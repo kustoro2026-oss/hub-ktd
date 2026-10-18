@@ -4,9 +4,10 @@
 // hasil sweep listing + detail). Kolom: nama, id, harga beli, rekomendasi
 // jual, profit, stok, varian, lokasi, pengiriman. Baris bisa dibuka untuk
 // melihat rincian varian (warna/ukuran/stok) + alamat seller + ekspedisi.
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import { ChevronDown, ChevronRight, Search } from "lucide-react";
 import type { AnekaMasterProduct } from "@/lib/aneka-master";
+import TableScrollArrows from "@/components/table-scroll-arrows";
 
 function fmtRp(n: number): string {
   return "Rp " + Math.round(n).toLocaleString("id-ID");
@@ -34,6 +35,8 @@ export default function AnekaProdukClient({
   };
 }) {
   const [q, setQ] = useState("");
+  // Wadah tabel utama — digulirkan ke kiri/kanan lewat TableScrollArrows.
+  const tableRef = useRef<HTMLDivElement>(null);
   const [kategori, setKategori] = useState("semua");
   const [stokFilter, setStokFilter] = useState<StokFilter>("semua");
   const [sortKey, setSortKey] = useState<SortKey>("profit");
@@ -150,7 +153,11 @@ export default function AnekaProdukClient({
         </select>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+      <div
+        ref={tableRef}
+        className="overflow-x-auto rounded-xl border border-slate-200 bg-white"
+      >
+        <TableScrollArrows targetRef={tableRef} />
         <table className="w-full min-w-[980px] text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">
