@@ -153,11 +153,11 @@ export default function AnekaProdukClient({
         </select>
       </div>
 
+      <TableScrollArrows targetRef={tableRef} />
       <div
         ref={tableRef}
         className="overflow-x-auto rounded-xl border border-slate-200 bg-white"
       >
-        <TableScrollArrows targetRef={tableRef} />
         <table className="w-full min-w-[980px] text-left text-sm">
           <thead>
             <tr className="border-b border-slate-200 text-xs uppercase tracking-wide text-slate-500">

@@ -54,10 +54,12 @@ export default function TableScrollArrows({
     "rounded-md border border-slate-300 bg-white p-1.5 text-slate-500 transition hover:bg-slate-100 hover:text-slate-800 disabled:cursor-default disabled:opacity-35";
 
   return (
-    // sticky left-0: saat tabel digeser ke kanan, bilah ini tetap menempel
-    // di tepi kiri area tabel yang terlihat (lebar bilah = lebar area
-    // terlihat, jadi tombol panah di ujung kanannya selalu tampak).
-    <div className="sticky left-0 z-10 flex items-center justify-end gap-1 border-b border-slate-200 bg-white px-3 py-1.5">
+    // Bilah ini diletakkan DI ATAS wadah gulir tabel. md:sticky md:top-0
+    // membuatnya menempel di tepi atas layar saat halaman digulir ke bawah —
+    // jadi navigasi geser tetap terlihat selama tabel masih di layar, tidak
+    // hilang saat scroll vertikal ke tengah daftar. Di mobile tidak menempel
+    // agar tidak bertabrakan dengan bar navigasi atas.
+    <div className="md:sticky md:top-0 z-10 mb-2 flex items-center justify-end gap-1 rounded-xl border border-slate-200 bg-white px-3 py-1.5 shadow-sm">
       <button
         type="button"
         onClick={() => scrollPage(-1)}
