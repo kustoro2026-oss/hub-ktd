@@ -37,6 +37,7 @@ import {
 import {
   cancelAnekaExec,
   checkAnekaExecutable,
+  notifSiapEksekusiTikTok,
   prepareAnekaExec,
   type AnekaExecPayload,
 } from "@/lib/aneka-exec";
@@ -251,7 +252,7 @@ async function isiLabelEksekusi(
   }
 
   const official = await getOfficialResiForCred(cred, orderId);
-  const stempel = `[${Date.now()}] | isi-label | ${
+  let stempel = `[${Date.now()}] | isi-label | ${
     official.ok ? "ok" : `gagal: ${official.detail}`
   }`;
   if (official.ok) {
@@ -262,6 +263,13 @@ async function isiLabelEksekusi(
       status: "menunggu",
       payload: JSON.stringify(payload),
     });
+    // Label baru terisi — kirim ulang notif Setuju dengan format lengkap
+    // (termasuk nomor resi) supaya pesan terbaru sama seperti pesanan yang
+    // labelnya tersedia sejak persiapan.
+    const notice = await sendOwnerNotice(notifSiapEksekusiTikTok(payload));
+    stempel += ` | notif ulang: ${
+      notice.startsWith("ok") ? "ok" : `GAGAL — ${notice}`
+    }`;
   }
   await appendTiktokOrderExecLog(orderId, stempel);
 }

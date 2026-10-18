@@ -190,6 +190,19 @@ export async function checkAnekaExecutable(
   return { ok: true, items: mergeExecItems(items) };
 }
 
+/** Teks notif WA "siap dieksekusi" — dibangun dari payload antrean
+ *  (sumber tunggal) supaya kiriman ulang setelah label terisi (isi-label)
+ *  sama persis dengan notif persiapan. */
+export function notifSiapEksekusiTikTok(payload: AnekaExecPayload): string {
+  const baris = payload.items
+    .map((it) => `- ${it.qty}x ${it.product_name} (${fmtRp(it.subtotal)})`)
+    .join("\n");
+  const resi = payload.tracking_number
+    ? ` No resi ${payload.tracking_number}.`
+    : " Label resi belum tersedia — akan diisi otomatis sebelum pembayaran.";
+  return `Pesanan TikTok ${payload.order_id} siap dieksekusi ke Aneka (${payload.shop_name}).\n${baris}\nTotal modal ${fmtRp(payload.total_modal)}.${resi}\nSetuju/batalkan: ${EKSEKUSI_URL}?order=${payload.order_id}`;
+}
+
 /** PERSIAPAN: simpan label resmi + rincian produk sebagai antrean eksekusi
  *  "menunggu" dan kirim notif WA berisi tautan Setuju. Idempoten — bila
  *  barisnya sudah menunggu, tidak menyimpan/kirim ulang (kecuali
@@ -234,12 +247,7 @@ export async function prepareAnekaExec(
     executed_at: "",
   });
 
-  const baris = check.items
-    .map((it) => `- ${it.qty}x ${it.product_name} (${fmtRp(it.subtotal)})`)
-    .join("\n");
-  const notice = await sendExecNotice(
-    `Pesanan TikTok ${order.order_id} siap dieksekusi ke Aneka (${shop.shop_name}).\n${baris}\nTotal modal ${fmtRp(total)}.${official ? ` No resi ${official.tracking_number}.` : " Label resi belum tersedia — akan diisi otomatis sebelum pembayaran."}\nSetuju/batalkan: ${EKSEKUSI_URL}?order=${order.order_id}`,
-  );
+  const notice = await sendExecNotice(notifSiapEksekusiTikTok(payload));
   if (!notice.startsWith("ok")) {
     return { ok: false, detail: `Tersimpan, tetapi notif WA gagal: ${notice}` };
   }
