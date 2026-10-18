@@ -5,8 +5,9 @@
 //     nomor resi penjual "KT<order_id>" → unduh label resmi) lalu PDF
 //     dikirim ke WhatsApp pemilik toko.
 //  b. SEMUA item terpetakan ke Aneka → antrean eksekusi "menunggu"
-//     disiapkan (pemenuhan Lazada DITUNDA sampai tombol Setuju — status
-//     pesanan tidak berubah sebelum pemilik menyetujui).
+//     disiapkan + AUTOPACK (pack → rts otomatis supaya status Seller Center
+//     berubah tanpa menunggu Setuju, pola Blibli) — rantai checkout Aneka
+//     tetap menunggu tombol Setuju.
 //
 // Alur pengecekan:
 //  1. Tarik pesanan terbaru (7 hari) lewat /orders/get dan bandingkan per
@@ -42,11 +43,14 @@ import {
   updateLazadaOrderExecPayload,
 } from "@/lib/db";
 import {
+  autoPackLazadaOrder,
   buatResiFallback,
   cancelLazadaExec,
   checkLazadaExecutable,
   lazadaTrackingNumber,
+  notifSiapEksekusiLazada,
   prepareLazadaExec,
+  sendExecNotice,
   type LazadaExecPayload,
   type LazadaExecSourceItem,
 } from "@/lib/lazada-exec";
@@ -903,6 +907,8 @@ async function runCheckNewLazadaOrders(): Promise<LazadaResiCheckResult> {
       );
 
       if (execCheck.ok) {
+        // Persiapan antrean SENYAP dulu — notif "siap dieksekusi" dikirim
+        // SETELAH autopack supaya nomor resi yang tercantum sudah resi asli.
         const prep = await prepareLazadaExec(
           {
             order_id: orderId,
@@ -914,22 +920,90 @@ async function runCheckNewLazadaOrders(): Promise<LazadaResiCheckResult> {
           },
           // Percobaan ulang setelah kegagalan: antrean "menunggu" mungkin
           // sudah tersimpan tetapi notif WA-nya gagal — kirim ulang.
-          { resendNotice: prev.notify.startsWith("gagal") },
+          { resendNotice: prev.notify.startsWith("gagal"), silent: true },
         );
-        if (prep.ok) {
-          for (const x of items) {
-            await markSeen(x.order_item_id, orderId, "eksekusi:menunggu");
-          }
-          sent.push(
-            `${LAZADA_STORE_NAME} ${orderId} → menunggu persetujuan Aneka`,
-          );
-        } else {
+        if (!prep.ok) {
           errors.push(`${LAZADA_STORE_NAME}: ${orderId}: ${prep.detail}`);
           await recordLazadaOrderFailure(
             itemId,
             orderId,
             storeCode,
             `gagal: ${prep.detail}`,
+          );
+          continue;
+        }
+        for (const x of items) {
+          await markSeen(x.order_item_id, orderId, "eksekusi:menunggu");
+        }
+
+        // AUTOPACK: kemas + rts otomatis sekarang juga — status pesanan di
+        // Seller Center berubah tanpa menunggu klik Setuju (sama seperti
+        // Blibli). Kegagalan TIDAK membatalkan antrean: pemenuhan diulang
+        // saat Setuju ditekan.
+        let catatanPack = "";
+        try {
+          const auto = await autoPackLazadaOrder(orderId);
+          if (auto.ok) {
+            catatanPack = auto.tracking
+              ? `Paket otomatis dikemas & siap kirim (resi ${auto.tracking}) — status Lazada sudah berubah, tinggal klik Setuju untuk checkout Aneka.`
+              : "Paket otomatis dikemas & siap kirim — tinggal klik Setuju untuk checkout Aneka.";
+            sent.push(
+              `${LAZADA_STORE_NAME} ${orderId} → otomatis dikemas (${auto.detail})`,
+            );
+          } else {
+            catatanPack =
+              "Paket belum bisa dikemas otomatis — pemenuhan dijalankan saat tombol Setuju ditekan.";
+            errors.push(
+              `${LAZADA_STORE_NAME}: ${orderId}: autopack: ${auto.detail}`,
+            );
+          }
+        } catch (e) {
+          catatanPack =
+            "Paket belum bisa dikemas otomatis — pemenuhan dijalankan saat tombol Setuju ditekan.";
+          errors.push(
+            `${LAZADA_STORE_NAME}: ${orderId}: autopack error: ${e instanceof Error ? e.message : "tidak dikenal"}`,
+          );
+        }
+
+        // Payload TERBARU (resi/label hasil autopack) untuk teks notif.
+        const rowExec = await getLazadaOrderExec(orderId);
+        let payloadFinal: LazadaExecPayload | null = null;
+        if (rowExec) {
+          try {
+            payloadFinal = JSON.parse(rowExec.payload) as LazadaExecPayload;
+          } catch {
+            payloadFinal = null;
+          }
+        }
+        if (!payloadFinal) {
+          payloadFinal = {
+            order_id: orderId,
+            order_item_ids: items.map((x) => x.order_item_id),
+            store_name: LAZADA_STORE_NAME,
+            customer_name: customerName,
+            alamat_pembeli: customerAddress,
+            tracking_number: lazadaTrackingNumber(orderId),
+            label_pdf_base64: "",
+            items: execCheck.items,
+            total_modal: execCheck.items.reduce((s, it) => s + it.subtotal, 0),
+          };
+        }
+        const notice = await sendExecNotice(
+          notifSiapEksekusiLazada(payloadFinal, catatanPack),
+        );
+        if (!notice.startsWith("ok")) {
+          errors.push(
+            `${LAZADA_STORE_NAME}: ${orderId}: notif siap eksekusi gagal: ${notice}`,
+          );
+          await recordLazadaOrderFailure(
+            itemId,
+            orderId,
+            storeCode,
+            `gagal: notif WA gagal: ${notice}`,
+          );
+        } else {
+          sent.push(
+            `${LAZADA_STORE_NAME} ${orderId} → menunggu persetujuan Aneka`,
           );
         }
         continue;

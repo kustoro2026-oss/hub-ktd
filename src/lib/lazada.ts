@@ -736,6 +736,7 @@ export async function getLazadaLabelPdf(
 export async function fulfillLazadaOrderForItems(
   orderItemIds: string[],
   orderId: string,
+  opts: { quick?: boolean } = {},
 ): Promise<
   | { ok: true; pdf: Buffer; pageCount: number; trackingNumber: string; packageId?: string }
   | {
@@ -796,6 +797,18 @@ export async function fulfillLazadaOrderForItems(
     }
   } catch {
     // Biarkan — nomor resi penjual tetap sah sebagai cadangan.
+  }
+  // Mode kilat (autopack saat deteksi): berhenti setelah pack + rts —
+  // label resmi diurus pemanggil lewat PrintAWB/resi cadangan supaya ronde
+  // deteksi tidak menunggu perburuan dokumen yang lama.
+  if (opts.quick) {
+    return {
+      ok: false,
+      detail: "",
+      rtsDone: true,
+      trackingNumber: trackingFinal,
+      packageId: packageId || undefined,
+    };
   }
   const doc = await getLazadaLabelPdf(orderItemIds);
   if (!doc.ok) {

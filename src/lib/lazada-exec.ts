@@ -3,13 +3,16 @@
 //
 //  1. PERSIAPAN (murah, saat pesanan baru terdeteksi setelah masa tunggu):
 //     cek semua item pesanan sudah dipetakan ke Aneka → simpan rincian
-//     produk ke tabel lazada_order_exec (status "menunggu") → kirim notif
-//     WA "Setuju" berisi tautan halaman Eksekusi.
+//     produk ke tabel lazada_order_exec (status "menunggu") → autopack
+//     (kemas + rts otomatis supaya status Seller Center berubah tanpa
+//     menunggu Setuju, pola Blibli) → kirim notif WA "Setuju" berisi
+//     tautan halaman Eksekusi.
 //  2. PERSETUJUAN (tombol Setuju di halaman Eksekusi, dipicu pemilik toko):
-//     baru DI SINI rantai Aneka dijalankan penuh — pemenuhan Lazada
-//     (pack → rts → label) lalu login → payment/create → variant/save →
-//     token checkout → pembayaran/process (bayar saldo) → verifikasi lewat
-//     payment_id dari riwayat — lalu kabari WA.
+//     rantai Aneka dijalankan penuh — login → payment/create → variant/save
+//     → token checkout → pembayaran/process (bayar saldo) → verifikasi lewat
+//     payment_id dari riwayat — lalu kabari WA. Pemenuhan Lazada (pack →
+//     rts → label) sudah dijalankan saat autopack; bila belum (autopack
+//     gagal), dijalankan di sini sebelum membayar.
 //
 // Rantai Aneka TIDAK dijalankan saat persiapan supaya tidak menumpuk
 // pembayaran mangkrak di akun Aneka bila pemilik tidak menyetujui.
@@ -17,8 +20,9 @@
 // Perbedaan dengan Blibli: kunci antrean = order_id (satu pesanan = satu
 // paket = satu slot resi Aneka); kunci pemetaan = SellerSku (tingkat
 // produk); petunjuk varian = variation dari order item. Pemenuhan Lazada
-// DITUNDA sampai eksekusi (status pesanan tidak berubah sebelum Setuju);
-// nomor resi dibuat penjual (KT + order_id).
+// (pack + rts) berjalan OTOMATIS saat deteksi setelah masa tunggu 15 menit
+// (autopack); nomor resi awal penjual (KT + order_id) diganti nomor resi
+// asli kurir terintegrasi bila ada.
 import { findAnekaCatalogById } from "@/lib/aneka-map";
 import {
   anekaCheckoutToken,
@@ -40,6 +44,7 @@ import {
   getLazadaProductMap,
   saveLazadaOrderExec,
   setLazadaOrderExecPayment,
+  updateLazadaOrderExecPayload,
 } from "@/lib/db";
 import {
   fulfillLazadaOrderForItems,
@@ -98,11 +103,14 @@ export type LazadaExecPayload = {
   alamat_pembeli?: string;
   tracking_number: string;
   /** Kosong saat persiapan — diisi label PDF hasil pemenuhan (pack → rts →
-   *  document) pada saat eksekusi. */
+   *  document) pada saat autopack atau eksekusi. */
   label_pdf_base64: string;
   /** package_id paket Lazada (hasil /order/pack) — bahan PrintAWB untuk
    *  cetak AWB resmi lewat Open Platform. */
   package_id?: string;
+  /** true bila pack + rts SUDAH berhasil (autopack saat deteksi) — eksekusi
+   *  tidak mengulang pemenuhan, cukup mengurus label. */
+  fulfilled?: boolean;
   items: LazadaExecItem[];
   total_modal: number;
 };
@@ -120,7 +128,7 @@ function fmtRp(n: number): string {
 
 /** Kirim notifikasi teks ke WA admin: teks bebas (window 24 jam) → template
  *  teks cadangan (bebas window, menunggu review Meta). */
-async function sendExecNotice(msg: string): Promise<string> {
+export async function sendExecNotice(msg: string): Promise<string> {
   const owner = ownerNumber();
   if (!owner) return "gagal: OWNER_WA_NUMBER belum diatur";
   const free = await sendText(owner, msg);
@@ -325,6 +333,25 @@ export async function buatResiFallback(
  *  Idempoten — bila barisnya sudah menunggu, tidak menyimpan/kirim ulang
  *  (kecuali opts.resendNotice = true, dipakai ketika notif WA percobaan
  *  sebelumnya gagal terkirim). */
+/** Teks notif "siap dieksekusi" — dibangun dari payload supaya nomor resi
+ *  yang tercantum selalu yang TERBARU (setelah autopack, resi asli kurir
+ *  menggantikan nomor KT...). catatan dipakai untuk baris informasi
+ *  tambahan (mis. status autopack). */
+export function notifSiapEksekusiLazada(
+  payload: LazadaExecPayload,
+  catatan?: string,
+): string {
+  const baris = payload.items
+    .map(
+      (it) =>
+        `- ${it.qty}x ${it.item_name}${it.variant_name ? ` (${it.variant_name})` : ""} (${fmtRp(it.subtotal)})`,
+    )
+    .join("\n");
+  const total = payload.items.reduce((s, it) => s + it.subtotal, 0);
+  const extra = catatan ? `\n${catatan}` : "";
+  return `Pesanan Lazada ${payload.order_id} siap dieksekusi ke Aneka (${payload.store_name}).\n${baris}\nTotal modal ${fmtRp(total)}. No resi ${payload.tracking_number}.${extra}\nSetuju/batalkan: ${EKSEKUSI_URL}?order=${payload.order_id}`;
+}
+
 export async function prepareLazadaExec(
   pkg: {
     order_id: string;
@@ -334,7 +361,7 @@ export async function prepareLazadaExec(
     customer_address?: string;
     items: LazadaExecSourceItem[];
   },
-  opts: { resendNotice?: boolean } = {},
+  opts: { resendNotice?: boolean; silent?: boolean } = {},
 ): Promise<{ ok: boolean; detail: string }> {
   const existing = await getLazadaOrderExec(pkg.order_id);
   if (existing?.status === "menunggu" && !opts.resendNotice) {
@@ -391,19 +418,116 @@ export async function prepareLazadaExec(
     executed_at: "",
   });
 
-  const baris = check.items
-    .map(
-      (it) =>
-        `- ${it.qty}x ${it.item_name}${it.variant_name ? ` (${it.variant_name})` : ""} (${fmtRp(it.subtotal)})`,
-    )
-    .join("\n");
-  const notice = await sendExecNotice(
-    `Pesanan Lazada ${pkg.order_id} siap dieksekusi ke Aneka (${pkg.store_name}).\n${baris}\nTotal modal ${fmtRp(total)}. No resi ${payload.tracking_number}.\nSetuju/batalkan: ${EKSEKUSI_URL}?order=${pkg.order_id}`,
-  );
+  // Senyap = notif dikirim pemanggil SETELAH autopack (supaya nomor resi
+  // yang tercantum sudah resi asli, bukan KT... yang mungkin berubah).
+  const notice = opts.silent
+    ? "ok"
+    : await sendExecNotice(notifSiapEksekusiLazada(payload));
   if (!notice.startsWith("ok")) {
     return { ok: false, detail: `Tersimpan, tetapi notif WA gagal: ${notice}` };
   }
   return { ok: true, detail: "Menunggu persetujuan" };
+}
+
+/** Kemas otomatis (pack → rts → label) saat deteksi — supaya status
+ *  pesanan di Seller Center berubah TANPA menunggu tombol Setuju (pola
+ *  Blibli). Dipanggil persis setelah masa tunggu 15 menit berakhir, saat
+ *  antrean "menunggu" disiapkan. Label diusahakan lewat AWB resmi
+ *  (PrintAWB), kalau tidak ada resi PDF cadangan — hasilnya dicache ke
+ *  payload antrean (fulfilled=true) sehingga eksekusi nanti tidak
+ *  mengulang pemenuhan. Bila pack/rts gagal total, antrean tetap
+ *  "menunggu" dan pemenuhan diulang saat Setuju. */
+export async function autoPackLazadaOrder(
+  orderId: string,
+): Promise<{ ok: boolean; detail: string; tracking?: string }> {
+  const row = await getLazadaOrderExec(orderId);
+  if (!row) return { ok: false, detail: "Antrean eksekusi tidak ditemukan" };
+  if (row.status !== "menunggu") {
+    return { ok: false, detail: `Status antrean ${row.status} — autopack dilewati` };
+  }
+  let payload: LazadaExecPayload;
+  try {
+    payload = JSON.parse(row.payload) as LazadaExecPayload;
+  } catch {
+    return { ok: false, detail: "Payload eksekusi rusak" };
+  }
+  // Sudah ada label valid = pemenuhan sudah pernah berhasil — jangan
+  // memanggil API pemenuhan lagi.
+  if (payload.label_pdf_base64) {
+    const lama = Buffer.from(payload.label_pdf_base64, "base64");
+    if (lama.length >= 5 && lama.subarray(0, 5).toString("latin1") === "%PDF-") {
+      return {
+        ok: true,
+        detail: "Label sudah tersimpan (pemenuhan selesai sebelumnya)",
+        tracking: payload.tracking_number,
+      };
+    }
+  }
+  const fulf = await fulfillLazadaOrderForItems(
+    payload.order_item_ids,
+    orderId,
+    { quick: true },
+  );
+  if (!fulf.ok && !fulf.rtsDone) {
+    await appendLazadaOrderExecLog(
+      orderId,
+      `${new Date().toISOString().slice(0, 19).replace("T", " ")} | autopack | GAGAL — ${fulf.detail}`,
+    );
+    return { ok: false, detail: fulf.detail };
+  }
+  const tracking = fulf.trackingNumber ?? payload.tracking_number;
+  const packageId =
+    fulf.packageId ??
+    payload.package_id ??
+    (await (async () => {
+      const its = await getLazadaOrderItems(orderId).catch(() => null);
+      if (!its || !its.ok) return "";
+      return (
+        its.data
+          .map((i) => (i.package_id ?? "").trim())
+          .find((x) => x !== "") ?? ""
+      );
+    })());
+  // Label: AWB resmi Open Platform → resi PDF cadangan (nomor resi tetap
+  // asli dari kurir, hanya dokumennya tiruan bila AWB tidak tersedia).
+  let label: Buffer | null = null;
+  let sumber = "";
+  if (packageId) {
+    const awb = await printLazadaAwbPdf(packageId);
+    if (awb.ok) {
+      label = awb.data;
+      sumber = `AWB resmi PrintAWB (package ${packageId})`;
+    }
+  }
+  if (!label) {
+    const fb = await buatResiFallback({
+      ...payload,
+      tracking_number: tracking,
+    }).catch(() => null);
+    if (fb) {
+      label = fb;
+      sumber = "resi PDF cadangan";
+    }
+  }
+  payload = {
+    ...payload,
+    tracking_number: tracking,
+    label_pdf_base64: label
+      ? label.toString("base64")
+      : payload.label_pdf_base64,
+    ...(packageId ? { package_id: packageId } : {}),
+    fulfilled: true,
+  };
+  await updateLazadaOrderExecPayload(orderId, JSON.stringify(payload));
+  await appendLazadaOrderExecLog(
+    orderId,
+    `${new Date().toISOString().slice(0, 19).replace("T", " ")} | autopack | berhasil — pack + rts (resi ${tracking}, ${label ? sumber : "tanpa label — diurus saat eksekusi"})`,
+  );
+  return {
+    ok: true,
+    detail: label ? sumber : "pack + rts berhasil, label diurus saat eksekusi",
+    tracking,
+  };
 }
 
 /** Batal (dari tombol Batalkan atau deteksi pesanan dibatalkan pembeli). */
@@ -906,10 +1030,21 @@ export async function executeLazadaOrder(
         : null;
   }
   if (!pdfBuffer) {
-    const fulf = await fulfillLazadaOrderForItems(
-      payload.order_item_ids,
-      payload.order_id,
-    );
+    // Bila autopack saat deteksi SUDAH menyelesaikan pack + rts, jangan
+    // memanggil API pemenuhan lagi (rts ulang bisa ditolak) — langsung
+    // urus label seperti jalur rtsDone.
+    const fulf = payload.fulfilled
+      ? ({
+          ok: false as const,
+          rtsDone: true as const,
+          trackingNumber: payload.tracking_number,
+          packageId: payload.package_id,
+          detail: "Pemenuhan sudah selesai saat autopack deteksi",
+        })
+      : await fulfillLazadaOrderForItems(
+          payload.order_item_ids,
+          payload.order_id,
+        );
     if (!fulf.ok) {
       // rts sudah berhasil (rtsDone) = pesanan siap kirim, hanya label
       // resmi yang tidak tersedia — pakai resi PDF buatan sendiri supaya
