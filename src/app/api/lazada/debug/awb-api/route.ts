@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 async function callRaw(
   apiPath: string,
   params: Record<string, string>,
-): Promise<{ code: string; message?: string; data?: unknown; raw?: string }> {
+): Promise<Record<string, unknown>> {
   const ctx = await getLazadaCtx();
   if (!ctx.ok) return { code: "ctx-gagal", message: ctx.detail };
   const signed: Record<string, string> = {
@@ -38,12 +38,7 @@ async function callRaw(
     const res = await fetch(url.toString(), { method: "GET", cache: "no-store" });
     const text = await res.text();
     try {
-      const j = JSON.parse(text) as Record<string, unknown>;
-      return {
-        code: String(j.code ?? ""),
-        message: String(j.message ?? ""),
-        data: j.data,
-      };
+      return JSON.parse(text) as Record<string, unknown>;
     } catch {
       return { code: "non-json", raw: text.slice(0, 300) };
     }
@@ -162,11 +157,20 @@ export async function GET(request: Request): Promise<Response> {
     ];
     for (const [nama, params] of varian) {
       const r = await callRaw("/order/package/document/get", params);
-      hasil["printawb_" + nama] = {
-        code: r.code,
-        message: r.message ?? "",
-        data: r.data === undefined ? undefined : r.data,
-      };
+      // Ringkas respons: kunci + cuplikan nilai (PDF base64 bisa sangat
+      // panjang — potong sampai 120 karakter per nilai).
+      const ringkas: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(r)) {
+        const s =
+          typeof v === "string"
+            ? v.slice(0, 120) + (v.length > 120 ? `…(+${v.length - 120})` : "")
+            : v;
+        ringkas[k] = s;
+      }
+      hasil["printawb_" + nama] = ringkas;
+      if (r.code === "0" && (r.data !== undefined || r.file !== undefined || r.pdf_url !== undefined)) {
+        hasil["printawb_" + nama + "_MENTAH_berisi_data"] = true;
+      }
       if (r.code === "0") break;
     }
   } else {
