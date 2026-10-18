@@ -130,6 +130,19 @@ async function sendExecNotice(msg: string): Promise<string> {
   return `gagal: ${free.error ?? "teks ditolak"} | template: ${tpl.error ?? "ditolak"}`;
 }
 
+/** Kirim notif WA dengan konfirmasi hasil: bila percobaan pertama gagal,
+ *  coba ulang sekali lagi setelah jeda singkat (kesalahan sesaat Meta —
+ *  lihat catatan di aneka-exec.ts). */
+async function sendExecNoticeTerkonfirmasi(msg: string): Promise<string> {
+  const pertama = await sendExecNotice(msg);
+  if (pertama.startsWith("ok")) return pertama;
+  await new Promise((r) => setTimeout(r, 1500));
+  const ulang = await sendExecNotice(msg);
+  return ulang.startsWith("ok")
+    ? `ok (coba-ulang: ${ulang})`
+    : `gagal (2x): ${pertama} | ${ulang}`;
+}
+
 /** Gabung baris kembar (SKU + varian sama) menjadi satu baris dengan qty
  *  dijumlah. Lazada menulis satu order item per UNIT yang dibeli — SKU yang
  *  sama muncul berulang untuk qty > 1 — dan /variant/save Aneka MENIMPA qty
@@ -648,8 +661,12 @@ async function pulihkanSelesai(
     orderId,
     `${nowUtc} | pemulihan | pembayaran sebelumnya terverifikasi — ${bukti.keterangan}`,
   );
-  await sendExecNotice(
+  const notif = await sendExecNoticeTerkonfirmasi(
     `Eksekusi Aneka BERHASIL untuk pesanan Lazada ${orderId} (dipulihkan dari percobaan sebelumnya).\n${bukti.keterangan}${bukti.paymentId ? `\nID pembayaran Aneka: ${bukti.paymentId}` : ""}${bukti.orderCode ? ` (kode pesanan: ${bukti.orderCode})` : ""}\nDetail: https://anekadropship.id/payment-history`,
+  );
+  await appendLazadaOrderExecLog(
+    orderId,
+    `${new Date().toISOString().slice(0, 19).replace("T", " ")} | notif | ${notif.startsWith("ok") ? `WA terkirim — ${notif}` : `WA GAGAL — ${notif}`}`,
   );
   return { ok: true, detail: `Dipulihkan — ${bukti.keterangan}` };
 }
@@ -1196,8 +1213,14 @@ export async function executeLazadaOrder(
     `status selesai — payment ${pay.paymentId}${anekaId ? ` (${anekaId})` : ""}`,
   );
 
-  await sendExecNotice(
+  // Notif BERHASIL diwajibkan sampai: hasil kirim dicek + dicoba ulang,
+  // dan hasilnya dicatat ke log supaya kegagalan WA tidak lagi senyap.
+  const notif = await sendExecNoticeTerkonfirmasi(
     `Eksekusi Aneka BERHASIL untuk pesanan Lazada ${orderId}.\nID pembayaran Aneka: ${pay.paymentId}${anekaId ? ` (kode pesanan: ${anekaId})` : ""}\nDetail: https://anekadropship.id/payment-history/finish?payment_id=${pay.paymentId}&status=success`,
+  );
+  await logStep(
+    "notif",
+    notif.startsWith("ok") ? `WA terkirim — ${notif}` : `WA GAGAL — ${notif}`,
   );
   return {
     ok: true,
