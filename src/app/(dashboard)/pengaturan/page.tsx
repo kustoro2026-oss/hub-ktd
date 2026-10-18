@@ -2,6 +2,7 @@
 import { AD_PRODUCT_MAP } from "@/lib/replies";
 import DisplayNameStatus from "@/components/display-name-status";
 import BlocklistCard from "@/components/blocklist-card";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pengaturan" };
@@ -58,12 +59,10 @@ export default function PengaturanPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Pengaturan</h1>
-        <p className="text-sm text-slate-500">
-          Status konfigurasi dan kredensial KTD Hub
-        </p>
-      </div>
+      <PageHeader
+        title="Pengaturan"
+        subtitle="Status konfigurasi dan kredensial KTD Hub"
+      />
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="mb-2 text-sm font-semibold text-slate-900">
@@ -108,90 +107,137 @@ export default function PengaturanPage() {
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-sm">
-        <h2 className="mb-2 font-semibold text-slate-900">Catatan penting</h2>
-        <ul className="list-disc space-y-1 pl-5 text-slate-600">
-          <li>
-            <strong>Database:</strong> SQLite lokal (data/ktd-hub.db) untuk
-            pengembangan; di Vercel otomatis memakai Postgres lewat
-            SUPABASE_DATABASE_URL (Supabase Postgres) karena filesystem
-            serverless bersifat sementara.
-          </li>
-          <li>
-            <strong>Webhook bot:</strong> Callback URL Meta App sudah diarahkan
-            ke <code>/api/wa/webhook</code> di domain Hub — log chat otomatis
-            masuk ke menu Pesan Masuk.
-          </li>
-          <li>
-            <strong>Kirim massal:</strong> wajib opt-in dan memakai template yang
-            disetujui (info_promo_v2). Batas kirim dihitung per portofolio bisnis:{" "}
-            <strong>250 nomor unik/24 jam</strong> untuk akun baru; setelah
-            verifikasi bisnis naik ke <strong>2.000</strong>, lalu bisa naik
-            otomatis bertahap (10.000 → 100.000 → tanpa batas) bila kualitas
-            pesan terjaga. Sebelum kirim massal, cek dulu nomor kontak di menu{" "}
-            <strong>Verifikasi</strong> agar kuota tidak terbuang ke nomor
-            yang tidak terdaftar WhatsApp.
-          </li>
-          <li>
-            <strong>Verifikasi WhatsApp:</strong> menu Verifikasi mengecek
-            nomor kontak lewat endpoint <code>contacts</code> Meta — gratis,
-            tidak memakai kuota pesan, dan tidak mengirim apa pun ke nomor
-            itu. Nomor dicek satu per satu dari browser; hasil disimpan di
-            kolom <code>contacts.wa_status</code> (valid / tidak valid /
-            gagal cek) dan tampil juga di halaman Kontak. Catatan: bila
-            endpoint itu ditolak Meta (hasil "Gagal cek"), nomor yang tidak
-            terdaftar tetap otomatis ditandai <strong>tidak valid</strong>
-            saat kirim massal menemukannya (error 131026 dari Meta — tidak
-            memakai kuota karena pesan tidak jadi terkirim).
-          </li>
-          <li>
-            <strong>Balasan otomatis:</strong> teks bebas gratis dalam window 24
-            jam sejak pesan terakhir pelanggan — tanpa template.
-          </li>
-          <li>
-            <strong>FAQ bot:</strong> pertanyaan umum pelanggan (cara pesan,
-            ongkir, COD, pembayaran, stok, pengiriman, resi, jam CS, retur,
-            reseller, cara pakai produk, varian, detail produk, minimal beli,
-            jangkauan kirim, kurir, ubah/batal pesanan, nota, rekomendasi,
-            testimoni, identitas bot "siapa ini", dll) dijawab otomatis sesuai
-            FAQ situs — jawaban dikelola di <code>src/lib/faq.ts</code>.
-            Pertanyaan lain yang tidak dikenali diarahkan ke CS.
-          </li>
-          <li>
-            <strong>Bukti transfer:</strong> pesanan ber-metode Transfer Bank
-            dibalas dengan permintaan bukti transfer (rekening Mandiri toko).
-            Setelah pelanggan mengirim foto/screenshot/teks bukti, bot
-            otomatis membalas konfirmasi pesanan. Pesanan COD langsung dapat
-            konfirmasi tanpa bukti.
-          </li>
-          <li>
-            <strong>Notifikasi pesanan:</strong> setiap pesan berisi data
-            pesanan (alamat lengkap) otomatis diteruskan ke nomor admin di{" "}
-            <code>OWNER_WA_NUMBER</code> (default nomor CS 6285171157938),
-            lengkap dengan tanggal dan jam WIB saat pesanan masuk.
-            Dikirim sebagai teks bebas; bila window 24 jam tidak terbuka,
-            otomatis memakai template utility <code>order_alert_ktd2</code>
-            yang bisa masuk kapan saja. Status tampil di riwayat chat (hijau =
-            terkirim, abu-abu = dilewati karena pengirim adalah nomor admin,
-            merah = gagal).
-          </li>
-          <li>
-            <strong>Jeda bot:</strong> setelah admin membalas manual, bot tidak
-            membalas otomatis ke nomor itu selama 30 menit (atur lewat{" "}
-            <code>BOT_HANDOVER_MINUTES</code>) — percakapan dianggap sedang
-            ditangani manusia, lalu bot aktif kembali bila tidak ada balasan
-            manual baru.
-          </li>
-          <li>
-            <strong>Anti-spam:</strong> nomor yang mengirim 8 pesan atau lebih
-            dalam 3 menit dianggap spam — bot berhenti membalas sementara
-            (pesan tetap dicatat, AI tidak dipanggil). Nomor yang diblokir
-            lewat tombol <strong>Blokir</strong> di halaman chat atau daftar
-            di atas tidak dibalas bot sama sekali. Pesanan selalu diproses
-            normal supaya orderan asli tidak terlewat. Catatan: Meta tidak
-            menyediakan fitur blokir nomor di Cloud API, jadi pembatasan
-            sepenuhnya diatur dari sisi Hub.
-          </li>
-        </ul>
+        <h2 className="mb-1 font-semibold text-slate-900">Catatan penting</h2>
+        <div className="divide-y divide-slate-100">
+          <details className="py-2">
+            <summary className="cursor-pointer select-none font-medium text-slate-700">
+              Database
+            </summary>
+            <p className="mt-1 pl-4 leading-relaxed text-slate-600">
+              SQLite lokal (data/ktd-hub.db) untuk pengembangan; di Vercel
+              otomatis memakai Postgres lewat SUPABASE_DATABASE_URL (Supabase
+              Postgres) karena filesystem serverless bersifat sementara.
+            </p>
+          </details>
+          <details className="py-2">
+            <summary className="cursor-pointer select-none font-medium text-slate-700">
+              Webhook bot
+            </summary>
+            <p className="mt-1 pl-4 leading-relaxed text-slate-600">
+              Callback URL Meta App sudah diarahkan ke{" "}
+              <code>/api/wa/webhook</code> di domain Hub — log chat otomatis
+              masuk ke menu Pesan Masuk.
+            </p>
+          </details>
+          <details className="py-2">
+            <summary className="cursor-pointer select-none font-medium text-slate-700">
+              Kirim massal
+            </summary>
+            <p className="mt-1 pl-4 leading-relaxed text-slate-600">
+              Wajib opt-in dan memakai template yang disetujui (info_promo_v2).
+              Batas kirim dihitung per portofolio bisnis:{" "}
+              <strong>250 nomor unik/24 jam</strong> untuk akun baru; setelah
+              verifikasi bisnis naik ke <strong>2.000</strong>, lalu bisa naik
+              otomatis bertahap (10.000 → 100.000 → tanpa batas) bila kualitas
+              pesan terjaga. Sebelum kirim massal, cek dulu nomor kontak di
+              menu <strong>Verifikasi</strong> agar kuota tidak terbuang ke
+              nomor yang tidak terdaftar WhatsApp.
+            </p>
+          </details>
+          <details className="py-2">
+            <summary className="cursor-pointer select-none font-medium text-slate-700">
+              Verifikasi WhatsApp
+            </summary>
+            <p className="mt-1 pl-4 leading-relaxed text-slate-600">
+              Menu Verifikasi mengecek nomor kontak lewat endpoint{" "}
+              <code>contacts</code> Meta — gratis, tidak memakai kuota pesan,
+              dan tidak mengirim apa pun ke nomor itu. Nomor dicek satu per
+              satu dari browser; hasil disimpan di kolom{" "}
+              <code>contacts.wa_status</code> (valid / tidak valid / gagal cek)
+              dan tampil juga di halaman Kontak. Catatan: bila endpoint itu
+              ditolak Meta (hasil &quot;Gagal cek&quot;), nomor yang tidak
+              terdaftar tetap otomatis ditandai <strong>tidak valid</strong>{" "}
+              saat kirim massal menemukannya (error 131026 dari Meta — tidak
+              memakai kuota karena pesan tidak jadi terkirim).
+            </p>
+          </details>
+          <details className="py-2">
+            <summary className="cursor-pointer select-none font-medium text-slate-700">
+              Balasan otomatis
+            </summary>
+            <p className="mt-1 pl-4 leading-relaxed text-slate-600">
+              Teks bebas gratis dalam window 24 jam sejak pesan terakhir
+              pelanggan — tanpa template.
+            </p>
+          </details>
+          <details className="py-2">
+            <summary className="cursor-pointer select-none font-medium text-slate-700">
+              FAQ bot
+            </summary>
+            <p className="mt-1 pl-4 leading-relaxed text-slate-600">
+              Pertanyaan umum pelanggan (cara pesan, ongkir, COD, pembayaran,
+              stok, pengiriman, resi, jam CS, retur, reseller, cara pakai
+              produk, varian, detail produk, minimal beli, jangkauan kirim,
+              kurir, ubah/batal pesanan, nota, rekomendasi, testimoni,
+              identitas bot &quot;siapa ini&quot;, dll) dijawab otomatis sesuai
+              FAQ situs — jawaban dikelola di <code>src/lib/faq.ts</code>.
+              Pertanyaan lain yang tidak dikenali diarahkan ke CS.
+            </p>
+          </details>
+          <details className="py-2">
+            <summary className="cursor-pointer select-none font-medium text-slate-700">
+              Bukti transfer
+            </summary>
+            <p className="mt-1 pl-4 leading-relaxed text-slate-600">
+              Pesanan ber-metode Transfer Bank dibalas dengan permintaan bukti
+              transfer (rekening Mandiri toko). Setelah pelanggan mengirim
+              foto/screenshot/teks bukti, bot otomatis membalas konfirmasi
+              pesanan. Pesanan COD langsung dapat konfirmasi tanpa bukti.
+            </p>
+          </details>
+          <details className="py-2">
+            <summary className="cursor-pointer select-none font-medium text-slate-700">
+              Notifikasi pesanan
+            </summary>
+            <p className="mt-1 pl-4 leading-relaxed text-slate-600">
+              Setiap pesan berisi data pesanan (alamat lengkap) otomatis
+              diteruskan ke nomor admin di <code>OWNER_WA_NUMBER</code>{" "}
+              (default nomor CS 6285171157938), lengkap dengan tanggal dan jam
+              WIB saat pesanan masuk. Dikirim sebagai teks bebas; bila window
+              24 jam tidak terbuka, otomatis memakai template utility{" "}
+              <code>order_alert_ktd2</code> yang bisa masuk kapan saja. Status
+              tampil di riwayat chat (hijau = terkirim, abu-abu = dilewati
+              karena pengirim adalah nomor admin, merah = gagal).
+            </p>
+          </details>
+          <details className="py-2">
+            <summary className="cursor-pointer select-none font-medium text-slate-700">
+              Jeda bot
+            </summary>
+            <p className="mt-1 pl-4 leading-relaxed text-slate-600">
+              Setelah admin membalas manual, bot tidak membalas otomatis ke
+              nomor itu selama 30 menit (atur lewat{" "}
+              <code>BOT_HANDOVER_MINUTES</code>) — percakapan dianggap sedang
+              ditangani manusia, lalu bot aktif kembali bila tidak ada balasan
+              manual baru.
+            </p>
+          </details>
+          <details className="py-2">
+            <summary className="cursor-pointer select-none font-medium text-slate-700">
+              Anti-spam
+            </summary>
+            <p className="mt-1 pl-4 leading-relaxed text-slate-600">
+              Nomor yang mengirim 8 pesan atau lebih dalam 3 menit dianggap
+              spam — bot berhenti membalas sementara (pesan tetap dicatat, AI
+              tidak dipanggil). Nomor yang diblokir lewat tombol{" "}
+              <strong>Blokir</strong> di halaman chat atau daftar di atas tidak
+              dibalas bot sama sekali. Pesanan selalu diproses normal supaya
+              orderan asli tidak terlewat. Catatan: Meta tidak menyediakan
+              fitur blokir nomor di Cloud API, jadi pembatasan sepenuhnya
+              diatur dari sisi Hub.
+            </p>
+          </details>
+        </div>
       </div>
     </div>
   );

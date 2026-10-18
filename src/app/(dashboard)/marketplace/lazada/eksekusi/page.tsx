@@ -6,6 +6,7 @@
 // Lazada.
 import LazadaExecClient, { type ExecRow } from "@/components/lazada-exec-client";
 import { listLazadaOrderExecs } from "@/lib/db";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Eksekusi Pesanan Aneka" };
@@ -107,23 +108,18 @@ export default async function EksekusiLazadaPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-          Marketplace · Lazada
-        </p>
-        <h1 className="text-xl font-bold text-slate-900">Eksekusi Pesanan</h1>
-        <p className="text-sm text-slate-500">
-          Pesanan terpetakan otomatis disiapkan di sini — tekan{" "}
-          <span className="font-medium">Setuju</span> untuk checkout Aneka
-          (bayar saldo + upload label), atau{" "}
-          <span className="font-medium">Batalkan</span> untuk proses manual.
-        </p>
-        {menunggu > 0 ? (
-          <p className="mt-2 inline-block rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
-            {menunggu} pesanan menunggu persetujuan
-          </p>
-        ) : null}
-      </div>
+      <PageHeader
+        eyebrow="Marketplace · Lazada"
+        title="Eksekusi Pesanan"
+        subtitle="Setujui untuk checkout Aneka otomatis, atau batalkan untuk proses manual"
+        actions={
+          menunggu > 0 ? (
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-medium text-amber-800">
+              {menunggu} menunggu persetujuan
+            </span>
+          ) : null
+        }
+      />
 
       {data.length === 0 ? (
         <div className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-500">

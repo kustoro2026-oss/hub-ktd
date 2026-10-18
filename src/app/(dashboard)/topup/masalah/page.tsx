@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { fmtRp, wibDariMs } from "@/lib/keuangan";
 import { ambilTopupMasalah, parseUtcMs } from "@/lib/topup";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Top Up · Log Masalah" };
@@ -15,16 +16,11 @@ export default async function TopupMasalahPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-          Top Up · Log Masalah
-        </p>
-        <h1 className="text-xl font-bold text-slate-900">Log Masalah</h1>
-        <p className="text-sm text-slate-500">
-          Dari {total} pesanan 7 hari terakhir, {jumlahMasalah} baris butuh
-          perhatian — dikelompokkan per jenis.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Top Up · Log Masalah"
+        title="Log Masalah"
+        subtitle={`${jumlahMasalah} dari ${total} pesanan 7 hari terakhir butuh perhatian`}
+      />
 
       {groups.length === 0 ? (
         <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-6 text-center text-sm text-emerald-900">

@@ -10,6 +10,7 @@ import {
 import TiktokOrdersClient from "@/components/tiktok-orders-client";
 import RefreshButton from "@/components/refresh-button";
 import ResiCheckButton from "@/components/resi-check-button";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pesanan TikTok Shop" };
@@ -92,21 +93,17 @@ export default async function PesananTikTokPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-            Marketplace · TikTok Shop
-          </p>
-          <h1 className="text-xl font-bold text-slate-900">Pesanan</h1>
-          <p className="text-sm text-slate-500">
-            Pesanan ditarik langsung dari API Seller — {rentang.label}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <RefreshButton />
-          <ResiCheckButton />
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Marketplace · TikTok Shop"
+        title="Pesanan"
+        subtitle={`Ditarik langsung dari API Seller — ${rentang.label}`}
+        actions={
+          <>
+            <RefreshButton />
+            <ResiCheckButton />
+          </>
+        }
+      />
 
       <form
         method="GET"
@@ -196,12 +193,7 @@ export default async function PesananTikTokPage({
 
       {results.length > 0 ? (
         <p className="text-xs text-slate-400">
-          Menampilkan maksimal 50 pesanan ({rentang.label}) per toko. Bila
-          butuh rentang tanggal lain, isi &quot;Dari&quot; dan
-          &quot;Sampai&quot; lalu tekan &quot;Terapkan&quot;. Tekan
-          &quot;Segarkan&quot; untuk menarik data ulang, atau &quot;Cek Pesanan
-          Baru&quot; untuk mengirim resi PDF otomatis ke WhatsApp
-          (085171157938) bila ada pesanan yang belum diproses.
+          Menampilkan maksimal 50 pesanan per toko ({rentang.label}).
         </p>
       ) : null}
     </div>

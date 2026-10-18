@@ -7,6 +7,7 @@ import {
   listMessages,
 } from "@/lib/db";
 import { Users, Send, MessageSquare, Megaphone } from "lucide-react";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 
@@ -57,23 +58,23 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Dasbor</h1>
-        <p className="text-sm text-slate-500">
-          Ringkasan aktivitas WhatsApp KTD Store
-        </p>
-      </div>
+      <PageHeader
+        title="Dasbor"
+        subtitle="Ringkasan aktivitas KTD Store"
+      />
 
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         {stats.map(({ label, value, Icon, href }) => (
           <Link
             key={label}
             href={href}
-            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-emerald-300"
+            className="group rounded-xl border border-slate-200 bg-white p-4 shadow-sm transition hover:border-emerald-300 hover:shadow"
           >
-            <Icon className="mb-2 h-5 w-5 text-emerald-600" />
+            <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 transition group-hover:bg-emerald-600 group-hover:text-white">
+              <Icon className="h-4.5 w-4.5" />
+            </div>
             <div className="text-2xl font-bold text-slate-900">{value}</div>
-            <div className="text-xs text-slate-500">{label}</div>
+            <div className="mt-0.5 truncate text-xs text-slate-500">{label}</div>
           </Link>
         ))}
       </div>
@@ -88,10 +89,7 @@ export default async function DashboardPage() {
           </Link>
         </div>
         {latest.length === 0 ? (
-          <p className="text-sm text-slate-500">
-            Belum ada pesan masuk. Chat pelanggan akan tampil di sini setelah
-            webhook KTD Hub diaktifkan.
-          </p>
+          <p className="text-sm text-slate-500">Belum ada pesan masuk.</p>
         ) : (
           <ul className="divide-y divide-slate-100">
             {latest.map((m) => (

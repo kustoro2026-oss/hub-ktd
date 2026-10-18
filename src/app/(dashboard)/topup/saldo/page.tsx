@@ -6,6 +6,7 @@ import Link from "next/link";
 import { fmtRp, wibDariMs } from "@/lib/keuangan";
 import { ambilTopupSaldoInfo, topupThreshold } from "@/lib/topup";
 import TopupSaldoCard from "@/components/topup-saldo-card";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Top Up · Saldo & Deposit" };
@@ -40,16 +41,11 @@ export default async function TopupSaldoPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-          Top Up · Saldo & Deposit
-        </p>
-        <h1 className="text-xl font-bold text-slate-900">Saldo &amp; Deposit</h1>
-        <p className="text-sm text-slate-500">
-          Saldo Digiflazz terkini, pengeluaran modal, dan perkiraan ketahanan
-          saldo sebelum deposit berikutnya.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Top Up · Saldo & Deposit"
+        title="Saldo & Deposit"
+        subtitle="Saldo Digiflazz, pengeluaran modal, dan perkiraan ketahanan saldo"
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <TopupSaldoCard threshold={threshold} rataHarian={info.rataHarian} />

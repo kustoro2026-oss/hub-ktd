@@ -13,6 +13,7 @@ import {
   startOfWibDayMs,
   utcStrFromMs,
 } from "@/lib/topup";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Top Up · Pesanan" };
@@ -142,16 +143,11 @@ export default async function TopupPesananPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-          Top Up · Pesanan
-        </p>
-        <h1 className="text-xl font-bold text-slate-900">Pesanan Top Up</h1>
-        <p className="text-sm text-slate-500">
-          {tanggalLabel(geMs)} – {tanggalLabel(ltMs - 1)} · {total} pesanan
-          ditemukan
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Top Up · Pesanan"
+        title="Pesanan Top Up"
+        subtitle={`${tanggalLabel(geMs)} – ${tanggalLabel(ltMs - 1)} · ${total} pesanan ditemukan`}
+      />
 
       <form
         method="GET"

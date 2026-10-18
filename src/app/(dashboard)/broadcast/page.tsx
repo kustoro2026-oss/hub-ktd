@@ -4,6 +4,7 @@ import { countContacts, listBroadcasts, listGroups } from "@/lib/db";
 import { toWib } from "@/lib/format";
 import BroadcastCreate from "@/components/broadcast-create";
 import SendLimitPanel from "@/components/send-limit-panel";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Broadcast" };
@@ -23,12 +24,10 @@ export default async function BroadcastPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Broadcast</h1>
-        <p className="text-sm text-slate-500">
-          Kirim pesan massal memakai template WhatsApp
-        </p>
-      </div>
+      <PageHeader
+        title="Broadcast"
+        subtitle="Kirim pesan massal via template WhatsApp"
+      />
 
       <SendLimitPanel />
 
@@ -39,8 +38,7 @@ export default async function BroadcastPage() {
         <BroadcastCreate contactCount={contactCount} groups={groups} />
         <p className="mt-3 text-xs text-slate-400">
           Hanya template berstatus <strong>Disetujui</strong> Meta yang bisa
-          dipilih. Sasaran bisa semua kontak atau satu grup — kirim berjalan
-          dari halaman detail kampanye.
+          dipilih.
         </p>
       </div>
 

@@ -4,6 +4,7 @@
 // dengan snapshot harga awal otomatis untuk reset.
 import HargaSyncClient from "@/components/harga-sync-client";
 import { anekaMasterMeta, listAnekaMaster } from "@/lib/aneka-master";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Sinkron Harga Aneka" };
@@ -22,20 +23,11 @@ export default async function SinkronHargaAnekaPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-          Marketplace · Aneka (Supplier)
-        </p>
-        <h1 className="text-xl font-bold text-slate-900">Sinkron Harga Master</h1>
-        <p className="text-sm text-slate-500">
-          Satu aksi mengubah harga jual di master Aneka → harga target yang
-          sama didorong ke semua kanal tempat produk dipetakan: TikTok Shop
-          (semua SKU), Blibli (semua varian), Lazada (SellerSku), dan KTD
-          Store (override situs toko). Harga target default = rekomendasi jual
-          Aneka dan bisa diubah per baris. Snapshot harga awal tersimpan
-          otomatis — Reset ada di halaman Harga Massal tiap kanal.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Marketplace · Aneka (Supplier)"
+        title="Sinkron Harga Master"
+        subtitle="Ubah harga di master Aneka → didorong ke semua kanal yang terpetakan"
+      />
       <HargaSyncClient rows={rows} meta={meta} />
     </div>
   );

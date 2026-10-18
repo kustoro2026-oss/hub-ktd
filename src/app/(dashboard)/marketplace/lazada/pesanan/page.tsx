@@ -11,6 +11,7 @@ import {
 import LazadaOrdersClient from "@/components/lazada-orders-client";
 import RefreshButton from "@/components/refresh-button";
 import LazadaResiCheckButton from "@/components/lazada-resi-check-button";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pesanan Lazada" };
@@ -110,21 +111,17 @@ export default async function PesananLazadaPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-            Marketplace · Lazada
-          </p>
-          <h1 className="text-xl font-bold text-slate-900">Pesanan</h1>
-          <p className="text-sm text-slate-500">
-            Pesanan ditarik langsung dari API Open Platform — {rentang.label}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <RefreshButton />
-          <LazadaResiCheckButton />
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Marketplace · Lazada"
+        title="Pesanan"
+        subtitle={`Ditarik langsung dari API Open Platform — ${rentang.label}`}
+        actions={
+          <>
+            <RefreshButton />
+            <LazadaResiCheckButton />
+          </>
+        }
+      />
 
       <form
         method="GET"

@@ -9,6 +9,7 @@ import ContactForm from "@/components/contact-form";
 import ImportForm from "@/components/import-form";
 import ContactsTable from "@/components/contacts-table";
 import GroupsManager from "@/components/groups-manager";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Kontak" };
@@ -35,12 +36,10 @@ export default async function KontakPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Kontak</h1>
-        <p className="text-sm text-slate-500">
-          Daftar penerima pesan broadcast WhatsApp
-        </p>
-      </div>
+      <PageHeader
+        title="Kontak"
+        subtitle="Penerima pesan broadcast WhatsApp"
+      />
 
       {/* Langkah 1 — grup */}
       <div className="space-y-3">
@@ -49,10 +48,8 @@ export default async function KontakPage() {
             <StepBadge n={1} /> Buat grup (opsional)
           </h2>
           <p className="text-xs text-slate-500">
-            Grup untuk mengelompokkan kontak — mis. &quot;Bisnis A&quot; atau
-            &quot;Pelanggan Herbal&quot;. Satu kontak boleh masuk beberapa grup.
-            Kalau tidak perlu dikelompokkan, lewati langkah ini; kontak tetap
-            tersimpan di daftar umum.
+            Kelompokkan kontak — mis. &quot;Bisnis A&quot; atau
+            &quot;Pelanggan Herbal&quot;. Lewati bila tidak perlu.
           </p>
         </div>
         <GroupsManager groups={groups} />
@@ -62,12 +59,11 @@ export default async function KontakPage() {
       <div className="space-y-3">
         <div>
           <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-            <StepBadge n={2} /> Tambah kontak — satuan atau massal
+            <StepBadge n={2} /> Tambah kontak
           </h2>
           <p className="text-xs text-slate-500">
-            Kedua cara bisa langsung memilih grup tujuan. Pilih &quot;Tanpa
-            grup&quot; untuk menyimpan di daftar umum — nanti tetap bisa
-            dikelompokkan lewat Langkah 3.
+            Satuan atau import massal — keduanya bisa langsung memilih grup
+            tujuan.
           </p>
         </div>
         <div className="grid gap-6 lg:grid-cols-2">
@@ -93,9 +89,7 @@ export default async function KontakPage() {
             <StepBadge n={3} /> Kelola daftar kontak ({contacts.length})
           </h2>
           <p className="text-xs text-slate-500">
-            Tandai satu atau beberapa kontak lalu pilih &quot;Masukkan ke
-            grup&quot; atau &quot;Hapus terpilih&quot;. Untuk satu kontak saja,
-            klik ikon tag di barisnya untuk mengubah keanggotaan grup.
+            Tandai kontak untuk dimasukkan ke grup atau dihapus sekaligus.
           </p>
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { listConversations } from "@/lib/db";
 import { formatWa, timeHM } from "@/lib/format";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pesan Masuk" };
@@ -19,18 +20,15 @@ export default async function PesanPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl font-bold text-slate-900">Pesan Masuk</h1>
-        <p className="text-sm text-slate-500">
-          Klik percakapan untuk membuka dan membalas chat pelanggan
-        </p>
-      </div>
+      <PageHeader
+        title="Pesan Masuk"
+        subtitle="Klik percakapan untuk membalas chat pelanggan"
+      />
 
       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
         {conversations.length === 0 ? (
           <p className="p-10 text-center text-sm text-slate-600">
-            Belum ada pesan masuk. Chat pelanggan yang masuk ke nomor WhatsApp
-            API (0821-7342-7249) otomatis muncul di sini.
+            Belum ada pesan masuk.
           </p>
         ) : (
           <ul>

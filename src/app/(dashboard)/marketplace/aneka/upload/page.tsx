@@ -11,6 +11,7 @@ import { kandidatUploadBlibli } from "@/lib/upload-blibli";
 import { kandidatUploadLazada } from "@/lib/upload-lazada";
 import { kandidatUploadTikTok } from "@/lib/upload-tiktok";
 import { listAnekaUploads } from "@/lib/db";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Upload Produk Baru" };
@@ -34,30 +35,24 @@ export default async function UploadAnekaPage({
 
   const kepala = (
     <>
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-          Marketplace · Aneka (Supplier)
-        </p>
-        <h1 className="text-xl font-bold text-slate-900">Upload Produk Baru</h1>
-        <p className="text-sm text-slate-500">
-          Kirim produk master Aneka yang belum ada di channel. Alur: pilih
-          produk → hub membangun file bulk-upload channel → unduh file →
-          upload manual di Seller Center. Gerbang aturan Tahap 5 otomatis:
-          produk berstatus blokir/review tidak dapat masuk file.
-        </p>
-      </div>
-      {/* Tab kanal */}
-      <div className="flex gap-2">
-        <Link href="/marketplace/aneka/upload?kanal=blibli" className={tabKelas("blibli")}>
-          Blibli
-        </Link>
-        <Link href="/marketplace/aneka/upload?kanal=lazada" className={tabKelas("lazada")}>
-          Lazada
-        </Link>
-        <Link href="/marketplace/aneka/upload?kanal=tiktok" className={tabKelas("tiktok")}>
-          TikTok
-        </Link>
-      </div>
+      <PageHeader
+        eyebrow="Marketplace · Aneka (Supplier)"
+        title="Upload Produk Baru"
+        subtitle="Pilih produk → hub membangun file bulk-upload → unduh & upload manual di Seller Center"
+        actions={
+          <div className="flex gap-2">
+            <Link href="/marketplace/aneka/upload?kanal=blibli" className={tabKelas("blibli")}>
+              Blibli
+            </Link>
+            <Link href="/marketplace/aneka/upload?kanal=lazada" className={tabKelas("lazada")}>
+              Lazada
+            </Link>
+            <Link href="/marketplace/aneka/upload?kanal=tiktok" className={tabKelas("tiktok")}>
+              TikTok
+            </Link>
+          </div>
+        }
+      />
     </>
   );
 

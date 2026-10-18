@@ -10,6 +10,7 @@ import {
 import BlibliOrdersClient from "@/components/blibli-orders-client";
 import RefreshButton from "@/components/refresh-button";
 import BlibliResiCheckButton from "@/components/blibli-resi-check-button";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pesanan Blibli" };
@@ -90,21 +91,17 @@ export default async function PesananBlibliPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-            Marketplace · Blibli
-          </p>
-          <h1 className="text-xl font-bold text-slate-900">Pesanan</h1>
-          <p className="text-sm text-slate-500">
-            Pesanan ditarik langsung dari API Seller — {rentang.label}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <RefreshButton />
-          <BlibliResiCheckButton />
-        </div>
-      </div>
+      <PageHeader
+        eyebrow="Marketplace · Blibli"
+        title="Pesanan"
+        subtitle={`Ditarik langsung dari API Seller — ${rentang.label}`}
+        actions={
+          <>
+            <RefreshButton />
+            <BlibliResiCheckButton />
+          </>
+        }
+      />
 
       <form
         method="GET"

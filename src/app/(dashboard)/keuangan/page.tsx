@@ -6,6 +6,7 @@
 // pengemasan Rp3.000). Komisi TikTok belum ikut (laba bersih menyusul).
 import { ambilDataKeuangan, fmtRp, wibDariMs } from "@/lib/keuangan";
 import KeuanganRefresh from "@/components/keuangan-refresh";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -188,20 +189,12 @@ export default async function KeuanganPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-            Keuangan · Laba Rugi
-          </p>
-          <h1 className="text-xl font-bold text-slate-900">
-            Dashboard Keuangan
-          </h1>
-          <p className="text-sm text-slate-500">
-            Omset TikTok + Blibli + Lazada − pembayaran Aneka = laba kotor · {rentang.label}
-          </p>
-        </div>
-        <KeuanganRefresh />
-      </div>
+      <PageHeader
+        eyebrow="Keuangan · Laba Rugi"
+        title="Keuangan"
+        subtitle={`Omset marketplace − pembayaran Aneka = laba kotor · ${rentang.label}`}
+        actions={<KeuanganRefresh />}
+      />
 
       <form
         method="GET"
@@ -667,18 +660,23 @@ export default async function KeuanganPage({
         </div>
       </section>
 
-      <p className="text-xs text-slate-400">
-        Laba kotor = omset − total bayar Aneka (sudah termasuk ongkos
-        pengemasan Rp3.000 per resi). Belum termasuk komisi TikTok (±8%
-        dinamis per kategori sejak 18 Mei 2026 + biaya transaksi) dan komisi
-        afiliasi. Order yang belum dibayar ke Aneka memakai laba
-        &quot;proyeksi&quot; berdasarkan harga modal katalog. Pembayaran
-        bertanda &quot;Manual&quot; dibuat langsung di situs Aneka (bukan
-        lewat KTD Hub) — tetap ikut dihitung sebagai biaya. Data Aneka
-        diperbarui otomatis maksimal setiap 15 menit saat halaman dibuka —
-        tekan &quot;Muat Ulang Data Aneka&quot; untuk memaksa pembaruan
-        sekarang.
-      </p>
+      <details className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+        <summary className="cursor-pointer select-none text-xs font-semibold text-slate-600">
+          Catatan perhitungan
+        </summary>
+        <p className="mt-2 text-xs leading-relaxed text-slate-500">
+          Laba kotor = omset − total bayar Aneka (sudah termasuk ongkos
+          pengemasan Rp3.000 per resi). Belum termasuk komisi TikTok (±8%
+          dinamis per kategori sejak 18 Mei 2026 + biaya transaksi) dan komisi
+          afiliasi. Order yang belum dibayar ke Aneka memakai laba
+          &quot;proyeksi&quot; berdasarkan harga modal katalog. Pembayaran
+          bertanda &quot;Manual&quot; dibuat langsung di situs Aneka (bukan
+          lewat KTD Hub) — tetap ikut dihitung sebagai biaya. Data Aneka
+          diperbarui otomatis maksimal setiap 15 menit saat halaman dibuka —
+          tekan &quot;Muat Ulang Data Aneka&quot; untuk memaksa pembaruan
+          sekarang.
+        </p>
+      </details>
     </div>
   );
 }

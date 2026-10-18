@@ -5,6 +5,7 @@
 import Link from "next/link";
 import { fmtRp } from "@/lib/keuangan";
 import { ambilTopupKatalog } from "@/lib/topup";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Top Up · Katalog & Margin" };
@@ -17,16 +18,11 @@ export default async function TopupKatalogPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-          Top Up · Katalog & Margin
-        </p>
-        <h1 className="text-xl font-bold text-slate-900">Katalog &amp; Margin</h1>
-        <p className="text-sm text-slate-500">
-          Agregat per SKU dari {list.length} SKU yang pernah dipesan — diurut
-          dari laba terbesar.
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Top Up · Katalog & Margin"
+        title="Katalog & Margin"
+        subtitle={`Agregat per SKU dari ${list.length} SKU yang pernah dipesan`}
+      />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="rounded-xl border border-slate-200 bg-white p-4">

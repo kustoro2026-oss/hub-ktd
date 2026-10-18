@@ -10,6 +10,7 @@ import {
   topupThreshold,
 } from "@/lib/topup";
 import TopupSaldoCard from "@/components/topup-saldo-card";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Top Up · Ringkasan" };
@@ -62,18 +63,11 @@ export default async function TopupRingkasanPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-          Top Up · Ringkasan
-        </p>
-        <h1 className="text-xl font-bold text-slate-900">
-          Dashboard Top Up &amp; Isi Saldo
-        </h1>
-        <p className="text-sm text-slate-500">
-          Pantau saldo Digiflazz, pesanan masuk, dan eksekusi transaksi — 7
-          hari terakhir (WIB).
-        </p>
-      </div>
+      <PageHeader
+        eyebrow="Top Up · Ringkasan"
+        title="Dashboard Top Up"
+        subtitle="Saldo, pesanan, dan eksekusi transaksi — 7 hari terakhir (WIB)"
+      />
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
         <TopupSaldoCard threshold={threshold} />

@@ -8,6 +8,7 @@ import KtdStoreProdukClient, {
 } from "@/components/ktd-store-produk-client";
 import { anekaCatalogGeneratedAt, listAnekaCatalog } from "@/lib/aneka-map";
 import { listKtdStoreHarga } from "@/lib/db";
+import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Produk KTD Store" };
@@ -43,35 +44,20 @@ export default async function ProdukKtdStorePage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">
-            Marketplace · KTD Store
-          </p>
-          <h1 className="text-xl font-bold text-slate-900">Produk</h1>
-          <p className="text-sm text-slate-500">
-            Katalog situs toko (toko.kustoro2026.com) dari snapshot Aneka —
-            harga toko mengikuti override bila ada, selain itu rekomendasi
-            jual Aneka. Ubah harga banyak produk lewat{" "}
-            <Link
-              href="/marketplace/ktd-store/produk/massal"
-              className="font-medium text-emerald-700 hover:underline"
-            >
-              Harga Massal
-            </Link>
-            .
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
+      <PageHeader
+        eyebrow="Marketplace · KTD Store"
+        title="Produk"
+        subtitle="Katalog toko.kustoro2026.com — harga mengikuti override bila ada"
+        actions={
           <Link
             href="/marketplace/ktd-store/produk/massal"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
           >
             <SlidersHorizontal className="h-4 w-4" />
             Atur Massal
           </Link>
-        </div>
-      </div>
+        }
+      />
       <KtdStoreProdukClient rows={rows} generatedAt={anekaCatalogGeneratedAt()} />
     </div>
   );
