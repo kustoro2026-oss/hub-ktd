@@ -23,6 +23,12 @@ import {
 /** Konteks toko siap pakai: cipher + access token valid. */
 export type AffiliateShopCtx = { cipher: string; access_token: string };
 
+/** Tidur singkat tanpa memblokir event loop (dipakai jeda antarpage supaya
+ *  tidak menabrak rate-limit app-group TikTok 36009002). */
+export function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function str(v: unknown): string {
   return String(v ?? "");
 }

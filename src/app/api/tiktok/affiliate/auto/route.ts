@@ -21,6 +21,7 @@ import {
   prepareAffiliateShop,
   searchMarketplaceCreators,
   sendTargetCollaborationInvites,
+  sleep,
   type AffiliateCreatorRow,
 } from "@/lib/tiktok-affiliate";
 import {
@@ -42,11 +43,6 @@ const AUTO = {
   CACHE_LIMIT: 300,
   MAX_INVITE_PER_RUN: 500,
 };
-
-/** Tidur singkat tanpa memblokir event loop. */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 type Candidate = { creatorOpenId: string; followerCount: number };
 
@@ -134,8 +130,8 @@ export async function POST(request: Request) {
   let pageToken = "";
   let searchKey = "";
   for (let p = 0; p < AUTO.SEARCH_PAGES; p += 1) {
-    // Jeda antarpage: timestamp detik baru + hindari rate-limit per detik.
-    if (p > 0) await sleep(1000);
+    // Jeda antarpage: batas rate TikTok dinamis per app-group (36009002).
+    if (p > 0) await sleep(2000);
     let res = await searchMarketplaceCreators(
       prep.ctx,
       filter,
@@ -145,8 +141,9 @@ export async function POST(request: Request) {
         pageSize: AUTO.SEARCH_PAGE_SIZE,
       },
     );
-    if (!res.ok && p > 0) {
-      await sleep(1500);
+    // Backoff bertahap bila kena rate-limit app-group sesaat.
+    for (let t = 0; !res.ok && p > 0 && t < 2; t += 1) {
+      await sleep(3000 + t * 3000);
       res = await searchMarketplaceCreators(
         prep.ctx,
         filter,

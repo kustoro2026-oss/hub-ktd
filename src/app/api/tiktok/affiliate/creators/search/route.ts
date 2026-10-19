@@ -4,9 +4,9 @@
 // page_token?, search_key?, page_size? (hanya 12 atau 20),
 // pages? (1-20, berapa halaman dipindai server-side per panggilan).
 // Hasil otomatis disimpan ke cache kandidat (kolam kreator untuk cron auto).
-// Antarpage diberi jeda 1 detik (timestamp signature + batas rate per detik
-// TikTok); halaman lanjutan yang gagal dicoba sekali lagi sebelum berhenti,
-// dan rinciannya dikembalikan lewat page_errors.
+// Antarpage diberi jeda 2 detik + backoff bertahap karena batas rate TikTok
+// bersifat dinamis per app-group (kode 36009002); halaman yang tetap gagal
+// dicatat di page_errors (klien bisa lanjut lewat Muat Lebih).
 //
 // Auth: sesi admin (isAuthed) ATAU CRON_SECRET (Bearer / x-cron-secret /
 // ?secret=) — pola sama dengan route afiliasi lainnya.
@@ -14,6 +14,7 @@ import { isAuthed } from "@/lib/auth";
 import {
   prepareAffiliateShop,
   searchMarketplaceCreators,
+  sleep,
   type AffiliateCreatorRow,
 } from "@/lib/tiktok-affiliate";
 import { upsertAffiliateCreatorCache } from "@/lib/db";
@@ -41,11 +42,6 @@ function numOf(v: unknown): number | undefined {
   if (v === null || v === undefined || v === "") return undefined;
   const n = Number(v);
   return Number.isFinite(n) ? n : undefined;
-}
-
-/** Tidur singkat tanpa memblokir event loop. */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function POST(request: Request) {
@@ -90,17 +86,17 @@ export async function POST(request: Request) {
   let nextPageToken = "";
   let searchKey = key ?? "";
   for (let p = 0; p < maxPages; p += 1) {
-    // Jeda antarpage: memastikan timestamp detik baru pada signature dan
-    // tidak menabrak batas rate per detik TikTok.
-    if (p > 0) await sleep(1000);
+    // Jeda antarpage: batas rate TikTok dinamis per app-group (36009002),
+    // jadi biarkan napas 2 detik antara panggilan marketplace.
+    if (p > 0) await sleep(2000);
     let res = await searchMarketplaceCreators(prep.ctx, filter, {
       pageToken: token,
       searchKey: key,
       pageSize,
     });
-    if (!res.ok && p > 0) {
-      // Kemungkinan rate-limit sesaat — coba sekali lagi.
-      await sleep(1500);
+    // Backoff bertahap bila kena rate-limit app-group sesaat.
+    for (let t = 0; !res.ok && p > 0 && t < 2; t += 1) {
+      await sleep(3000 + t * 3000);
       res = await searchMarketplaceCreators(prep.ctx, filter, {
         pageToken: token,
         searchKey: key,
