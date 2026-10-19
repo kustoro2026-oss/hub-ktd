@@ -128,8 +128,28 @@ function TabCari({ productIds }: { productIds: string[] }) {
   const [inviting, setInviting] = useState(false);
   const [result, setResult] = useState("");
 
+  // Muat kolam kandidat dari cache (hasil pencarian sebelumnya + cron auto)
+  // supaya daftar kreator langsung terisi banyak tanpa mencari dulu.
+  async function loadCandidates() {
+    try {
+      const res = await fetch("/api/tiktok/affiliate/candidates?limit=2000", {
+        cache: "no-store",
+      });
+      const data = (await res.json()) as { ok?: boolean; items?: CreatorRow[] };
+      if (!data.ok || !data.items) return;
+      setItems((prev) => {
+        const seen = new Set(prev.map((c) => c.creatorOpenId));
+        const added = data.items!.filter((c) => !seen.has(c.creatorOpenId));
+        return [...prev, ...added];
+      });
+      setTotalLoaded((n) => n + data.items!.length);
+    } catch {
+      // Kolam cache tidak tersedia — pencarian marketplace tetap jalan.
+    }
+  }
+
   const doSearch = useCallback(
-    async (pageToken?: string, key?: string, append = false, pages = 10) => {
+    async (pageToken?: string, key?: string, append = false, pages = 5) => {
       if (append) setLoadingMore(true);
       else setLoading(true);
       setError("");
@@ -167,7 +187,9 @@ function TabCari({ productIds }: { productIds: string[] }) {
         if ((data.page_errors ?? []).length > 0) {
           const pertama = data.page_errors![0];
           setError(
-            `Pemindaian berhenti di halaman ${pertama.page} (${pertama.detail}). Klik Muat Lebih untuk melanjutkan.`,
+            pertama.code === 36009002
+              ? `Batas rate TikTok tercapai di halaman ${pertama.page}. Tunggu beberapa menit lalu klik Muat Lebih untuk melanjutkan.`
+              : `Pemindaian berhenti di halaman ${pertama.page} (${pertama.detail}). Klik Muat Lebih untuk melanjutkan.`,
           );
         }
         if (append) {
@@ -196,16 +218,18 @@ function TabCari({ productIds }: { productIds: string[] }) {
     [keyword, minFollowers, maxFollowers, notInvited],
   );
 
-  // Muat halaman berikutnya (10 halaman marketplace = sampai 200 kreator)
-  // lalu tambahkan ke daftar yang sudah dimuat.
+  // Muat halaman berikutnya (5 halaman marketplace = sampai 100 kreator,
+  // sesuai jendela rate-limit TikTok) lalu tambahkan ke daftar.
   function muatLebih() {
     if (!nextPageToken || loading || loadingMore) return;
-    doSearch(nextPageToken, searchKey, true, 10);
+    doSearch(nextPageToken, searchKey, true, 5);
   }
 
-  // Kreator langsung dimuat otomatis saat tab dibuka — tanpa cari manual.
+  // Kreator langsung dimuat otomatis saat tab dibuka: kolam cache dulu
+  // (instan), lalu 5 halaman marketplace terbaru — tanpa cari manual.
   useEffect(() => {
-    doSearch(undefined, undefined, false, 10);
+    loadCandidates();
+    doSearch(undefined, undefined, true, 5);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -390,11 +414,18 @@ function TabCari({ productIds }: { productIds: string[] }) {
         </div>
       ) : null}
 
-      {loading && items.length === 0 ? (
-        <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          Memuat kreator dari marketplace…
-        </div>
+      {loading || loadingMore ? (
+        items.length === 0 ? (
+          <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Memuat kreator…
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs text-slate-500">
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            Menambah kreator terbaru dari marketplace…
+          </div>
+        )
       ) : null}
 
       {productIds.length === 0 && items.length === 0 ? (
@@ -452,7 +483,7 @@ function TabCari({ productIds }: { productIds: string[] }) {
                 ) : (
                   <ChevronDown className="h-3.5 w-3.5" />
                 )}
-                Muat Lebih (200)
+                Muat Lebih (100)
               </button>
             </div>
           </div>
