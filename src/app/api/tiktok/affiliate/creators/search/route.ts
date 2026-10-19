@@ -1,7 +1,8 @@
 // Cari kreator Creator Marketplace untuk diundang ke program afiliasi.
 // Body: keyword?, count_ge?, count_le?, not_invited_l90_days?,
 // category_parent_id?, category_child_ids?, sorter_algorithm_id?,
-// page_token?, search_key?, page_size? (hanya 12 atau 20).
+// page_token?, search_key?, page_size? (hanya 12 atau 20),
+// pages? (1-20, berapa halaman dipindai server-side per panggilan).
 // Hasil otomatis disimpan ke cache kandidat (kolam kreator untuk cron auto).
 //
 // Auth: sesi admin (isAuthed) ATAU CRON_SECRET (Bearer / x-cron-secret /
@@ -10,11 +11,12 @@ import { isAuthed } from "@/lib/auth";
 import {
   prepareAffiliateShop,
   searchMarketplaceCreators,
+  type AffiliateCreatorRow,
 } from "@/lib/tiktok-affiliate";
 import { upsertAffiliateCreatorCache } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
-export const maxDuration = 30;
+export const maxDuration = 60;
 
 /** True bila secret cocok lewat salah satu saluran yang didukung. */
 function cronAuthorized(request: Request): boolean {
@@ -62,18 +64,48 @@ export async function POST(request: Request) {
       : undefined,
     sorterAlgorithmId: strOf(body.sorter_algorithm_id) || undefined,
   };
-  const res = await searchMarketplaceCreators(prep.ctx, filter, {
-    pageToken: strOf(body.page_token) || undefined,
-    searchKey: strOf(body.search_key) || undefined,
-    pageSize: Number(body.page_size ?? 20),
-  });
-  if (!res.ok) {
-    return Response.json({ ok: false, detail: res.detail });
+  // Pindai beberapa halaman marketplace sekaligus (param pages, maks 20)
+  // agar daftar kreator langsung banyak tanpa bolak-balik panggilan.
+  const pageSize = Number(body.page_size ?? 20);
+  const rawPages = Number(body.pages ?? 1);
+  const maxPages = Math.min(
+    Math.max(Number.isFinite(rawPages) ? Math.floor(rawPages) : 1, 1),
+    20,
+  );
+  let token = strOf(body.page_token) || undefined;
+  let key = strOf(body.search_key) || undefined;
+  const seen = new Set<string>();
+  const items: AffiliateCreatorRow[] = [];
+  let pagesScanned = 0;
+  let nextPageToken = "";
+  let searchKey = key ?? "";
+  for (let p = 0; p < maxPages; p += 1) {
+    const res = await searchMarketplaceCreators(prep.ctx, filter, {
+      pageToken: token,
+      searchKey: key,
+      pageSize,
+    });
+    if (!res.ok) {
+      if (p === 0) return Response.json({ ok: false, detail: res.detail });
+      break;
+    }
+    pagesScanned += 1;
+    for (const c of res.items) {
+      if (!seen.has(c.creatorOpenId)) {
+        seen.add(c.creatorOpenId);
+        items.push(c);
+      }
+    }
+    nextPageToken = res.nextPageToken;
+    searchKey = res.searchKey;
+    if (!res.nextPageToken) break;
+    token = res.nextPageToken;
+    key = res.searchKey;
   }
 
   // Simpan ke cache kandidat agar cron auto punya kolam kreator.
   await upsertAffiliateCreatorCache(
-    res.items.map((c) => ({
+    items.map((c) => ({
       creator_open_id: c.creatorOpenId,
       username: c.username,
       nickname: c.nickname,
@@ -85,8 +117,9 @@ export async function POST(request: Request) {
 
   return Response.json({
     ok: true,
-    items: res.items,
-    next_page_token: res.nextPageToken,
-    search_key: res.searchKey,
+    items,
+    next_page_token: nextPageToken,
+    search_key: searchKey,
+    pages_scanned: pagesScanned,
   });
 }

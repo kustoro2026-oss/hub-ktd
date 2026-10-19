@@ -8,8 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
-  ChevronLeft,
-  ChevronRight,
+  ChevronDown,
   Loader2,
   RefreshCw,
   Search,
@@ -119,8 +118,9 @@ function TabCari({ productIds }: { productIds: string[] }) {
   const [items, setItems] = useState<CreatorRow[]>([]);
   const [nextPageToken, setNextPageToken] = useState("");
   const [searchKey, setSearchKey] = useState("");
-  const [prevTokens, setPrevTokens] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalLoaded, setTotalLoaded] = useState(0);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [elig, setElig] = useState<Map<string, EligibilityRow>>(new Map());
@@ -129,8 +129,9 @@ function TabCari({ productIds }: { productIds: string[] }) {
   const [result, setResult] = useState("");
 
   const doSearch = useCallback(
-    async (pageToken?: string, key?: string) => {
-      setLoading(true);
+    async (pageToken?: string, key?: string, append = false, pages = 10) => {
+      if (append) setLoadingMore(true);
+      else setLoading(true);
       setError("");
       try {
         const res = await fetch("/api/tiktok/affiliate/creators/search", {
@@ -143,6 +144,7 @@ function TabCari({ productIds }: { productIds: string[] }) {
             not_invited_l90_days: notInvited,
             page_token: pageToken,
             search_key: key,
+            pages,
           }),
         });
         const data = (await res.json()) as {
@@ -151,40 +153,54 @@ function TabCari({ productIds }: { productIds: string[] }) {
           items?: CreatorRow[];
           next_page_token?: string;
           search_key?: string;
+          pages_scanned?: number;
         };
         if (!data.ok || !data.items) {
           setError(data.detail ?? "Gagal mencari kreator.");
-          setItems([]);
+          if (!append) {
+            setItems([]);
+            setTotalLoaded(0);
+          }
           return;
         }
-        setItems(data.items);
+        if (append) {
+          setItems((prev) => {
+            const seen = new Set(prev.map((c) => c.creatorOpenId));
+            const added = data.items!.filter((c) => !seen.has(c.creatorOpenId));
+            return [...prev, ...added];
+          });
+          setTotalLoaded((n) => n + data.items!.length);
+        } else {
+          setItems(data.items);
+          setTotalLoaded(data.items.length);
+          setSelected(new Set());
+          setElig(new Map());
+          setResult("");
+        }
         setNextPageToken(data.next_page_token ?? "");
         setSearchKey(data.search_key ?? "");
-        setSelected(new Set());
-        setElig(new Map());
-        setResult("");
       } catch {
         setError("Kesalahan jaringan saat mencari kreator.");
       } finally {
-        setLoading(false);
+        if (append) setLoadingMore(false);
+        else setLoading(false);
       }
     },
     [keyword, minFollowers, maxFollowers, notInvited],
   );
 
-  function nextPage() {
-    if (!nextPageToken) return;
-    setPrevTokens((t) => [...t, nextPageToken]);
-    doSearch(nextPageToken, searchKey);
+  // Muat halaman berikutnya (10 halaman marketplace = sampai 200 kreator)
+  // lalu tambahkan ke daftar yang sudah dimuat.
+  function muatLebih() {
+    if (!nextPageToken || loading || loadingMore) return;
+    doSearch(nextPageToken, searchKey, true, 10);
   }
 
-  function prevPage() {
-    if (prevTokens.length === 0) return;
-    const tokens = [...prevTokens];
-    const token = tokens.pop();
-    setPrevTokens(tokens);
-    doSearch(token || undefined, token ? searchKey : undefined);
-  }
+  // Kreator langsung dimuat otomatis saat tab dibuka — tanpa cari manual.
+  useEffect(() => {
+    doSearch(undefined, undefined, false, 10);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function toggle(id: string) {
     setSelected((s) => {
@@ -212,22 +228,26 @@ function TabCari({ productIds }: { productIds: string[] }) {
     setError("");
     setResult("");
     try {
-      const res = await fetch("/api/tiktok/affiliate/eligibility", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ creator_open_ids: [...selected] }),
-      });
-      const data = (await res.json()) as {
-        ok: boolean;
-        detail?: string;
-        results?: EligibilityRow[];
-      };
-      if (!data.ok || !data.results) {
-        setError(data.detail ?? "Gagal cek eligibilitas.");
-        return;
-      }
+      const ids = [...selected];
       const map = new Map<string, EligibilityRow>();
-      for (const r of data.results) map.set(r.creatorOpenId, r);
+      for (let i = 0; i < ids.length; i += 500) {
+        const chunk = ids.slice(i, i + 500);
+        const res = await fetch("/api/tiktok/affiliate/eligibility", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ creator_open_ids: chunk }),
+        });
+        const data = (await res.json()) as {
+          ok: boolean;
+          detail?: string;
+          results?: EligibilityRow[];
+        };
+        if (!data.ok || !data.results) {
+          setError(data.detail ?? "Gagal cek eligibilitas.");
+          return;
+        }
+        for (const r of data.results) map.set(r.creatorOpenId, r);
+      }
       setElig(map);
     } catch {
       setError("Kesalahan jaringan saat cek eligibilitas.");
@@ -242,37 +262,44 @@ function TabCari({ productIds }: { productIds: string[] }) {
     setError("");
     setResult("");
     try {
-      const res = await fetch("/api/tiktok/affiliate/invite", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          creator_open_ids: [...selected],
-          product_ids: productIds,
-        }),
-      });
-      const data = (await res.json()) as {
-        ok: boolean;
-        detail?: string;
-        invited?: number;
-        batches?: {
+      const ids = [...selected];
+      let invited = 0;
+      const gagal: string[] = [];
+      for (let i = 0; i < ids.length; i += 500) {
+        const chunk = ids.slice(i, i + 500);
+        const res = await fetch("/api/tiktok/affiliate/invite", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            creator_open_ids: chunk,
+            product_ids: productIds,
+          }),
+        });
+        const data = (await res.json()) as {
           ok: boolean;
-          count: number;
-          code: number | null;
-          hint: string;
-          detail: string;
-        }[];
-      };
-      if (!data.ok) {
-        setError(data.detail ?? "Gagal mengirim undangan.");
-        return;
+          detail?: string;
+          invited?: number;
+          batches?: {
+            ok: boolean;
+            count: number;
+            code: number | null;
+            hint: string;
+            detail: string;
+          }[];
+        };
+        if (!data.ok) {
+          setError(data.detail ?? "Gagal mengirim undangan.");
+          return;
+        }
+        invited += data.invited ?? 0;
+        for (const b of data.batches ?? []) {
+          if (!b.ok) gagal.push(b.hint || b.detail || String(b.code ?? "?"));
+        }
       }
-      const gagal = (data.batches ?? []).filter((b) => !b.ok);
       setResult(
-        `Undangan terkirim ke ${data.invited ?? 0} kreator. ${
+        `Undangan terkirim ke ${invited} kreator.${
           gagal.length > 0
-            ? `${gagal.length} batch gagal: ${gagal
-                .map((b) => (b.hint || b.detail || b.code || "?"))
-                .join("; ")}`
+            ? ` ${gagal.length} batch gagal: ${[...new Set(gagal)].join("; ")}`
             : ""
         }`,
       );
@@ -356,6 +383,13 @@ function TabCari({ productIds }: { productIds: string[] }) {
         </div>
       ) : null}
 
+      {loading && items.length === 0 ? (
+        <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Memuat kreator dari marketplace…
+        </div>
+      ) : null}
+
       {productIds.length === 0 && items.length === 0 ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
           Pilih produk yang mau diundangkan dulu di tab{" "}
@@ -373,7 +407,7 @@ function TabCari({ productIds }: { productIds: string[] }) {
         <>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-3 text-sm text-slate-600">
-              <span className="font-medium">{items.length} kreator</span>
+              <span className="font-medium">{totalLoaded} kreator dimuat</span>
               <span className="text-emerald-700 font-semibold">
                 {selected.size} dipilih
               </span>
@@ -402,18 +436,16 @@ function TabCari({ productIds }: { productIds: string[] }) {
             </div>
             <div className="flex items-center gap-2 text-xs">
               <button
-                onClick={prevPage}
-                disabled={prevTokens.length === 0 || loading}
-                className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
+                onClick={muatLebih}
+                disabled={!nextPageToken || loading || loadingMore}
+                className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
               >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              <button
-                onClick={nextPage}
-                disabled={!nextPageToken || loading}
-                className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
-              >
-                <ChevronRight className="h-4 w-4" />
+                {loadingMore ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <ChevronDown className="h-3.5 w-3.5" />
+                )}
+                Muat Lebih (200)
               </button>
             </div>
           </div>
@@ -553,6 +585,23 @@ function TabCari({ productIds }: { productIds: string[] }) {
                 })}
               </tbody>
             </table>
+          </div>
+
+          <div className="flex justify-center pt-1">
+            <button
+              onClick={muatLebih}
+              disabled={!nextPageToken || loading || loadingMore}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 transition hover:bg-slate-50 disabled:opacity-40"
+            >
+              {loadingMore ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <ChevronDown className="h-4 w-4" />
+              )}
+              {nextPageToken
+                ? "Muat Lebih Banyak"
+                : "Semua halaman yang tersedia sudah dimuat"}
+            </button>
           </div>
         </>
       ) : null}
