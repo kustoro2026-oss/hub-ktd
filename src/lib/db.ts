@@ -57,6 +57,70 @@ export type BroadcastItem = {
   claimed_at: string;
 };
 
+export type EmailContact = {
+  id: number;
+  name: string;
+  email: string;
+  note: string;
+  status: string; // subscribed / unsubscribed / bounced
+  created_at: string;
+};
+
+export type EmailGroup = {
+  id: number;
+  name: string;
+  member_count: number;
+  created_at: string;
+};
+
+export type EmailTemplate = {
+  id: number;
+  name: string;
+  subject: string;
+  html_body: string;
+  lang: string;
+  created_at: string;
+};
+
+export type EmailCampaign = {
+  id: number;
+  name: string;
+  template_id: number;
+  group_id: number | null;
+  subject: string;
+  vars: string;
+  scheduled_at: string;
+  total: number;
+  sent: number;
+  failed: number;
+  opened: number;
+  clicked: number;
+  bounced: number;
+  unsubscribed: number;
+  status: "draft" | "sending" | "done";
+  created_at: string;
+};
+
+export type EmailCampaignItem = {
+  id: number;
+  campaign_id: number;
+  contact_id: number | null;
+  name: string;
+  email: string;
+  status:
+    | "pending"
+    | "queued"
+    | "sent"
+    | "delivered"
+    | "opened"
+    | "clicked"
+    | "failed";
+  error: string;
+  brevo_message_id: string;
+  claimed_at: string;
+  created_at: string;
+};
+
 export type InboundMessage = {
   id: string;
   wa_from: string;
@@ -610,6 +674,81 @@ function migrateSqlite(db: DatabaseSync) {
       updated_at TEXT NOT NULL DEFAULT ''
     );
 
+    -- Email Marketing: kontak, grup, template, kampanye, dan log event.
+    CREATE TABLE IF NOT EXISTS email_contacts (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL UNIQUE,
+      note TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'subscribed',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS email_groups (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS email_group_members (
+      group_id INTEGER NOT NULL,
+      contact_id INTEGER NOT NULL,
+      PRIMARY KEY (group_id, contact_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS email_templates (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL UNIQUE,
+      subject TEXT NOT NULL DEFAULT '',
+      html_body TEXT NOT NULL DEFAULT '',
+      lang TEXT NOT NULL DEFAULT 'id',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS email_campaigns (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      template_id INTEGER NOT NULL DEFAULT 0,
+      group_id INTEGER,
+      subject TEXT NOT NULL DEFAULT '',
+      vars TEXT NOT NULL DEFAULT '',
+      scheduled_at TEXT NOT NULL DEFAULT '',
+      total INTEGER NOT NULL DEFAULT 0,
+      sent INTEGER NOT NULL DEFAULT 0,
+      failed INTEGER NOT NULL DEFAULT 0,
+      opened INTEGER NOT NULL DEFAULT 0,
+      clicked INTEGER NOT NULL DEFAULT 0,
+      bounced INTEGER NOT NULL DEFAULT 0,
+      unsubscribed INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'draft',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
+    CREATE TABLE IF NOT EXISTS email_campaign_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id INTEGER NOT NULL,
+      contact_id INTEGER,
+      name TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      error TEXT NOT NULL DEFAULT '',
+      brevo_message_id TEXT NOT NULL DEFAULT '',
+      claimed_at TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_email_items_campaign
+      ON email_campaign_items (campaign_id);
+
+    CREATE TABLE IF NOT EXISTS email_events (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      event TEXT NOT NULL DEFAULT '',
+      campaign_item_id INTEGER NOT NULL,
+      detail TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE INDEX IF NOT EXISTS idx_email_events_item
+      ON email_events (campaign_item_id);
+
     CREATE TABLE IF NOT EXISTS ops_backups (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL DEFAULT '',
@@ -1104,6 +1243,81 @@ async function migratePg(pool: Pool) {
       v TEXT NOT NULL DEFAULT '',
       updated_at TEXT NOT NULL DEFAULT ''
     );
+
+    -- Email Marketing: kontak, grup, template, kampanye, dan log event.
+    CREATE TABLE IF NOT EXISTS email_contacts (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL UNIQUE,
+      note TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'subscribed',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS email_groups (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS email_group_members (
+      group_id INTEGER NOT NULL,
+      contact_id INTEGER NOT NULL,
+      PRIMARY KEY (group_id, contact_id)
+    );
+
+    CREATE TABLE IF NOT EXISTS email_templates (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL UNIQUE,
+      subject TEXT NOT NULL DEFAULT '',
+      html_body TEXT NOT NULL DEFAULT '',
+      lang TEXT NOT NULL DEFAULT 'id',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS email_campaigns (
+      id SERIAL PRIMARY KEY,
+      name TEXT NOT NULL,
+      template_id INTEGER NOT NULL DEFAULT 0,
+      group_id INTEGER,
+      subject TEXT NOT NULL DEFAULT '',
+      vars TEXT NOT NULL DEFAULT '',
+      scheduled_at TEXT NOT NULL DEFAULT '',
+      total INTEGER NOT NULL DEFAULT 0,
+      sent INTEGER NOT NULL DEFAULT 0,
+      failed INTEGER NOT NULL DEFAULT 0,
+      opened INTEGER NOT NULL DEFAULT 0,
+      clicked INTEGER NOT NULL DEFAULT 0,
+      bounced INTEGER NOT NULL DEFAULT 0,
+      unsubscribed INTEGER NOT NULL DEFAULT 0,
+      status TEXT NOT NULL DEFAULT 'draft',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS email_campaign_items (
+      id SERIAL PRIMARY KEY,
+      campaign_id INTEGER NOT NULL,
+      contact_id INTEGER,
+      name TEXT NOT NULL DEFAULT '',
+      email TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending',
+      error TEXT NOT NULL DEFAULT '',
+      brevo_message_id TEXT NOT NULL DEFAULT '',
+      claimed_at TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_email_items_campaign
+      ON email_campaign_items (campaign_id);
+
+    CREATE TABLE IF NOT EXISTS email_events (
+      id SERIAL PRIMARY KEY,
+      event TEXT NOT NULL DEFAULT '',
+      campaign_item_id INTEGER NOT NULL,
+      detail TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS idx_email_events_item
+      ON email_events (campaign_item_id);
 
     CREATE TABLE IF NOT EXISTS ops_backups (
       id SERIAL PRIMARY KEY,
@@ -3882,4 +4096,500 @@ export async function tandaiStokKanalSelesai(
      WHERE id = ?`,
     [catatan, catatan, id],
   );
+}
+
+// ---------- Email Marketing ----------
+// Modul email massal via Brevo — pola sama dengan broadcast WhatsApp:
+// kontak → grup → template → kampanye → penjadwalan. Statistik (dibuka,
+// diklik, bounce) diisi dari webhook Brevo lewat tabel email_events.
+
+export async function listEmailContacts(): Promise<EmailContact[]> {
+  return queryAll<EmailContact>("SELECT * FROM email_contacts ORDER BY id DESC");
+}
+
+export async function countEmailContacts(): Promise<number> {
+  const row = await queryOne<{ n: string | number }>(
+    "SELECT COUNT(*) AS n FROM email_contacts",
+  );
+  return Number(row?.n ?? 0);
+}
+
+export async function getEmailContactByEmail(
+  email: string,
+): Promise<EmailContact | undefined> {
+  return queryOne<EmailContact>(
+    "SELECT * FROM email_contacts WHERE email = ?",
+    [email.trim().toLowerCase()],
+  );
+}
+
+/** Tambah kontak email. Alamat yang sama tidak diduplikasi — baris lama
+ *  diperbarui nama/catatannya lalu dikembalikan (dipakai import massal). */
+export async function addEmailContact(
+  name: string,
+  email: string,
+  note = "",
+): Promise<EmailContact> {
+  const clean = email.trim().toLowerCase();
+  const existing = await getEmailContactByEmail(clean);
+  if (existing) {
+    await queryRun(
+      "UPDATE email_contacts SET name = ?, note = ? WHERE id = ?",
+      [name.trim(), note.trim(), existing.id],
+    );
+    return { ...existing, name: name.trim(), note: note.trim() };
+  }
+  const row = await queryOne<EmailContact>(
+    "INSERT INTO email_contacts (name, email, note) VALUES (?, ?, ?) RETURNING *",
+    [name.trim(), clean, note.trim()],
+  );
+  if (!row) throw new Error("gagal menyimpan kontak email");
+  return row;
+}
+
+/** Status langganan: subscribed / unsubscribed / bounced. */
+export async function setEmailContactStatus(
+  id: number,
+  status: string,
+): Promise<void> {
+  await queryRun("UPDATE email_contacts SET status = ? WHERE id = ?", [
+    status,
+    id,
+  ]);
+}
+
+/** Hapus banyak kontak email (permanen). Riwayat kampanye tetap utuh —
+ *  email_campaign_items menyimpan salinan alamatnya sendiri. */
+export async function deleteEmailContacts(ids: number[]): Promise<number> {
+  if (ids.length === 0) return 0;
+  const ph = ids.map(() => "?").join(", ");
+  await queryRun(
+    `UPDATE email_campaign_items SET contact_id = NULL WHERE contact_id IN (${ph})`,
+    ids,
+  );
+  await queryRun(
+    `DELETE FROM email_group_members WHERE contact_id IN (${ph})`,
+    ids,
+  );
+  await queryRun(`DELETE FROM email_contacts WHERE id IN (${ph})`, ids);
+  return ids.length;
+}
+
+// ---------- Grup kontak email ----------
+
+export async function listEmailGroups(): Promise<EmailGroup[]> {
+  const rows = await queryAll<
+    Omit<EmailGroup, "member_count"> & { member_count: string | number }
+  >(
+    `SELECT g.id, g.name, g.created_at,
+       (SELECT COUNT(*) FROM email_group_members m WHERE m.group_id = g.id) AS member_count
+     FROM email_groups g ORDER BY g.name`,
+  );
+  return rows.map((r) => ({ ...r, member_count: Number(r.member_count ?? 0) }));
+}
+
+export async function createEmailGroup(name: string): Promise<EmailGroup> {
+  const row = await queryOne<Omit<EmailGroup, "member_count">>(
+    "INSERT INTO email_groups (name) VALUES (?) RETURNING id, name, created_at",
+    [name.trim()],
+  );
+  if (!row) throw new Error("gagal membuat grup email");
+  return { ...row, member_count: 0 };
+}
+
+export async function renameEmailGroup(id: number, name: string): Promise<void> {
+  await queryRun("UPDATE email_groups SET name = ? WHERE id = ?", [
+    name.trim(),
+    id,
+  ]);
+}
+
+/** Hapus grup email — kontak di dalamnya TIDAK ikut terhapus. */
+export async function deleteEmailGroup(id: number): Promise<void> {
+  await queryRun("DELETE FROM email_group_members WHERE group_id = ?", [id]);
+  await queryRun("DELETE FROM email_groups WHERE id = ?", [id]);
+}
+
+/** Peta id kontak → daftar grup emailnya (untuk badge di tabel kontak). */
+export async function listEmailContactGroupMap(): Promise<
+  { contact_id: number; group_id: number; group_name: string }[]
+> {
+  return queryAll(
+    `SELECT m.contact_id, m.group_id, g.name AS group_name
+     FROM email_group_members m JOIN email_groups g ON g.id = m.group_id`,
+  );
+}
+
+/** Ganti seluruh keanggotaan grup email satu kontak. */
+export async function setEmailContactGroups(
+  contactId: number,
+  groupIds: number[],
+): Promise<void> {
+  await queryRun("DELETE FROM email_group_members WHERE contact_id = ?", [
+    contactId,
+  ]);
+  for (const gid of groupIds) {
+    await queryRun(
+      "INSERT INTO email_group_members (group_id, contact_id) VALUES (?, ?)",
+      [gid, contactId],
+    );
+  }
+}
+
+/** Tambahkan banyak kontak ke satu grup email (keanggotaan lama
+ *  dipertahankan). */
+export async function addEmailContactsToGroup(
+  contactIds: number[],
+  groupId: number,
+): Promise<void> {
+  const sql =
+    dbMode() === "pg"
+      ? "INSERT INTO email_group_members (group_id, contact_id) VALUES (?, ?) ON CONFLICT DO NOTHING"
+      : "INSERT OR IGNORE INTO email_group_members (group_id, contact_id) VALUES (?, ?)";
+  for (const cid of contactIds) {
+    await queryRun(sql, [groupId, cid]);
+  }
+}
+
+/** Kontak anggota satu grup email. */
+export async function listEmailContactsByGroup(
+  groupId: number,
+): Promise<EmailContact[]> {
+  return queryAll<EmailContact>(
+    `SELECT c.* FROM email_contacts c
+     JOIN email_group_members m ON m.contact_id = c.id
+     WHERE m.group_id = ? ORDER BY c.id DESC`,
+    [groupId],
+  );
+}
+
+// ---------- Template email ----------
+
+export async function listEmailTemplates(): Promise<EmailTemplate[]> {
+  return queryAll<EmailTemplate>(
+    "SELECT * FROM email_templates ORDER BY id DESC",
+  );
+}
+
+export async function getEmailTemplate(
+  id: number,
+): Promise<EmailTemplate | undefined> {
+  return queryOne<EmailTemplate>(
+    "SELECT * FROM email_templates WHERE id = ?",
+    [id],
+  );
+}
+
+export async function createEmailTemplate(
+  name: string,
+  subject: string,
+  htmlBody: string,
+  lang = "id",
+): Promise<EmailTemplate> {
+  const row = await queryOne<EmailTemplate>(
+    "INSERT INTO email_templates (name, subject, html_body, lang) VALUES (?, ?, ?, ?) RETURNING *",
+    [name.trim(), subject.trim(), htmlBody, lang],
+  );
+  if (!row) throw new Error("gagal membuat template email");
+  return row;
+}
+
+export async function updateEmailTemplate(
+  id: number,
+  subject: string,
+  htmlBody: string,
+  lang = "id",
+): Promise<void> {
+  await queryRun(
+    "UPDATE email_templates SET subject = ?, html_body = ?, lang = ? WHERE id = ?",
+    [subject.trim(), htmlBody, lang, id],
+  );
+}
+
+export async function deleteEmailTemplate(id: number): Promise<void> {
+  await queryRun("DELETE FROM email_templates WHERE id = ?", [id]);
+}
+
+// ---------- Kampanye email ----------
+
+export async function listEmailCampaigns(): Promise<EmailCampaign[]> {
+  return queryAll<EmailCampaign>(
+    "SELECT * FROM email_campaigns ORDER BY id DESC",
+  );
+}
+
+export async function getEmailCampaign(
+  id: number,
+): Promise<EmailCampaign | undefined> {
+  return queryOne<EmailCampaign>(
+    "SELECT * FROM email_campaigns WHERE id = ?",
+    [id],
+  );
+}
+
+export async function listEmailCampaignItems(
+  campaignId: number,
+): Promise<EmailCampaignItem[]> {
+  return queryAll<EmailCampaignItem>(
+    "SELECT * FROM email_campaign_items WHERE campaign_id = ? ORDER BY id",
+    [campaignId],
+  );
+}
+
+// Pencarian item lewat messageId Brevo — dipakai webhook statistik
+// sebagai fallback bila tag korelasi tidak ikut terkirim.
+export async function getEmailCampaignItemByMessageId(
+  messageId: string,
+): Promise<EmailCampaignItem | undefined> {
+  return queryOne<EmailCampaignItem>(
+    "SELECT * FROM email_campaign_items WHERE brevo_message_id = ?",
+    [messageId],
+  );
+}
+
+export async function createEmailCampaignWithItems(
+  name: string,
+  templateId: number,
+  subject: string,
+  items: { contactId: number | null; name: string; email: string }[],
+  groupId: number | null = null,
+  vars: Record<string, string> = {},
+  scheduledAt = "",
+): Promise<EmailCampaign> {
+  const campaign = await queryOne<EmailCampaign>(
+    "INSERT INTO email_campaigns (name, template_id, group_id, subject, vars, scheduled_at, total) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING *",
+    [
+      name.trim(),
+      templateId,
+      groupId,
+      subject.trim(),
+      JSON.stringify(vars),
+      scheduledAt,
+      items.length,
+    ],
+  );
+  if (!campaign) throw new Error("gagal membuat kampanye email");
+  if (items.length > 0) {
+    const values = items.map(() => "(?, ?, ?, ?)").join(", ");
+    const params = items.flatMap((it) => [
+      campaign.id,
+      it.contactId,
+      it.name,
+      it.email,
+    ]);
+    await queryRun(
+      `INSERT INTO email_campaign_items (campaign_id, contact_id, name, email) VALUES ${values}`,
+      params,
+    );
+  }
+  return campaign;
+}
+
+export async function setEmailCampaignStatus(
+  id: number,
+  status: EmailCampaign["status"],
+  sent: number,
+  failed: number,
+): Promise<void> {
+  await queryRun(
+    "UPDATE email_campaigns SET status = ?, sent = ?, failed = ? WHERE id = ?",
+    [status, sent, failed, id],
+  );
+}
+
+// Ambil-sekaligus-tandai item yang akan dikirim pada ronde ini (atomik,
+// pola claimPendingBroadcastItems) supaya dua ronde tidak kirim dobel.
+export async function claimPendingEmailItems(
+  campaignId: number,
+  limit = 40,
+): Promise<EmailCampaignItem[]> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  return queryAll<EmailCampaignItem>(
+    "UPDATE email_campaign_items SET status = 'queued', claimed_at = ? WHERE id IN (SELECT id FROM email_campaign_items WHERE campaign_id = ? AND status = 'pending' ORDER BY id LIMIT ?) RETURNING *",
+    [nowUtc, campaignId, limit],
+  );
+}
+
+// Kembalikan item yang sempat di-claim tapi rondenya tidak selesai.
+export async function requeueStaleQueuedEmailItems(
+  campaignId: number,
+  staleMinutes = 5,
+): Promise<void> {
+  const cutoff = new Date(Date.now() - staleMinutes * 60_000)
+    .toISOString()
+    .slice(0, 19)
+    .replace("T", " ");
+  await queryRun(
+    "UPDATE email_campaign_items SET status = 'pending', claimed_at = '' WHERE campaign_id = ? AND status = 'queued' AND claimed_at != '' AND claimed_at <= ?",
+    [campaignId, cutoff],
+  );
+}
+
+export async function markEmailCampaignItem(
+  id: number,
+  status: "sent" | "delivered" | "opened" | "clicked" | "failed",
+  error = "",
+  brevoMessageId = "",
+): Promise<void> {
+  await queryRun(
+    "UPDATE email_campaign_items SET status = ?, error = ?, brevo_message_id = ?, claimed_at = '' WHERE id = ?",
+    [status, error, brevoMessageId, id],
+  );
+}
+
+export async function emailCampaignProgress(id: number): Promise<{
+  sent: number;
+  failed: number;
+  pending: number;
+}> {
+  const row = await queryOne<{
+    sent: string | number | null;
+    failed: string | number | null;
+    pending: string | number | null;
+  }>(
+    `SELECT
+      SUM(CASE WHEN status IN ('sent', 'delivered', 'opened', 'clicked') THEN 1 ELSE 0 END) AS sent,
+      SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed,
+      SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending
+    FROM email_campaign_items WHERE campaign_id = ?`,
+    [id],
+  );
+  return {
+    sent: Number(row?.sent ?? 0),
+    failed: Number(row?.failed ?? 0),
+    pending: Number(row?.pending ?? 0),
+  };
+}
+
+// Email terkirim dari Hub hari ini (jendela kalender lokal) — dasar panel
+// batas harian. Batas Brevo gratis = 300 email per hari.
+export async function countEmailsSentToday(): Promise<number> {
+  const since =
+    dbMode() === "pg"
+      ? "date_trunc('day', now())"
+      : "datetime('now','localtime','start of day')";
+  const rows = await queryAll<{ n: string | number | null }>(
+    `SELECT COUNT(*) AS n FROM email_campaign_items WHERE status IN ('sent', 'delivered', 'opened', 'clicked') AND created_at >= ${since}`,
+  );
+  return Number(rows[0]?.n ?? 0);
+}
+
+// Kampanye email terjadwal yang waktunya sudah tiba dan belum dikirim.
+export async function listDueScheduledEmailCampaigns(): Promise<
+  EmailCampaign[]
+> {
+  const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+  return queryAll<EmailCampaign>(
+    "SELECT * FROM email_campaigns WHERE status = 'draft' AND scheduled_at != '' AND scheduled_at <= ? ORDER BY scheduled_at ASC",
+    [nowUtc],
+  );
+}
+
+// ---------- Statistik via webhook Brevo ----------
+
+/** Urutan status item email: hanya boleh naik. "failed" final. */
+const EMAIL_RANK: Record<string, number> = {
+  pending: 0,
+  queued: 0,
+  sent: 1,
+  delivered: 2,
+  opened: 3,
+  clicked: 4,
+  failed: 9,
+};
+
+/** Nama event Brevo → status item. Event lain diabaikan. */
+const EMAIL_EVENT_STATUS: Record<string, string> = {
+  delivered: "delivered",
+  opened: "opened",
+  click: "clicked",
+};
+
+/** Terapkan satu event webhook Brevo ke item kampanye. Status item hanya
+ *  naik (guard rank) sehingga event dobel dari Brevo tidak menggandakan
+ *  counter kampanye maupun status kontak. */
+export async function applyEmailEvent(
+  campaignItemId: number,
+  event: string,
+  detail = "",
+): Promise<void> {
+  const item = await queryOne<{
+    id: number;
+    campaign_id: number;
+    email: string;
+    status: string;
+  }>(
+    "SELECT id, campaign_id, email, status FROM email_campaign_items WHERE id = ?",
+    [campaignItemId],
+  );
+  if (!item) return;
+  const current = EMAIL_RANK[item.status] ?? 0;
+  const insert = () =>
+    queryRun(
+      "INSERT INTO email_events (event, campaign_item_id, detail) VALUES (?, ?, ?)",
+      [event, campaignItemId, detail],
+    );
+
+  // Berhenti berlangganan / keluhan spam: dedupe lewat tabel event karena
+  // Brevo kadang mengirim ulang payload yang sama — satu kontak hanya
+  // dihitung satu kali walau event unsubscribed & complaint dua-duanya
+  // datang.
+  if (event === "unsubscribed" || event === "complaint") {
+    const exists = await queryOne<{ x: number }>(
+      "SELECT 1 AS x FROM email_events WHERE campaign_item_id = ? AND event IN ('unsubscribed', 'complaint')",
+      [campaignItemId],
+    );
+    if (!exists) {
+      await insert();
+      await queryRun(
+        "UPDATE email_campaigns SET unsubscribed = unsubscribed + 1 WHERE id = ?",
+        [item.campaign_id],
+      );
+      const contact = await getEmailContactByEmail(item.email);
+      if (contact) await setEmailContactStatus(contact.id, "unsubscribed");
+    }
+    return;
+  }
+
+  // Bounce (keras/lunak): item gagal + kontak ditandai (hanya hard bounce
+  // yang menandai kontak, supaya salah ketik tidak langsung dibuang).
+  if (event === "hard_bounce" || event === "soft_bounce") {
+    if (current >= EMAIL_RANK.failed) return;
+    await queryRun(
+      "UPDATE email_campaign_items SET status = 'failed', error = ? WHERE id = ?",
+      [`${event} ${detail}`.trim(), campaignItemId],
+    );
+    await queryRun(
+      "UPDATE email_campaigns SET bounced = bounced + 1 WHERE id = ?",
+      [item.campaign_id],
+    );
+    await insert();
+    if (event === "hard_bounce") {
+      const contact = await getEmailContactByEmail(item.email);
+      if (contact) await setEmailContactStatus(contact.id, "bounced");
+    }
+    return;
+  }
+
+  const nextStatus = EMAIL_EVENT_STATUS[event];
+  if (!nextStatus) return;
+  const next = EMAIL_RANK[nextStatus] ?? 0;
+  if (next <= current) return; // status tidak boleh turun / event lama
+  await queryRun(
+    "UPDATE email_campaign_items SET status = ? WHERE id = ?",
+    [nextStatus, campaignItemId],
+  );
+  if (nextStatus === "opened") {
+    await queryRun(
+      "UPDATE email_campaigns SET opened = opened + 1 WHERE id = ?",
+      [item.campaign_id],
+    );
+  }
+  if (nextStatus === "clicked") {
+    await queryRun(
+      "UPDATE email_campaigns SET clicked = clicked + 1 WHERE id = ?",
+      [item.campaign_id],
+    );
+  }
+  await insert();
 }

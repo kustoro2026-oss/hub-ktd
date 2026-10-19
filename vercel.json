@@ -39,6 +39,10 @@
     {
       "path": "/api/tiktok/affiliate/auto",
       "schedule": "30 7 * * *"
+    },
+    {
+      "path": "/api/cron/email",
+      "schedule": "30 3 * * *"
     }
   ]
 }

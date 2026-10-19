@@ -37,6 +37,8 @@ import {
   Upload,
   ShoppingBag,
   UserPlus,
+  Mail,
+  AtSign,
 } from "lucide-react";
 
 export type NavItem = {
@@ -86,6 +88,9 @@ export const NAV: NavSection[] = [
     items: [
       { href: "/kontak", label: "Kontak", Icon: Users },
       { href: "/broadcast", label: "Broadcast", Icon: Send },
+      { href: "/email/kampanye", label: "Email Marketing", Icon: Mail },
+      { href: "/email/kontak", label: "Kontak Email", Icon: AtSign },
+      { href: "/email/template", label: "Template Email", Icon: FileText },
       { href: "/template", label: "Template", Icon: FileText },
       { href: "/pesan", label: "Pesan Masuk", Icon: MessageSquare },
       { href: "/verifikasi", label: "Verifikasi", Icon: BadgeCheck },
@@ -239,6 +244,9 @@ export function flattenNav(): NavItem[] {
 function isActive(pathname: string, href: string): boolean {
   if (!href) return false;
   if (pathname === href) return true;
+  // Halaman detail kampanye email menyala di bawah menu Email Marketing.
+  if (href === "/email/kampanye" && pathname.startsWith("/email/kampanye/"))
+    return true;
   return href.endsWith("/produk") && pathname === `${href}/massal`;
 }
 
