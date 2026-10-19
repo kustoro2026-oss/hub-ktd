@@ -2,9 +2,10 @@
 // harian. Alur tiap run:
 //   1. Baca pengaturan (saklar auto_enabled, cap harian, filter follower,
 //      daftar produk, komisi, kontak penjual).
-//   2. Hentikan bila cap undangan hari ini (WIB) sudah tercapai.
-//   3. Cari kreator marketplace (filter follower + belum diundang 90 hari)
-//      beberapa halaman, simpan ke cache kandidat.
+//   2. PANEN dulu (selalu): cari kreator marketplace (filter follower +
+//      belum diundang 90 hari) beberapa halaman, simpan ke cache kandidat —
+//      supaya kolam kreator terus tumbuh meski cap undangan sudah tercapai.
+//   3. Hentikan bila cap undangan hari ini (WIB) sudah tercapai.
 //   4. Gabung hasil pencarian + cache lama, lalu BUANG kreator yang sudah
 //      diundang menurut jurnal internal (filter 90 hari TikTok terbukti
 //      bocor — dedup wajib pakai catatan sendiri).
@@ -38,7 +39,7 @@ export const maxDuration = 120;
 const AUTO = {
   DEFAULT_CAP: 500,
   MAX_CAP: 1000,
-  SEARCH_PAGES: 10,
+  SEARCH_PAGES: 5,
   SEARCH_PAGE_SIZE: 20,
   CACHE_LIMIT: 300,
   MAX_INVITE_PER_RUN: 500,
@@ -71,27 +72,6 @@ export async function POST(request: Request) {
     });
   }
 
-  const capRaw = Number(settings.daily_cap ?? AUTO.DEFAULT_CAP);
-  const dailyCap = Number.isFinite(capRaw) && capRaw > 0
-    ? Math.min(Math.floor(capRaw), AUTO.MAX_CAP)
-    : AUTO.DEFAULT_CAP;
-  // Cap dihitung per hari kalender WIB (bukan 24 jam berjalan) supaya dua
-  // run cron harian (08:30 & 14:30 WIB) sama-sama bisa mengisi cap harian.
-  const now = new Date();
-  const wibMidnight = new Date(
-    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), -7),
-  ).toISOString();
-  const sentToday = await countAffiliateInvitesSentSince(wibMidnight);
-  const remaining = dailyCap - sentToday;
-  if (remaining <= 0) {
-    return Response.json({
-      ok: true,
-      skipped: "cap",
-      sent_today: sentToday,
-      daily_cap: dailyCap,
-    });
-  }
-
   let productIds: string[] = [];
   try {
     const parsed = JSON.parse(settings.product_ids ?? "") as unknown;
@@ -100,13 +80,6 @@ export async function POST(request: Request) {
     }
   } catch {
     productIds = [];
-  }
-  if (productIds.length === 0) {
-    return Response.json({
-      ok: false,
-      detail:
-        "Pengaturan produk belum diisi — pilih produk dulu di halaman Afiliasi.",
-    });
   }
   const commissionRaw = Number(settings.commission_percent ?? 15);
   const commissionPercent = Math.min(
@@ -175,6 +148,38 @@ export async function POST(request: Request) {
         data: JSON.stringify(c),
       })),
     );
+  }
+
+  // Panen di atas selalu jalan supaya kolam kandidat terus tumbuh meski cap
+  // undangan hari ini sudah tercapai.
+  const capRaw = Number(settings.daily_cap ?? AUTO.DEFAULT_CAP);
+  const dailyCap = Number.isFinite(capRaw) && capRaw > 0
+    ? Math.min(Math.floor(capRaw), AUTO.MAX_CAP)
+    : AUTO.DEFAULT_CAP;
+  // Cap dihitung per hari kalender WIB (bukan 24 jam berjalan) supaya dua
+  // run cron harian (08:30 & 14:30 WIB) sama-sama bisa mengisi cap harian.
+  const now = new Date();
+  const wibMidnight = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), -7),
+  ).toISOString();
+  const sentToday = await countAffiliateInvitesSentSince(wibMidnight);
+  const remaining = dailyCap - sentToday;
+  if (remaining <= 0) {
+    return Response.json({
+      ok: true,
+      skipped: "cap",
+      searched: fresh.length,
+      sent_today: sentToday,
+      daily_cap: dailyCap,
+    });
+  }
+  if (productIds.length === 0) {
+    return Response.json({
+      ok: false,
+      searched: fresh.length,
+      detail:
+        "Pengaturan produk belum diisi — pilih produk dulu di halaman Afiliasi.",
+    });
   }
 
   // 2) Kolam kandidat: hasil pencarian baru + cache lama.
