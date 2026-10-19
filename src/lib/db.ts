@@ -572,6 +572,44 @@ function migrateSqlite(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_topup_orders_created
       ON topup_orders (created_at DESC);
 
+    -- Afiliasi: jurnal undangan target collaboration (satu baris per kreator).
+    CREATE TABLE IF NOT EXISTS affiliate_invites (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      shop_id TEXT NOT NULL DEFAULT '',
+      collaboration_id TEXT NOT NULL DEFAULT '',
+      creator_open_id TEXT NOT NULL DEFAULT '',
+      username TEXT NOT NULL DEFAULT '',
+      nickname TEXT NOT NULL DEFAULT '',
+      product_ids TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'sent',
+      error_code TEXT NOT NULL DEFAULT '',
+      detail TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_affiliate_invites_creator
+      ON affiliate_invites (creator_open_id);
+    CREATE INDEX IF NOT EXISTS idx_affiliate_invites_created
+      ON affiliate_invites (created_at DESC);
+
+    -- Afiliasi: cache kreator hasil pencarian marketplace (kolam kandidat cron).
+    CREATE TABLE IF NOT EXISTS affiliate_creator_cache (
+      creator_open_id TEXT PRIMARY KEY,
+      username TEXT NOT NULL DEFAULT '',
+      nickname TEXT NOT NULL DEFAULT '',
+      avatar_url TEXT NOT NULL DEFAULT '',
+      follower_count INTEGER NOT NULL DEFAULT 0,
+      data TEXT NOT NULL DEFAULT '',
+      invited_status TEXT NOT NULL DEFAULT '',
+      cached_at TEXT NOT NULL DEFAULT ''
+    );
+
+    -- Afiliasi: pengaturan kunci–nilai (cap harian, filter, produk, komisi).
+    CREATE TABLE IF NOT EXISTS affiliate_settings (
+      k TEXT PRIMARY KEY,
+      v TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT ''
+    );
+
     CREATE TABLE IF NOT EXISTS ops_backups (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL DEFAULT '',
@@ -1028,6 +1066,44 @@ async function migratePg(pool: Pool) {
     );
     CREATE INDEX IF NOT EXISTS idx_topup_orders_created
       ON topup_orders (created_at DESC);
+
+    -- Afiliasi: jurnal undangan target collaboration (satu baris per kreator).
+    CREATE TABLE IF NOT EXISTS affiliate_invites (
+      id SERIAL PRIMARY KEY,
+      shop_id TEXT NOT NULL DEFAULT '',
+      collaboration_id TEXT NOT NULL DEFAULT '',
+      creator_open_id TEXT NOT NULL DEFAULT '',
+      username TEXT NOT NULL DEFAULT '',
+      nickname TEXT NOT NULL DEFAULT '',
+      product_ids TEXT NOT NULL DEFAULT '',
+      status TEXT NOT NULL DEFAULT 'sent',
+      error_code TEXT NOT NULL DEFAULT '',
+      detail TEXT NOT NULL DEFAULT '',
+      created_at TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX IF NOT EXISTS idx_affiliate_invites_creator
+      ON affiliate_invites (creator_open_id);
+    CREATE INDEX IF NOT EXISTS idx_affiliate_invites_created
+      ON affiliate_invites (created_at DESC);
+
+    -- Afiliasi: cache kreator hasil pencarian marketplace (kolam kandidat cron).
+    CREATE TABLE IF NOT EXISTS affiliate_creator_cache (
+      creator_open_id TEXT PRIMARY KEY,
+      username TEXT NOT NULL DEFAULT '',
+      nickname TEXT NOT NULL DEFAULT '',
+      avatar_url TEXT NOT NULL DEFAULT '',
+      follower_count INTEGER NOT NULL DEFAULT 0,
+      data TEXT NOT NULL DEFAULT '',
+      invited_status TEXT NOT NULL DEFAULT '',
+      cached_at TEXT NOT NULL DEFAULT ''
+    );
+
+    -- Afiliasi: pengaturan kunci–nilai (cap harian, filter, produk, komisi).
+    CREATE TABLE IF NOT EXISTS affiliate_settings (
+      k TEXT PRIMARY KEY,
+      v TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT ''
+    );
 
     CREATE TABLE IF NOT EXISTS ops_backups (
       id SERIAL PRIMARY KEY,
@@ -1734,6 +1810,171 @@ export async function saveTiktokShopToken(
 export async function listTiktokShopTokens(): Promise<TiktokShopToken[]> {
   return queryAll<TiktokShopToken>(
     "SELECT * FROM tiktok_shop_tokens ORDER BY updated_at DESC",
+  );
+}
+
+// ---------- Afiliasi kreator (jurnal undangan, cache, pengaturan) ----------
+
+export type AffiliateInviteRow = {
+  id: number;
+  shop_id: string;
+  collaboration_id: string;
+  creator_open_id: string;
+  username: string;
+  nickname: string;
+  product_ids: string;
+  status: string;
+  error_code: string;
+  detail: string;
+  created_at: string;
+};
+
+/** Tulis satu baris jurnal undangan per kreator (hasil tiap batch invite). */
+export async function saveAffiliateInvite(row: {
+  shop_id: string;
+  collaboration_id: string;
+  creator_open_id: string;
+  username?: string;
+  nickname?: string;
+  product_ids: string;
+  status: string;
+  error_code?: string;
+  detail?: string;
+}): Promise<void> {
+  await queryRun(
+    `INSERT INTO affiliate_invites (shop_id, collaboration_id, creator_open_id, username, nickname, product_ids, status, error_code, detail, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      row.shop_id,
+      row.collaboration_id,
+      row.creator_open_id,
+      row.username ?? "",
+      row.nickname ?? "",
+      row.product_ids,
+      row.status,
+      row.error_code ?? "",
+      row.detail ?? "",
+      new Date().toISOString(),
+    ],
+  );
+}
+
+/** Jurnal undangan terbaru (paling baru dulu). */
+export async function listAffiliateInvites(
+  opts: { limit?: number; offset?: number } = {},
+): Promise<AffiliateInviteRow[]> {
+  const limit = Math.min(Math.max(opts.limit ?? 100, 1), 500);
+  const offset = Math.max(opts.offset ?? 0, 0);
+  return queryAll<AffiliateInviteRow>(
+    "SELECT * FROM affiliate_invites ORDER BY id DESC LIMIT ? OFFSET ?",
+    [limit, offset],
+  );
+}
+
+/** Jumlah undangan berstatus sent sejak sejak `sinceIso` (dasar cap harian). */
+export async function countAffiliateInvitesSentSince(
+  sinceIso: string,
+): Promise<number> {
+  const row = await queryOne<{ n: number | string }>(
+    "SELECT COUNT(*) AS n FROM affiliate_invites WHERE status = 'sent' AND created_at >= ?",
+    [sinceIso],
+  );
+  return Number(row?.n ?? 0);
+}
+
+/** Open id kreator yang sudah pernah diundang (status sent) — untuk dedupe. */
+export async function listInvitedCreatorOpenIds(): Promise<string[]> {
+  const rows = await queryAll<{ creator_open_id: string }>(
+    "SELECT DISTINCT creator_open_id FROM affiliate_invites WHERE status = 'sent'",
+  );
+  return rows.map((r) => r.creator_open_id);
+}
+
+export type AffiliateCreatorCacheRow = {
+  creator_open_id: string;
+  username: string;
+  nickname: string;
+  avatar_url: string;
+  follower_count: number;
+  data: string;
+  invited_status: string;
+  cached_at: string;
+};
+
+/** Simpan/timpa kreator hasil pencarian ke cache kandidat. */
+export async function upsertAffiliateCreatorCache(
+  rows: {
+    creator_open_id: string;
+    username?: string;
+    nickname?: string;
+    avatar_url?: string;
+    follower_count?: number;
+    data?: string;
+  }[],
+): Promise<void> {
+  const nowIso = new Date().toISOString();
+  for (const r of rows) {
+    await queryRun(
+      `INSERT INTO affiliate_creator_cache (creator_open_id, username, nickname, avatar_url, follower_count, data, invited_status, cached_at)
+       VALUES (?, ?, ?, ?, ?, ?, '', ?)
+       ON CONFLICT (creator_open_id) DO UPDATE SET username = excluded.username, nickname = excluded.nickname,
+         avatar_url = excluded.avatar_url, follower_count = excluded.follower_count, data = excluded.data, cached_at = excluded.cached_at`,
+      [
+        r.creator_open_id,
+        r.username ?? "",
+        r.nickname ?? "",
+        r.avatar_url ?? "",
+        r.follower_count ?? 0,
+        r.data ?? "",
+        nowIso,
+      ],
+    );
+  }
+}
+
+/** Kandidat dari cache yang belum berstatus undangan (untuk cron). */
+export async function listAffiliateCreatorCandidates(
+  opts: { limit?: number } = {},
+): Promise<AffiliateCreatorCacheRow[]> {
+  const limit = Math.min(Math.max(opts.limit ?? 200, 1), 2000);
+  return queryAll<AffiliateCreatorCacheRow>(
+    "SELECT * FROM affiliate_creator_cache WHERE invited_status = '' ORDER BY follower_count DESC LIMIT ?",
+    [limit],
+  );
+}
+
+/** Tandai status undangan kreator di cache (sent/failed). */
+export async function markAffiliateCreatorStatus(
+  creatorOpenIds: string[],
+  status: string,
+): Promise<void> {
+  for (const id of creatorOpenIds) {
+    await queryRun(
+      "UPDATE affiliate_creator_cache SET invited_status = ? WHERE creator_open_id = ?",
+      [status, id],
+    );
+  }
+}
+
+/** Baca seluruh pengaturan afiliasi sebagai objek kunci → nilai. */
+export async function getAffiliateSettings(): Promise<Record<string, string>> {
+  const rows = await queryAll<{ k: string; v: string }>(
+    "SELECT k, v FROM affiliate_settings",
+  );
+  const out: Record<string, string> = {};
+  for (const r of rows) out[r.k] = r.v;
+  return out;
+}
+
+/** Simpan satu pengaturan afiliasi (kunci → nilai). */
+export async function setAffiliateSetting(
+  k: string,
+  v: string,
+): Promise<void> {
+  await queryRun(
+    `INSERT INTO affiliate_settings (k, v, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT (k) DO UPDATE SET v = excluded.v, updated_at = excluded.updated_at`,
+    [k, v, new Date().toISOString()],
   );
 }
 

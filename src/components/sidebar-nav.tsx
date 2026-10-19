@@ -36,6 +36,7 @@ import {
   ShieldAlert,
   Upload,
   ShoppingBag,
+  UserPlus,
 } from "lucide-react";
 
 export type NavItem = {
@@ -155,6 +156,11 @@ export const NAV: NavSection[] = [
             href: "/marketplace/tiktok/produk",
             label: "Produk",
             Icon: Boxes,
+          },
+          {
+            href: "/marketplace/tiktok/afiliasi",
+            label: "Undang Kreator",
+            Icon: UserPlus,
           },
         ],
       },
