@@ -1003,9 +1003,9 @@ function TabPengaturan({
               Pengundang Otomatis (Cron)
             </h3>
             <p className="mt-1 text-xs text-slate-500">
-              Berjalan 5× sehari (08:30, 11:30, 14:30, 17:30, 20:30 WIB).
-              Setiap run cari kreator baru, cek eligibilitas, lalu undang
-              sampai cap harian tercapai. Kreator yang sudah diundang
+              Berjalan otomatis 2× sehari (08:30 & 14:30 WIB).
+              Setiap run panen kreator baru ke kolam, cek eligibilitas, lalu
+              undang sampai cap harian tercapai. Kreator yang sudah diundang
               (jurnal internal) tidak akan diundang ulang.
             </p>
           </div>
