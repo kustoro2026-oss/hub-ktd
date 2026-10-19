@@ -187,7 +187,7 @@ export type AffiliateSearchResult =
       nextPageToken: string;
       searchKey: string;
     }
-  | { ok: false; detail: string };
+  | { ok: false; detail: string; code?: number | null };
 
 function parseCreatorRow(r: Record<string, unknown>): AffiliateCreatorRow {
   const avatar = (r.avatar ?? {}) as Record<string, unknown>;
@@ -275,7 +275,7 @@ export async function searchMarketplaceCreators(
     body,
     params,
   );
-  if (!res.ok) return { ok: false, detail: res.detail };
+  if (!res.ok) return { ok: false, detail: res.detail, code: res.code };
 
   const d = res.data;
   return {

@@ -154,6 +154,7 @@ function TabCari({ productIds }: { productIds: string[] }) {
           next_page_token?: string;
           search_key?: string;
           pages_scanned?: number;
+          page_errors?: { page: number; code: number | null; detail: string }[];
         };
         if (!data.ok || !data.items) {
           setError(data.detail ?? "Gagal mencari kreator.");
@@ -162,6 +163,12 @@ function TabCari({ productIds }: { productIds: string[] }) {
             setTotalLoaded(0);
           }
           return;
+        }
+        if ((data.page_errors ?? []).length > 0) {
+          const pertama = data.page_errors![0];
+          setError(
+            `Pemindaian berhenti di halaman ${pertama.page} (${pertama.detail}). Klik Muat Lebih untuk melanjutkan.`,
+          );
         }
         if (append) {
           setItems((prev) => {

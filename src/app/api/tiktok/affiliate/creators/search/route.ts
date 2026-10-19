@@ -4,6 +4,9 @@
 // page_token?, search_key?, page_size? (hanya 12 atau 20),
 // pages? (1-20, berapa halaman dipindai server-side per panggilan).
 // Hasil otomatis disimpan ke cache kandidat (kolam kreator untuk cron auto).
+// Antarpage diberi jeda 1 detik (timestamp signature + batas rate per detik
+// TikTok); halaman lanjutan yang gagal dicoba sekali lagi sebelum berhenti,
+// dan rinciannya dikembalikan lewat page_errors.
 //
 // Auth: sesi admin (isAuthed) ATAU CRON_SECRET (Bearer / x-cron-secret /
 // ?secret=) — pola sama dengan route afiliasi lainnya.
@@ -38,6 +41,11 @@ function numOf(v: unknown): number | undefined {
   if (v === null || v === undefined || v === "") return undefined;
   const n = Number(v);
   return Number.isFinite(n) ? n : undefined;
+}
+
+/** Tidur singkat tanpa memblokir event loop. */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export async function POST(request: Request) {
@@ -76,17 +84,36 @@ export async function POST(request: Request) {
   let key = strOf(body.search_key) || undefined;
   const seen = new Set<string>();
   const items: AffiliateCreatorRow[] = [];
+  const pageErrors: { page: number; code: number | null; detail: string }[] =
+    [];
   let pagesScanned = 0;
   let nextPageToken = "";
   let searchKey = key ?? "";
   for (let p = 0; p < maxPages; p += 1) {
-    const res = await searchMarketplaceCreators(prep.ctx, filter, {
+    // Jeda antarpage: memastikan timestamp detik baru pada signature dan
+    // tidak menabrak batas rate per detik TikTok.
+    if (p > 0) await sleep(1000);
+    let res = await searchMarketplaceCreators(prep.ctx, filter, {
       pageToken: token,
       searchKey: key,
       pageSize,
     });
+    if (!res.ok && p > 0) {
+      // Kemungkinan rate-limit sesaat — coba sekali lagi.
+      await sleep(1500);
+      res = await searchMarketplaceCreators(prep.ctx, filter, {
+        pageToken: token,
+        searchKey: key,
+        pageSize,
+      });
+    }
     if (!res.ok) {
       if (p === 0) return Response.json({ ok: false, detail: res.detail });
+      pageErrors.push({
+        page: p + 1,
+        code: res.code ?? null,
+        detail: res.detail,
+      });
       break;
     }
     pagesScanned += 1;
@@ -121,5 +148,6 @@ export async function POST(request: Request) {
     next_page_token: nextPageToken,
     search_key: searchKey,
     pages_scanned: pagesScanned,
+    page_errors: pageErrors,
   });
 }
