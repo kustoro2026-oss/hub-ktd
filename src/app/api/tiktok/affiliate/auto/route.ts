@@ -141,8 +141,9 @@ export async function POST(request: Request) {
         pageSize: AUTO.SEARCH_PAGE_SIZE,
       },
     );
-    // Backoff bertahap bila kena rate-limit app-group sesaat.
-    for (let t = 0; !res.ok && p > 0 && t < 2; t += 1) {
+    // Backoff bertahap bila kena rate-limit app-group sesaat. Bisa terjadi
+    // bahkan di halaman pertama karena kuota dibagi satu grup aplikasi.
+    for (let t = 0; !res.ok && t < 2; t += 1) {
       await sleep(3000 + t * 3000);
       res = await searchMarketplaceCreators(
         prep.ctx,
