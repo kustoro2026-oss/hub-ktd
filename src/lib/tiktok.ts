@@ -662,6 +662,105 @@ export async function getTiktokOrderDetail(
   }
 }
 
+// ---------- Afiliasi penjual (Creator Outreach / Target Collaboration) ----------
+
+/** Detail kuota per tingkat kreator (response creator_outreach/quota). */
+export type AffiliateQuotaDetail = {
+  creator_level: string;
+  quota_sum: number;
+  quota_use: number;
+  remaining: number;
+};
+
+export type AffiliateQuotaResult =
+  | {
+      ok: true;
+      quota_sum: number;
+      quota_use: number;
+      unlimited: boolean;
+      gmv_tier: string;
+      reached_max_follower_cnt: boolean;
+      details: AffiliateQuotaDetail[];
+      /** Respons mentah untuk diagnostik. */
+      raw: Record<string, unknown>;
+    }
+  | { ok: false; detail: string };
+
+/** GET /affiliate_seller/202607/creator_outreach/quota — kuota mingguan
+ *  undang kreator (model per-tingkat sejak 15 Okt 2026). Read-only. */
+export async function getAffiliateCreatorQuota(
+  shop: { cipher: string; access_token: string },
+): Promise<AffiliateQuotaResult> {
+  const { appKey, appSecret, ready } = tiktokEnv();
+  if (!ready || shop.cipher === "") {
+    return {
+      ok: false,
+      detail: "Kredensial aplikasi atau shop_cipher belum lengkap",
+    };
+  }
+  const path = "/affiliate_seller/202607/creator_outreach/quota";
+  const params: Record<string, string> = {
+    app_key: appKey,
+    shop_cipher: shop.cipher,
+    timestamp: Math.floor(Date.now() / 1000).toString(),
+  };
+  const sign = signRequest(appSecret, path, params);
+  const qs = new URLSearchParams({ ...params, sign });
+  try {
+    const res = await fetch(`${API_HOST}${path}?${qs.toString()}`, {
+      method: "GET",
+      headers: {
+        "content-type": "application/json",
+        "x-tts-access-token": shop.access_token,
+      },
+      cache: "no-store",
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      code?: number;
+      message?: string;
+      data?: Record<string, unknown>;
+    };
+    if (!res.ok || (data.code ?? 1) !== 0) {
+      return {
+        ok: false,
+        detail: `Gagal mengambil kuota undang kreator: ${String(
+          data.message ?? res.status,
+        )}`,
+      };
+    }
+    const d = (data.data ?? {}) as Record<string, unknown>;
+    const rawDetails = (d.quota_detail as Record<string, unknown>[] | undefined) ?? [];
+    return {
+      ok: true,
+      quota_sum: Number(d.quota_sum ?? 0),
+      quota_use: Number(d.quota_use ?? 0),
+      unlimited: Boolean(d.unlimited),
+      gmv_tier: String(d.gmv_tier ?? ""),
+      reached_max_follower_cnt: Boolean(d.reached_max_follower_cnt),
+      details: rawDetails.map((q) => {
+        const r = q as Record<string, unknown>;
+        const sum = Number(r.quota_sum ?? 0);
+        const use = Number(r.quota_use ?? 0);
+        return {
+          creator_level: String(r.creator_level ?? ""),
+          quota_sum: sum,
+          quota_use: use,
+          remaining: Math.max(0, sum - use),
+        };
+      }),
+      raw: d,
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Gagal menghubungi server TikTok: ${
+        e instanceof Error ? e.message : "kesalahan tidak dikenal"
+      }`,
+    };
+  }
+}
+
+
 // ---------- Dokumen pengiriman resmi (label kirim "Cetak Resi") ----------
 
 export type TiktokShippingDocumentResult =
