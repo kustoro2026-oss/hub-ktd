@@ -728,15 +728,26 @@ export async function getAffiliateCreatorQuota(
         )}`,
       };
     }
-    const d = (data.data ?? {}) as Record<string, unknown>;
-    const rawDetails = (d.quota_detail as Record<string, unknown>[] | undefined) ?? [];
+    const outer = (data.data ?? {}) as Record<string, unknown>;
+    // Payload asli bisa bersarang satu tingkat lagi (data.data.data) —
+    // cek kunci "data" di dalamnya sebelum membaca field kuota.
+    const d =
+      (outer.data as Record<string, unknown> | undefined) ?? outer;
+    const rawDetails =
+      (d.quota_detail as Record<string, unknown>[] | undefined) ?? [];
+    // Sentinel "-1" dari TikTok berarti tidak terbatas (unlimited).
+    const quotaSumRaw = String(d.quota_sum ?? "0");
+    const quotaSum = quotaSumRaw === "-1" ? -1 : Number(quotaSumRaw);
+    const followerRaw = String(d.reached_max_follower_cnt ?? "0");
     return {
       ok: true,
-      quota_sum: Number(d.quota_sum ?? 0),
+      quota_sum: quotaSum,
       quota_use: Number(d.quota_use ?? 0),
-      unlimited: Boolean(d.unlimited),
+      unlimited:
+        d.unlimited === true || d.unlimited === "true" || quotaSum === -1,
       gmv_tier: String(d.gmv_tier ?? ""),
-      reached_max_follower_cnt: Boolean(d.reached_max_follower_cnt),
+      reached_max_follower_cnt:
+        followerRaw === "1" || followerRaw === "true",
       details: rawDetails.map((q) => {
         const r = q as Record<string, unknown>;
         const sum = Number(r.quota_sum ?? 0);
