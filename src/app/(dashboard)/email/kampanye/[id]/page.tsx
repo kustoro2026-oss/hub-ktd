@@ -1,6 +1,7 @@
-// Detail kampanye email — ringkasan statistik (terkirim, sampai, open
-// rate, CTR, bounce, berhenti berlangganan) + tombol kirim batch + daftar
-// penerima. Statistik sampai/buka/klik berasal dari webhook Brevo.
+// Detail kampanye email — ringkasan statistik (terkirim, gagal, dibuka,
+// berhenti berlangganan) + tombol kirim batch + daftar penerima. Gmail
+// tidak menyediakan webhook statistik: "dibuka" dilacak via pixel 1x1,
+// sedangkan sampai/klik/bounce tidak tersedia.
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
@@ -67,13 +68,6 @@ export default async function EmailCampaignDetailPage({
   const failedItems = items.filter((i) => i.status === "failed");
   const isScheduled = campaign.status === "draft" && campaign.scheduled_at !== "";
 
-  // "Sampai" = item yang sudah dikonfirmasi Brevo sampai di inbox
-  // (delivered/opened/clicked) — sebelum webhook masuk, statusnya baru
-  // "sent" (diterima API Brevo).
-  const delivered = items.filter((i) =>
-    ["delivered", "opened", "clicked"].includes(i.status),
-  ).length;
-
   // Nilai variabel kampanye (mis. link produk) — JSON di kolom vars.
   const vars = (() => {
     try {
@@ -114,24 +108,18 @@ export default async function EmailCampaignDetailPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
-        <StatCard label="Terkirim" value={String(progress.sent)} sub="diterima API Brevo" />
-        <StatCard label="Sampai" value={String(delivered)} sub="konfirmasi webhook" />
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <StatCard label="Terkirim" value={String(progress.sent)} sub="diterima SMTP Gmail" />
         <StatCard
           label="Dibuka"
           value={String(campaign.opened)}
-          sub={`open rate ${pct(campaign.opened, progress.sent)}`}
+          sub={`open rate ${pct(campaign.opened, progress.sent)} · pixel 1x1`}
         />
         <StatCard
-          label="Klik"
-          value={String(campaign.clicked)}
-          sub={`CTR ${pct(campaign.clicked, progress.sent)}`}
-        />
-        <StatCard
-          label="Bounce"
-          value={String(campaign.bounced)}
+          label="Gagal"
+          value={String(progress.failed)}
           tone="red"
-          sub="email ditolak server"
+          sub="ditolak SMTP Gmail"
         />
         <StatCard
           label="Berhenti"
@@ -157,9 +145,9 @@ export default async function EmailCampaignDetailPage({
           />
           <p className="mt-3 text-xs text-slate-400">
             Tiap klik memproses satu batch (±40 penerima, jeda 1 detik antar
-            email). Klik tombol lagi sampai semua terkirim. Statistik sampai /
-            dibuka / klik masuk otomatis dari webhook Brevo (bisa terlambat
-            beberapa menit).
+            email). Klik tombol lagi sampai semua terkirim. Statistik dibuka
+            masuk otomatis dari pixel buka di badan email (bisa terlambat
+            beberapa menit) — Gmail tidak menyediakan data sampai/klik/bounce.
           </p>
         </div>
       )}
@@ -182,8 +170,8 @@ export default async function EmailCampaignDetailPage({
           Penerima ({items.length})
         </h2>
         <p className="mb-3 text-xs text-slate-400">
-          Terkirim = diterima API Brevo · Sampai = tiba di inbox · Dibuka /
-          Diklik = dari webhook statistik Brevo.
+          Terkirim = diterima SMTP Gmail · Dibuka = pixel buka di badan email.
+          Gmail tidak menyediakan statistik sampai/klik/bounce.
         </p>
         <div className="max-h-96 overflow-y-auto">
           <table className="w-full text-left text-sm">

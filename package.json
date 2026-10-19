@@ -12,6 +12,7 @@
     "@types/pdfkit": "^0.17.6",
     "lucide-react": "^1.51.0",
     "next": "16.3.8",
+    "nodemailer": "^10.1.7",
     "pdf-lib": "^1.17.1",
     "pdfkit": "^0.20.2",
     "pg": "^8.23.1",
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/node": "^24.19.1",
+    "@types/nodemailer": "^8.0.2",
     "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",

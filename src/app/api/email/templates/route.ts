@@ -1,6 +1,6 @@
 // Kelola template email (HTML + variabel {{...}}): GET daftar, POST buat,
 // PATCH ubah subject/body/bahasa, DELETE hapus. Semua mutasi butuh login
-// admin. Template disimpan di DB KTD Hub sendiri (bukan dashboard Brevo)
+// admin. Template disimpan di DB KTD Hub sendiri (bukan dashboard penyedia)
 // supaya variabel dan pratinjau konsisten dengan pola template WhatsApp.
 import { isAuthed } from "@/lib/auth";
 import {

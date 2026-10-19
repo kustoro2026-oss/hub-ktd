@@ -1,5 +1,5 @@
 // Kirim uji satu email dari template ke alamat pilihan (default: alamat
-// pengirim sendiri = BREVO_SENDER_EMAIL). Tidak menyentuh data kampanye —
+// pengirim sendiri = GMAIL_SENDER_EMAIL). Tidak menyentuh data kampanye —
 // murni cek tampilan subject + isi + variabel sebelum blast.
 //
 // Dua mode:
@@ -9,7 +9,7 @@
 //   subject, dan variabel diambil dari kampanye; body boleh menimpanya.
 import { isAuthed } from "@/lib/auth";
 import { getEmailCampaign, getEmailTemplate } from "@/lib/db";
-import { fillVars, getBrevoEnv, sendEmail } from "@/lib/brevo";
+import { fillVars, getGmailEnv, sendEmail } from "@/lib/gmail";
 
 export async function POST(
   request: Request,
@@ -58,11 +58,11 @@ export async function POST(
   if (!tpl) {
     return Response.json({ error: "Template tidak ditemukan" }, { status: 400 });
   }
-  const env = getBrevoEnv();
+  const env = await getGmailEnv();
   const to = (body.email ?? "").trim() || (env?.senderEmail ?? "");
   if (!to) {
     return Response.json(
-      { error: "BREVO_SENDER_EMAIL belum diatur — isi alamat email tujuan" },
+      { error: "Akun SMTP Gmail belum diatur — isi alamat email tujuan" },
       { status: 400 },
     );
   }
@@ -80,7 +80,6 @@ export async function POST(
     name: "Uji Kirim",
     subject: fillVars((body.subject ?? tpl.subject).trim() || tpl.subject, values),
     html: fillVars(tpl.html_body, values),
-    tags: ["ktd-email-test"],
   });
   if (!res.ok) {
     return Response.json({ ok: false, error: res.error }, { status: 409 });

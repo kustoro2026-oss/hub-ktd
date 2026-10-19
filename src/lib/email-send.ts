@@ -6,7 +6,8 @@
 // default 40) supaya aman untuk serverless Vercel. Item di-claim atomik
 // (status "queued") sehingga dua ronde beriringan tidak mengirim email
 // yang sama dua kali. Setiap email ditambahi footer berisi link berhenti
-// berlangganan per penerima (token HMAC alamatnya).
+// berlangganan per penerima (token HMAC alamatnya) + pixel 1x1 pelacak
+// "dibuka" (Gmail tidak menyediakan webhook statistik).
 import {
   claimPendingEmailItems,
   emailCampaignProgress,
@@ -17,9 +18,15 @@ import {
   requeueStaleQueuedEmailItems,
   setEmailCampaignStatus,
 } from "@/lib/db";
-import { fillVars, getBrevoEnv, sendEmail, unsubscribeToken } from "@/lib/brevo";
+import {
+  fillVars,
+  getGmailEnv,
+  openPixelToken,
+  sendEmail,
+  unsubscribeToken,
+} from "@/lib/gmail";
 
-const DELAY_MS = 1000; // jeda antar email — aman untuk API Brevo
+const DELAY_MS = 1000; // jeda antar email — jaga reputasi akun Gmail
 const BATCH_SIZE = Number(process.env.EMAIL_BATCH ?? 40) || 40;
 
 export type EmailRunResult = {
@@ -51,15 +58,25 @@ function unsubscribeFooter(email: string): string {
   );
 }
 
+/** Pixel 1x1 pelacak "dibuka" per item — token HMAC id item, dihitung
+ *  di route /api/email/open/[id]/[token]. */
+function openPixel(itemId: number): string {
+  const token = openPixelToken(itemId);
+  const url = `${publicBase()}/api/email/open/${itemId}/${token}`;
+  return (
+    `<img src="${url}" width="1" height="1" alt="" style="display:block;width:1px;height:1px;" />`
+  );
+}
+
 export async function runEmailCampaign(id: number): Promise<EmailRunResult> {
   const campaign = await getEmailCampaign(id);
   if (!campaign) {
     return { ok: false, error: "Kampanye tidak ditemukan" };
   }
-  if (!getBrevoEnv()) {
+  if (!(await getGmailEnv())) {
     return {
       ok: false,
-      error: "BREVO_API_KEY / BREVO_SENDER_EMAIL belum diatur",
+      error: "Akun SMTP Gmail belum diatur — isi di panel Pengaturan SMTP",
     };
   }
   if (campaign.status === "done") {
@@ -119,13 +136,17 @@ export async function runEmailCampaign(id: number): Promise<EmailRunResult> {
     const values = { ...varValues, nama: item.name, email: item.email };
     const subject = fillVars(campaign.subject || tpl.subject, values);
     const html =
-      fillVars(tpl.html_body, values) + unsubscribeFooter(item.email);
+      fillVars(tpl.html_body, values) +
+      unsubscribeFooter(item.email) +
+      openPixel(item.id);
+    const token = unsubscribeToken(item.email);
+    const unsubUrl = `${publicBase()}/api/email/unsubscribe?email=${encodeURIComponent(item.email)}&token=${token}`;
     const res = await sendEmail({
       to: item.email,
       name: item.name,
       subject,
       html,
-      tags: [`ktd-email-${campaign.id}`, `email-item-${item.id}`],
+      listUnsubscribe: unsubUrl,
     });
     if (res.ok) {
       await markEmailCampaignItem(item.id, "sent", "", res.messageId ?? "");

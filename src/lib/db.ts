@@ -116,7 +116,7 @@ export type EmailCampaignItem = {
     | "clicked"
     | "failed";
   error: string;
-  brevo_message_id: string;
+  message_id: string;
   claimed_at: string;
   created_at: string;
 };
@@ -312,6 +312,106 @@ export async function opsStoreBackup(dump: unknown): Promise<void> {
 export async function opsHealthCheck(): Promise<void> {
   await queryRun("SELECT 1");
 }
+
+// ---------- Email Marketing: benih template bawaan ----------
+// Enam template siap pakai dimasukkan saat tabel email_templates masih
+// kosong (sekali saja) — pengguna bebas mengubah/menghapusnya.
+const EMAIL_SEED_TEMPLATES: {
+  name: string;
+  subject: string;
+  html: string;
+}[] = [
+  {
+    name: "Promo Diskon",
+    subject: "Promo Spesial untuk {{nama}} 🎉",
+    html: `<div style="background:#f1f5f9;padding:24px 12px;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+<div style="background:#10b981;padding:20px 24px;"><span style="color:#fff;font-size:20px;font-weight:700;">KTD Store</span></div>
+<div style="padding:24px;">
+<p style="margin:0 0 12px;font-size:16px;color:#0f172a;">Halo <strong>{{nama}}</strong>,</p>
+<p style="margin:0 0 12px;font-size:14px;color:#334155;line-height:1.6;">Ada promo spesial menanti Anda! Diskon hingga <strong>50%</strong> untuk produk pilihan minggu ini — hanya berlaku selama stok masih ada.</p>
+<p style="margin:0 0 12px;font-size:14px;color:#334155;line-height:1.6;">Gunakan kode promo <strong>{{kode}}</strong> saat checkout.</p>
+<p style="margin:24px 0;"><a href="{{link}}" style="background:#10b981;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;display:inline-block;">Lihat Promo Sekarang</a></p>
+<p style="margin:0;font-size:12px;color:#94a3b8;">Syarat &amp; ketentuan berlaku. Stok terbatas.</p>
+</div>
+</div>
+</div>`,
+  },
+  {
+    name: "Produk Baru",
+    subject: "Produk Baru Sudah Hadir di KTD Store!",
+    html: `<div style="background:#f1f5f9;padding:24px 12px;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+<div style="background:#10b981;padding:20px 24px;"><span style="color:#fff;font-size:20px;font-weight:700;">KTD Store</span></div>
+<div style="padding:24px;">
+<p style="margin:0 0 12px;font-size:16px;color:#0f172a;">Halo <strong>{{nama}}</strong>,</p>
+<p style="margin:0 0 12px;font-size:14px;color:#334155;line-height:1.6;"><strong>{{produk}}</strong> baru saja masuk katalog kami dan kami rasa Anda akan menyukainya.</p>
+<p style="margin:0 0 12px;font-size:14px;color:#334155;line-height:1.6;">Stok awal terbatas — jangan sampai kehabisan.</p>
+<p style="margin:24px 0;"><a href="{{link}}" style="background:#10b981;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;display:inline-block;">Lihat Produk</a></p>
+</div>
+</div>
+</div>`,
+  },
+  {
+    name: "Keranjang Terbengkalai",
+    subject: "{{nama}}, Keranjang Anda Masih Menunggu",
+    html: `<div style="background:#f1f5f9;padding:24px 12px;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+<div style="background:#10b981;padding:20px 24px;"><span style="color:#fff;font-size:20px;font-weight:700;">KTD Store</span></div>
+<div style="padding:24px;">
+<p style="margin:0 0 12px;font-size:16px;color:#0f172a;">Halo <strong>{{nama}}</strong>,</p>
+<p style="margin:0 0 12px;font-size:14px;color:#334155;line-height:1.6;"><strong>{{produk}}</strong> masih tersimpan di keranjang belanja Anda.</p>
+<p style="margin:0 0 12px;font-size:14px;color:#334155;line-height:1.6;">Selesaikan pesanan Anda sekarang — barang populer bisa cepat habis.</p>
+<p style="margin:24px 0;"><a href="{{link}}" style="background:#10b981;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;display:inline-block;">Lanjutkan Belanja</a></p>
+</div>
+</div>
+</div>`,
+  },
+  {
+    name: "Ulang Tahun Pelanggan",
+    subject: "Selamat Ulang Tahun, {{nama}}! 🎂",
+    html: `<div style="background:#f1f5f9;padding:24px 12px;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+<div style="background:#10b981;padding:20px 24px;"><span style="color:#fff;font-size:20px;font-weight:700;">KTD Store</span></div>
+<div style="padding:24px;">
+<p style="margin:0 0 12px;font-size:16px;color:#0f172a;">Halo <strong>{{nama}}</strong>,</p>
+<p style="margin:0 0 12px;font-size:14px;color:#334155;line-height:1.6;">Selamat ulang tahun! Semoga hari Anda penuh kebahagiaan. Sebagai hadiah, kami berikan kode spesial <strong>{{kode}}</strong> untuk belanja berikutnya.</p>
+<p style="margin:24px 0;"><a href="{{link}}" style="background:#10b981;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;display:inline-block;">Ambil Hadiah Saya</a></p>
+<p style="margin:0;font-size:12px;color:#94a3b8;">Kode berlaku 7 hari sejak email ini dikirim.</p>
+</div>
+</div>
+</div>`,
+  },
+  {
+    name: "Minta Ulasan",
+    subject: "Bagaimana Pengalaman Belanja Anda, {{nama}}?",
+    html: `<div style="background:#f1f5f9;padding:24px 12px;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+<div style="background:#10b981;padding:20px 24px;"><span style="color:#fff;font-size:20px;font-weight:700;">KTD Store</span></div>
+<div style="padding:24px;">
+<p style="margin:0 0 12px;font-size:16px;color:#0f172a;">Halo <strong>{{nama}}</strong>,</p>
+<p style="margin:0 0 12px;font-size:14px;color:#334155;line-height:1.6;">Terima kasih sudah berbelanja di KTD Store. Penilaian Anda membantu kami melayani lebih baik.</p>
+<p style="margin:0 0 12px;font-size:14px;color:#334155;line-height:1.6;">Luangkan 1 menit untuk berbagi pengalaman Anda.</p>
+<p style="margin:24px 0;"><a href="{{link}}" style="background:#10b981;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;display:inline-block;">Tulis Ulasan</a></p>
+</div>
+</div>
+</div>`,
+  },
+  {
+    name: "Newsletter Bulanan",
+    subject: "Kabar Terbaru KTD Store untuk {{nama}}",
+    html: `<div style="background:#f1f5f9;padding:24px 12px;">
+<div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+<div style="background:#10b981;padding:20px 24px;"><span style="color:#fff;font-size:20px;font-weight:700;">KTD Store</span></div>
+<div style="padding:24px;">
+<p style="margin:0 0 12px;font-size:16px;color:#0f172a;">Halo <strong>{{nama}}</strong>,</p>
+<p style="margin:0 0 12px;font-size:14px;color:#334155;line-height:1.6;">Inilah rangkuman kabar terbaru dari KTD Store: promo berjalan, produk baru, dan tips belanja hemat bulan ini.</p>
+<p style="margin:24px 0;"><a href="{{link}}" style="background:#10b981;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;display:inline-block;">Baca Selengkapnya</a></p>
+</div>
+</div>
+</div>`,
+  },
+];
 
 // ---------- migrasi ----------
 
@@ -732,7 +832,7 @@ function migrateSqlite(db: DatabaseSync) {
       email TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'pending',
       error TEXT NOT NULL DEFAULT '',
-      brevo_message_id TEXT NOT NULL DEFAULT '',
+      message_id TEXT NOT NULL DEFAULT '',
       claimed_at TEXT NOT NULL DEFAULT '',
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
@@ -749,6 +849,14 @@ function migrateSqlite(db: DatabaseSync) {
     CREATE INDEX IF NOT EXISTS idx_email_events_item
       ON email_events (campaign_item_id);
 
+    -- Email Marketing: pengaturan SMTP kunci–nilai (akun Gmail bisa
+    -- diganti dari UI tanpa menyentuh env).
+    CREATE TABLE IF NOT EXISTS email_settings (
+      k TEXT PRIMARY KEY,
+      v TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT ''
+    );
+
     CREATE TABLE IF NOT EXISTS ops_backups (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       name TEXT NOT NULL DEFAULT '',
@@ -756,6 +864,33 @@ function migrateSqlite(db: DatabaseSync) {
       created_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
   `);
+
+  // Migrasi email marketing: kolom brevo_message_id → message_id (provider
+  // kini Gmail; kolom lama ditinggal — belum ada data yang berarti).
+  const emItemCols = db
+    .prepare("PRAGMA table_info(email_campaign_items)")
+    .all() as { name: string }[];
+  if (
+    emItemCols.length > 0 &&
+    !emItemCols.some((c) => c.name === "message_id")
+  ) {
+    db.exec(
+      "ALTER TABLE email_campaign_items ADD COLUMN message_id TEXT NOT NULL DEFAULT ''",
+    );
+  }
+
+  // Benih 6 template email marketing bawaan (hanya bila tabel kosong).
+  const tplSeed = db
+    .prepare("SELECT COUNT(*) AS c FROM email_templates")
+    .get() as { c: number };
+  if (tplSeed.c === 0) {
+    const ins = db.prepare(
+      "INSERT INTO email_templates (name, subject, html_body) VALUES (?, ?, ?)",
+    );
+    for (const t of EMAIL_SEED_TEMPLATES) {
+      ins.run(t.name, t.subject, t.html);
+    }
+  }
 
   // Migrasi DB lama: kolom shop_cipher untuk panggilan API pesanan.
   const tcols = db
@@ -1302,7 +1437,7 @@ async function migratePg(pool: Pool) {
       email TEXT NOT NULL,
       status TEXT NOT NULL DEFAULT 'pending',
       error TEXT NOT NULL DEFAULT '',
-      brevo_message_id TEXT NOT NULL DEFAULT '',
+      message_id TEXT NOT NULL DEFAULT '',
       claimed_at TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
@@ -1319,6 +1454,14 @@ async function migratePg(pool: Pool) {
     CREATE INDEX IF NOT EXISTS idx_email_events_item
       ON email_events (campaign_item_id);
 
+    -- Email Marketing: pengaturan SMTP kunci–nilai (akun Gmail bisa
+    -- diganti dari UI tanpa menyentuh env).
+    CREATE TABLE IF NOT EXISTS email_settings (
+      k TEXT PRIMARY KEY,
+      v TEXT NOT NULL DEFAULT '',
+      updated_at TEXT NOT NULL DEFAULT ''
+    );
+
     CREATE TABLE IF NOT EXISTS ops_backups (
       id SERIAL PRIMARY KEY,
       name TEXT NOT NULL DEFAULT '',
@@ -1326,6 +1469,34 @@ async function migratePg(pool: Pool) {
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
   `);
+
+  // Migrasi email marketing: kolom brevo_message_id → message_id (provider
+  // kini Gmail; kolom lama ditinggal — belum ada data yang berarti).
+  const emCols = await pool.query<{ column_name: string }>(
+    `SELECT column_name FROM information_schema.columns
+     WHERE table_name = 'email_campaign_items'`,
+  );
+  if (
+    emCols.rows.length > 0 &&
+    !emCols.rows.some((c) => c.column_name === "message_id")
+  ) {
+    await pool.query(
+      "ALTER TABLE email_campaign_items ADD COLUMN message_id TEXT NOT NULL DEFAULT ''",
+    );
+  }
+
+  // Benih 6 template email marketing bawaan (hanya bila tabel kosong).
+  const tplSeed = await pool.query<{ c: string }>(
+    "SELECT COUNT(*)::int AS c FROM email_templates",
+  );
+  if (Number(tplSeed.rows[0]?.c ?? 0) === 0) {
+    for (const t of EMAIL_SEED_TEMPLATES) {
+      await pool.query(
+        "INSERT INTO email_templates (name, subject, html_body) VALUES ($1, $2, $3)",
+        [t.name, t.subject, t.html],
+      );
+    }
+  }
 
   // Migrasi skema awal blibli_order_exec (kunci order_item_id → package_id),
   // sama seperti versi SQLite — tabel lama kosong aman dibuang sekali.
@@ -4099,9 +4270,30 @@ export async function tandaiStokKanalSelesai(
 }
 
 // ---------- Email Marketing ----------
-// Modul email massal via Brevo — pola sama dengan broadcast WhatsApp:
-// kontak → grup → template → kampanye → penjadwalan. Statistik (dibuka,
-// diklik, bounce) diisi dari webhook Brevo lewat tabel email_events.
+// Modul email massal via Gmail — pola sama dengan broadcast WhatsApp:
+// kontak → grup → template → kampanye → penjadwalan. Gmail tidak punya
+// webhook statistik: "dibuka" dilacak lewat pixel 1x1 di badan email.
+
+// ---------- Pengaturan SMTP Gmail (kunci → nilai, disimpan di DB) ----------
+
+/** Baca seluruh pengaturan email sebagai objek kunci → nilai. */
+export async function getEmailSettings(): Promise<Record<string, string>> {
+  const rows = await queryAll<{ k: string; v: string }>(
+    "SELECT k, v FROM email_settings",
+  );
+  const out: Record<string, string> = {};
+  for (const r of rows) out[r.k] = r.v;
+  return out;
+}
+
+/** Simpan satu pengaturan email (kunci → nilai). */
+export async function setEmailSetting(k: string, v: string): Promise<void> {
+  await queryRun(
+    `INSERT INTO email_settings (k, v, updated_at) VALUES (?, ?, ?)
+     ON CONFLICT (k) DO UPDATE SET v = excluded.v, updated_at = excluded.updated_at`,
+    [k, v, new Date().toISOString()],
+  );
+}
 
 export async function listEmailContacts(): Promise<EmailContact[]> {
   return queryAll<EmailContact>("SELECT * FROM email_contacts ORDER BY id DESC");
@@ -4336,17 +4528,6 @@ export async function listEmailCampaignItems(
   );
 }
 
-// Pencarian item lewat messageId Brevo — dipakai webhook statistik
-// sebagai fallback bila tag korelasi tidak ikut terkirim.
-export async function getEmailCampaignItemByMessageId(
-  messageId: string,
-): Promise<EmailCampaignItem | undefined> {
-  return queryOne<EmailCampaignItem>(
-    "SELECT * FROM email_campaign_items WHERE brevo_message_id = ?",
-    [messageId],
-  );
-}
-
 export async function createEmailCampaignWithItems(
   name: string,
   templateId: number,
@@ -4429,11 +4610,11 @@ export async function markEmailCampaignItem(
   id: number,
   status: "sent" | "delivered" | "opened" | "clicked" | "failed",
   error = "",
-  brevoMessageId = "",
+  messageId = "",
 ): Promise<void> {
   await queryRun(
-    "UPDATE email_campaign_items SET status = ?, error = ?, brevo_message_id = ?, claimed_at = '' WHERE id = ?",
-    [status, error, brevoMessageId, id],
+    "UPDATE email_campaign_items SET status = ?, error = ?, message_id = ?, claimed_at = '' WHERE id = ?",
+    [status, error, messageId, id],
   );
 }
 
@@ -4462,7 +4643,7 @@ export async function emailCampaignProgress(id: number): Promise<{
 }
 
 // Email terkirim dari Hub hari ini (jendela kalender lokal) — dasar panel
-// batas harian. Batas Brevo gratis = 300 email per hari.
+// batas harian. Batas Gmail pribadi = 500 email per hari.
 export async function countEmailsSentToday(): Promise<number> {
   const since =
     dbMode() === "pg"
@@ -4485,7 +4666,7 @@ export async function listDueScheduledEmailCampaigns(): Promise<
   );
 }
 
-// ---------- Statistik via webhook Brevo ----------
+// ---------- Statistik via event (pixel buka + berhenti langganan) ----------
 
 /** Urutan status item email: hanya boleh naik. "failed" final. */
 const EMAIL_RANK: Record<string, number> = {
@@ -4498,16 +4679,17 @@ const EMAIL_RANK: Record<string, number> = {
   failed: 9,
 };
 
-/** Nama event Brevo → status item. Event lain diabaikan. */
+/** Nama event → status item. Event lain diabaikan. */
 const EMAIL_EVENT_STATUS: Record<string, string> = {
   delivered: "delivered",
   opened: "opened",
   click: "clicked",
 };
 
-/** Terapkan satu event webhook Brevo ke item kampanye. Status item hanya
- *  naik (guard rank) sehingga event dobel dari Brevo tidak menggandakan
- *  counter kampanye maupun status kontak. */
+/** Terapkan satu event ke item kampanye (pixel buka, berhenti langganan,
+ *  atau — bila nanti pakai penyedia ber-webhook — delivered/klik/bounce).
+ *  Status item hanya naik (guard rank) sehingga event dobel tidak
+ *  menggandakan counter kampanye maupun status kontak. */
 export async function applyEmailEvent(
   campaignItemId: number,
   event: string,
@@ -4530,10 +4712,9 @@ export async function applyEmailEvent(
       [event, campaignItemId, detail],
     );
 
-  // Berhenti berlangganan / keluhan spam: dedupe lewat tabel event karena
-  // Brevo kadang mengirim ulang payload yang sama — satu kontak hanya
-  // dihitung satu kali walau event unsubscribed & complaint dua-duanya
-  // datang.
+  // Berhenti berlangganan / keluhan spam: dedupe lewat tabel event — satu
+  // kontak hanya dihitung satu kali walau event unsubscribed & complaint
+  // dua-duanya datang.
   if (event === "unsubscribed" || event === "complaint") {
     const exists = await queryOne<{ x: number }>(
       "SELECT 1 AS x FROM email_events WHERE campaign_item_id = ? AND event IN ('unsubscribed', 'complaint')",

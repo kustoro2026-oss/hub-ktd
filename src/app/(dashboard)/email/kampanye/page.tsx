@@ -1,4 +1,4 @@
-// Halaman Kampanye Email — panel kuota harian Brevo, form buat kampanye
+// Halaman Kampanye Email — panel kuota harian Gmail, form buat kampanye
 // baru, dan riwayat kampanye dengan ringkasan statistik.
 import Link from "next/link";
 import {
@@ -10,6 +10,7 @@ import {
 import { toWib } from "@/lib/format";
 import EmailCampaignCreate from "@/components/email-campaign-create";
 import EmailSendLimitPanel from "@/components/email-send-limit-panel";
+import EmailSmtpSettings from "@/components/email-smtp-settings";
 import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
@@ -36,10 +37,12 @@ export default async function EmailKampanyePage() {
     <div className="space-y-6">
       <PageHeader
         title="Kampanye Email"
-        subtitle="Kirim email massal via Brevo (batas gratis 300/hari)"
+        subtitle="Kirim email massal via Gmail (batas 500/hari)"
       />
 
       <EmailSendLimitPanel />
+
+      <EmailSmtpSettings />
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="mb-3 text-sm font-semibold text-slate-900">

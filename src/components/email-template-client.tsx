@@ -1,7 +1,7 @@
 "use client";
 
 // Kelola template email marketing — disimpan di database KTD Hub sendiri
-// (bukan dashboard Brevo) supaya variabel dan pratinjau konsisten dengan
+// (bukan dashboard penyedia) supaya variabel dan pratinjau konsisten dengan
 // pola template WhatsApp. Satu template = nama + subjek + isi HTML.
 // Variabel {{...}} di subjek/isi diisi saat kampanye dibuat; {{nama}} dan
 // {{email}} otomatis terisi per penerima saat pengiriman.

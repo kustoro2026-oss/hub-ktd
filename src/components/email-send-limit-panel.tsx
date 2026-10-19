@@ -1,12 +1,12 @@
 // Panel "Status kirim & batas harian" untuk email marketing — batas akun
-// gratis Brevo 300 email/hari dipadukan dengan hitungan kiriman Hub hari
-// ini dari database lokal. Server component: nilai segar tiap kali halaman
-// dibuka (pola send-limit-panel WA).
+// Gmail 500 email/hari dipadukan dengan hitungan kiriman Hub hari ini dari
+// database lokal. Server component: nilai segar tiap kali halaman dibuka
+// (pola send-limit-panel WA).
 import { countEmailsSentToday } from "@/lib/db";
 
-// Batas akun gratis Brevo (300/hari). Naikkan bila berlangganan paket
-// berbayar — nilainya di sini supaya tampil jelas di UI.
-const FREE_TIER_LIMIT = 300;
+// Batas Gmail pribadi (500/hari). Naikkan bila akunnya Workspace (2000) —
+// nilainya di sini supaya tampil jelas di UI.
+const FREE_TIER_LIMIT = 500;
 
 export default async function EmailSendLimitPanel() {
   const [sentToday] = await Promise.all([countEmailsSentToday()]);
@@ -29,12 +29,12 @@ export default async function EmailSendLimitPanel() {
       <div className="grid grid-cols-3 gap-3">
         <div className="rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2">
           <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-            Batas harian Brevo
+            Batas harian Gmail
           </div>
           <div className="mt-0.5 text-lg font-bold text-slate-900">
             {FREE_TIER_LIMIT}
           </div>
-          <div className="text-[11px] text-slate-500">tier gratis</div>
+          <div className="text-[11px] text-slate-500">akun pribadi</div>
         </div>
         <div className="rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2">
           <div className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
@@ -72,15 +72,14 @@ export default async function EmailSendLimitPanel() {
         </summary>
         <ul className="mt-2 list-disc space-y-1 pl-4 text-xs text-slate-500">
           <li>
-            <strong>Batas 300/hari</strong> = akun gratis Brevo. Angka ini
-            dihitung dari tabel kampanye email Hub — kiriman dari dashboard
-            Brevo di luar Hub tidak ikut terhitung, jadi samakan perkiraan
-            Anda.
+            <strong>Batas 500/hari</strong> = akun Gmail pribadi (Workspace
+            2000). Angka ini dihitung dari tabel kampanye email Hub — kiriman
+            dari luar Hub tidak ikut terhitung, jadi samakan perkiraan Anda.
           </li>
           <li>
-            <strong>Bila tembus:</strong> Brevo menolak email berikutnya
-            (kode 402) sampai kuota pulih keesokan hari. Hub menandai
-            barisnya <strong>Gagal</strong> beserta alasannya.
+            <strong>Bila tembus:</strong> Gmail menolak email berikutnya
+            sampai kuota pulih keesokan hari. Hub menandai barisnya{" "}
+            <strong>Gagal</strong> beserta alasannya.
           </li>
           <li>
             <strong>Saran:</strong> pecah kampanye besar jadi beberapa hari,

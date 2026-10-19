@@ -1,13 +1,13 @@
-// Panel kuota harian email: batas Brevo gratis = 300 email per hari,
+// Panel kuota harian email: batas Gmail pribadi = 500 email per hari,
 // dikurangi kiriman Hub hari ini (jendela kalender lokal). Angka kiriman
-// dihitung dari tabel email_campaign_items — kiriman dari dashboard Brevo
-// di luar Hub tidak terhitung di sini.
+// dihitung dari tabel email_campaign_items — kiriman dari luar Hub tidak
+// terhitung di sini.
 import { isAuthed } from "@/lib/auth";
 import { countEmailsSentToday } from "@/lib/db";
 
-// Batas akun gratis Brevo (300/hari). Naikkan bila berlangganan paket
-// berbayar — nilainya di sini supaya tampil jelas di UI.
-const FREE_TIER_LIMIT = 300;
+// Batas Gmail pribadi (500/hari; Workspace 2000). Naikkan bila akunnya
+// Workspace — nilainya di sini supaya tampil jelas di UI.
+const FREE_TIER_LIMIT = 500;
 
 export async function GET() {
   if (!(await isAuthed())) {

@@ -52,7 +52,7 @@ export default function EmailCampaignCreate({
     text: string;
   } | null>(null);
 
-  // Penjaga kuota: baca kiriman Hub hari ini vs batas Brevo gratis 300.
+  // Penjaga kuota: baca kiriman Hub hari ini vs batas Gmail 500/hari.
   useEffect(() => {
     (async () => {
       try {
@@ -387,15 +387,15 @@ export default function EmailCampaignCreate({
           {recipients > (limitInfo.remaining ?? 0) ? (
             <>
               <strong>Perhatian kuota:</strong> penerima ({recipients})
-              melebihi sisa kuota harian Brevo ({limitInfo.remaining} —
+              melebihi sisa kuota harian Gmail ({limitInfo.remaining} —
               terpakai {limitInfo.sentToday} dari {limitInfo.limit}). Email
-              yang tembus batas akan <strong>ditolak Brevo</strong> dan
+              yang tembus batas akan <strong>ditolak Gmail</strong> dan
               tercatat Gagal. Saran: pecah jadi dua kampanye atau jadwalkan
               besok.
             </>
           ) : (
             <>
-              Sisa kuota harian Brevo: <strong>{limitInfo.remaining}</strong>{" "}
+              Sisa kuota harian Gmail: <strong>{limitInfo.remaining}</strong>{" "}
               email (terpakai {limitInfo.sentToday} dari {limitInfo.limit}) —{" "}
               {recipients} penerima masih aman.
             </>
