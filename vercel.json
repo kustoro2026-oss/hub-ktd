@@ -34,7 +34,11 @@
     },
     {
       "path": "/api/tiktok/affiliate/auto",
-      "schedule": "30 1,4,7,10,13 * * *"
+      "schedule": "30 1 * * *"
+    },
+    {
+      "path": "/api/tiktok/affiliate/auto",
+      "schedule": "30 7 * * *"
     }
   ]
 }

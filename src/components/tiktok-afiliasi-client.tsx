@@ -874,7 +874,7 @@ function TabPengaturan({
         invited?: number;
         candidates_checked?: number;
         eligible?: number;
-        sent24h?: number;
+        sent_today?: number;
         daily_cap?: number;
         batches_failed?: number;
       };
@@ -885,7 +885,7 @@ function TabPengaturan({
       if (data.skipped) {
         setMessage(
           data.skipped === "cap"
-            ? `Dilewati: cap harian tercapai (${data.sent24h}/${data.daily_cap} undangan 24 jam terakhir).`
+            ? `Dilewati: cap harian tercapai (${data.sent_today}/${data.daily_cap} undangan hari ini).`
             : data.skipped === "disabled"
               ? "Dilewati: pengundang otomatis masih mati."
               : "Dilewati: tidak ada kandidat baru.",
@@ -895,8 +895,8 @@ function TabPengaturan({
       setMessage(
         `Selesai: ${data.invited ?? 0} undangan terkirim dari ${
           data.candidates_checked ?? 0
-        } kandidat diperiksa (${data.eligible ?? 0} layak). 24 jam terakhir: ${
-          data.sent24h ?? 0
+        } kandidat diperiksa (${data.eligible ?? 0} layak). Hari ini: ${
+          data.sent_today ?? 0
         }/${data.daily_cap ?? 0}.`,
       );
     } catch {

@@ -2,7 +2,7 @@
 // harian. Alur tiap run:
 //   1. Baca pengaturan (saklar auto_enabled, cap harian, filter follower,
 //      daftar produk, komisi, kontak penjual).
-//   2. Hentikan bila cap undangan 24 jam terakhir sudah tercapai.
+//   2. Hentikan bila cap undangan hari ini (WIB) sudah tercapai.
 //   3. Cari kreator marketplace (filter follower + belum diundang 90 hari)
 //      beberapa halaman, simpan ke cache kandidat.
 //   4. Gabung hasil pencarian + cache lama, lalu BUANG kreator yang sudah
@@ -74,14 +74,19 @@ export async function POST(request: Request) {
   const dailyCap = Number.isFinite(capRaw) && capRaw > 0
     ? Math.min(Math.floor(capRaw), AUTO.MAX_CAP)
     : AUTO.DEFAULT_CAP;
-  const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-  const sent24h = await countAffiliateInvitesSentSince(since);
-  const remaining = dailyCap - sent24h;
+  // Cap dihitung per hari kalender WIB (bukan 24 jam berjalan) supaya dua
+  // run cron harian (08:30 & 14:30 WIB) sama-sama bisa mengisi cap harian.
+  const now = new Date();
+  const wibMidnight = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), -7),
+  ).toISOString();
+  const sentToday = await countAffiliateInvitesSentSince(wibMidnight);
+  const remaining = dailyCap - sentToday;
   if (remaining <= 0) {
     return Response.json({
       ok: true,
       skipped: "cap",
-      sent24h,
+      sent_today: sentToday,
       daily_cap: dailyCap,
     });
   }
@@ -198,7 +203,7 @@ export async function POST(request: Request) {
       skipped: "empty",
       searched: fresh.length,
       cached: cached.length,
-      sent24h,
+      sent_today: sentToday,
       daily_cap: dailyCap,
     });
   }
@@ -232,7 +237,7 @@ export async function POST(request: Request) {
       ok: true,
       skipped: "ineligible",
       checked: pool.length,
-      sent24h,
+      sent_today: sentToday,
       daily_cap: dailyCap,
     });
   }
@@ -276,7 +281,7 @@ export async function POST(request: Request) {
     batches_failed: summary.batches.filter((b) => !b.ok).length,
     candidates_checked: pool.length,
     eligible: target.length,
-    sent24h,
+    sent_today: sentToday,
     daily_cap: dailyCap,
   });
 }
