@@ -314,7 +314,7 @@ export async function opsHealthCheck(): Promise<void> {
 }
 
 // ---------- Email Marketing: benih template bawaan ----------
-// Enam template siap pakai dimasukkan saat tabel email_templates masih
+// Tujuh template siap pakai dimasukkan saat tabel email_templates masih
 // kosong (sekali saja) — pengguna bebas mengubah/menghapusnya.
 const EMAIL_SEED_TEMPLATES: {
   name: string;
@@ -407,6 +407,57 @@ const EMAIL_SEED_TEMPLATES: {
 <p style="margin:0 0 12px;font-size:16px;color:#0f172a;">Halo <strong>{{nama}}</strong>,</p>
 <p style="margin:0 0 12px;font-size:14px;color:#334155;line-height:1.6;">Inilah rangkuman kabar terbaru dari KTD Store: promo berjalan, produk baru, dan tips belanja hemat bulan ini.</p>
 <p style="margin:24px 0;"><a href="{{link}}" style="background:#10b981;color:#fff;text-decoration:none;padding:12px 24px;border-radius:8px;font-size:14px;font-weight:600;display:inline-block;">Baca Selengkapnya</a></p>
+</div>
+</div>
+</div>`,
+  },
+  {
+    name: "Yuk Kenalan KTD Store",
+    subject: "🚀 Yuk, Kenalan dengan KTD STORE !",
+    html: `<div style="background:#eef2f7;padding:28px 12px;font-family:'Segoe UI',Arial,Helvetica,sans-serif;">
+<div style="max-width:560px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
+<div style="background:#065f46;padding:26px 24px 22px;text-align:center;border-bottom:4px solid #10b981;">
+<div style="font-size:24px;font-weight:800;color:#ffffff;letter-spacing:2px;">KTD STORE</div>
+<div style="font-size:12px;color:#a7f3d0;margin-top:6px;letter-spacing:1px;">Satu Website, Semua Kebutuhan</div>
+</div>
+<div style="padding:30px 24px 8px;text-align:center;">
+<div style="font-size:52px;line-height:1;">🚀</div>
+<h1 style="margin:16px 0 8px;font-size:22px;font-weight:800;color:#0f172a;line-height:1.35;">Yuk, Kenalan dengan KTD STORE!</h1>
+<p style="margin:0;font-size:15px;color:#475569;">Halo, apa kabar? 👋</p>
+</div>
+<div style="padding:14px 24px 4px;text-align:center;">
+<p style="margin:0 0 14px;font-size:15px;color:#334155;line-height:1.7;">Sekarang saatnya mengenal <strong style="color:#059669;">KTD STORE</strong> 🎉</p>
+<p style="margin:0;font-size:14px;color:#475569;line-height:1.7;">Temukan berbagai pilihan produk, layanan top up game, dan isi saldo dalam satu website.</p>
+</div>
+<div style="padding:16px 24px 8px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;border-spacing:8px;">
+<tr>
+<td width="33%" align="center" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px 8px;">
+<div style="font-size:28px;line-height:1;">🛍️</div>
+<div style="font-size:13px;font-weight:700;color:#065f46;margin-top:10px;">Produk Pilihan</div>
+<div style="font-size:11px;color:#64748b;margin-top:3px;">kebutuhan harian</div>
+</td>
+<td width="33%" align="center" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px 8px;">
+<div style="font-size:28px;line-height:1;">🎮</div>
+<div style="font-size:13px;font-weight:700;color:#065f46;margin-top:10px;">Top Up Game</div>
+<div style="font-size:11px;color:#64748b;margin-top:3px;">cepat &amp; mudah</div>
+</td>
+<td width="33%" align="center" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:16px 8px;">
+<div style="font-size:28px;line-height:1;">💳</div>
+<div style="font-size:13px;font-weight:700;color:#065f46;margin-top:10px;">Isi Saldo</div>
+<div style="font-size:11px;color:#64748b;margin-top:3px;">praktis &amp; aman</div>
+</td>
+</tr>
+</table>
+</div>
+<div style="padding:8px 24px 22px;text-align:center;">
+<p style="margin:0 0 20px;font-size:14px;color:#475569;line-height:1.7;">Kami mengundang Anda untuk melihat layanan yang tersedia dan menemukan yang sesuai dengan kebutuhan Anda.</p>
+<a href="https://toko.kustoro2026.com" style="background:#10b981;color:#ffffff;text-decoration:none;padding:14px 34px;border-radius:999px;font-size:16px;font-weight:700;display:inline-block;border-bottom:3px solid #059669;">👉 Mulai Kunjungi KTD STORE</a>
+<div style="margin-top:14px;font-size:12px;color:#94a3b8;">atau buka langsung: <a href="https://toko.kustoro2026.com" style="color:#059669;font-weight:600;">toko.kustoro2026.com</a></div>
+</div>
+<div style="background:#f8fafc;border-top:1px solid #e2e8f0;padding:18px 24px;text-align:center;">
+<p style="margin:0 0 4px;font-size:14px;color:#334155;">Terima kasih telah berkunjung! ❤️</p>
+<p style="margin:0;font-size:13px;font-weight:700;color:#059669;">Tim KTD STORE</p>
 </div>
 </div>
 </div>`,
