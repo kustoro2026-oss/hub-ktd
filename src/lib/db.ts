@@ -3407,6 +3407,26 @@ export async function claimBlibliOrderExecRunning(
   return !!r;
 }
 
+/** Klaim atomik PERSIAPAN antrean eksekusi Blibli: sisipkan baris "menunggu"
+ *  hanya bila belum ada baris untuk paket ini. Dua ronde pengecekan yang
+ *  tumpang tindih sama-sama bisa lolos gerbang seen — tanpa klaim ini
+ *  keduanya menyimpan dan KEDUANYA mengirim notif Setuju. Kembali true
+ *  bila ronde ini yang menang (boleh mengirim notif). */
+export async function claimBlibliOrderExecPrepared(
+  packageId: string,
+  storeCode: string,
+  payload: string,
+): Promise<boolean> {
+  const r = await queryOne<{ package_id: string }>(
+    `INSERT INTO blibli_order_exec (package_id, store_code, status, payload, aneka_payment_id, aneka_order_id, detail, executed_at)
+     VALUES (?, ?, 'menunggu', ?, '', '', '', '')
+     ON CONFLICT (package_id) DO NOTHING
+     RETURNING package_id`,
+    [packageId, storeCode, payload],
+  );
+  return !!r;
+}
+
 // ---------- Riwayat resi pesanan Lazada (deteksi pesanan baru) ----------
 
 export type LazadaOrderSeen = {
@@ -3957,6 +3977,26 @@ export async function claimLazadaOrderExecRunning(
      WHERE order_id = ? AND status IN ('menunggu', 'gagal')
      RETURNING order_id`,
     [orderId],
+  );
+  return !!r;
+}
+
+/** Klaim atomik PERSIAPAN antrean eksekusi Lazada: sisipkan baris "menunggu"
+ *  hanya bila belum ada baris untuk pesanan ini. Dua ronde pengecekan yang
+ *  tumpang tindih sama-sama bisa lolos gerbang seen — tanpa klaim ini
+ *  keduanya menyimpan, lalu KEDUANYA melanjutkan autopack + notif Setuju.
+ *  Kembali true bila ronde ini yang menang (boleh autopack + mengirim). */
+export async function claimLazadaOrderExecPrepared(
+  orderId: string,
+  storeCode: string,
+  payload: string,
+): Promise<boolean> {
+  const r = await queryOne<{ order_id: string }>(
+    `INSERT INTO lazada_order_exec (order_id, store_code, status, payload, aneka_payment_id, aneka_order_id, detail, executed_at)
+     VALUES (?, ?, 'menunggu', ?, '', '', '', '')
+     ON CONFLICT (order_id) DO NOTHING
+     RETURNING order_id`,
+    [orderId, storeCode, payload],
   );
   return !!r;
 }

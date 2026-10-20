@@ -909,6 +909,7 @@ async function runCheckNewLazadaOrders(): Promise<LazadaResiCheckResult> {
       if (execCheck.ok) {
         // Persiapan antrean SENYAP dulu — notif "siap dieksekusi" dikirim
         // SETELAH autopack supaya nomor resi yang tercantum sudah resi asli.
+        const resend = prev.notify.startsWith("gagal");
         const prep = await prepareLazadaExec(
           {
             order_id: orderId,
@@ -920,7 +921,7 @@ async function runCheckNewLazadaOrders(): Promise<LazadaResiCheckResult> {
           },
           // Percobaan ulang setelah kegagalan: antrean "menunggu" mungkin
           // sudah tersimpan tetapi notif WA-nya gagal — kirim ulang.
-          { resendNotice: prev.notify.startsWith("gagal"), silent: true },
+          { resendNotice: resend, silent: true },
         );
         if (!prep.ok) {
           errors.push(`${LAZADA_STORE_NAME}: ${orderId}: ${prep.detail}`);
@@ -934,6 +935,16 @@ async function runCheckNewLazadaOrders(): Promise<LazadaResiCheckResult> {
         }
         for (const x of items) {
           await markSeen(x.order_item_id, orderId, "eksekusi:menunggu");
+        }
+
+        // Ronde lain sudah menyiapkan antrean (klaim kalah) — autopack dan
+        // notif Setuju sudah dijalankan ronde pemenang; lewati supaya tidak
+        // dobel. Jalur resend (notif WA gagal sebelumnya) tetap lanjut.
+        if (!prep.created && !resend) {
+          sent.push(
+            `${LAZADA_STORE_NAME} ${orderId} → sudah menunggu persetujuan Aneka`,
+          );
+          continue;
         }
 
         // AUTOPACK: kemas + rts otomatis sekarang juga — status pesanan di

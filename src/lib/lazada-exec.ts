@@ -39,6 +39,7 @@ import { buildAnekaCartItems } from "@/lib/aneka-exec";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
   appendLazadaOrderExecLog,
+  claimLazadaOrderExecPrepared,
   claimLazadaOrderExecRunning,
   getLazadaOrderExec,
   getLazadaProductMap,
@@ -362,16 +363,16 @@ export async function prepareLazadaExec(
     items: LazadaExecSourceItem[];
   },
   opts: { resendNotice?: boolean; silent?: boolean } = {},
-): Promise<{ ok: boolean; detail: string }> {
+): Promise<{ ok: boolean; detail: string; created?: boolean }> {
   const existing = await getLazadaOrderExec(pkg.order_id);
   if (existing?.status === "menunggu" && !opts.resendNotice) {
-    return { ok: true, detail: "Sudah menunggu persetujuan" };
+    return { ok: true, detail: "Sudah menunggu persetujuan", created: false };
   }
   // Pesanan yang SUDAH selesai tidak boleh di-antre ulang — route
   // prepare-ulang/tick tidak boleh membangkitkan notif Setuju baru untuk
   // pesanan yang sudah terbayar (barisnya menimpa status + payload).
   if (existing?.status === "selesai") {
-    return { ok: true, detail: "Pesanan sudah selesai dieksekusi" };
+    return { ok: true, detail: "Pesanan sudah selesai dieksekusi", created: false };
   }
 
   const check = await checkLazadaExecutable(pkg.items);
@@ -403,20 +404,39 @@ export async function prepareLazadaExec(
     }
   }
 
-  // Persiapan ulang = antrean baru. Jejak pembayaran percobaan lama
-  // DIPERTAHANKAN (aneka_payment_id/aneka_order_id + log) — bahan pengaman
-  // anti-dobel bila baris ini dieksekusi lagi.
+  // Baris BARU disimpan lewat klaim atomik: dua ronde pengecekan yang
+  // tumpang tindih (tab admin + ping eksternal + tick webhook berjalan
+  // tanpa mutex lintas ronde) sama-sama bisa membaca "belum ada baris" lalu
+  // sama-sama melanjutkan autopack + notif Setuju. Hanya pemenang klaim
+  // yang menyimpan (created=true) — pemanggil memakai flag ini untuk
+  // melewati autopack + kirim saat kalah. Jalur persiapan ulang (baris
+  // lama, mis. notif WA gagal terkirim) tetap memakai upsert — jejak
+  // pembayaran lama tidak boleh hilang.
   const ctx = await getLazadaCtx();
-  await saveLazadaOrderExec({
-    order_id: pkg.order_id,
-    store_code: ctx.ok ? ctx.sellerId : "",
-    status: "menunggu",
-    payload: JSON.stringify(payload),
-    aneka_payment_id: existing?.aneka_payment_id ?? "",
-    aneka_order_id: existing?.aneka_order_id ?? "",
-    detail: "",
-    executed_at: "",
-  });
+  const storeCode = ctx.ok ? ctx.sellerId : "";
+  let created = false;
+  if (!existing) {
+    const claimed = await claimLazadaOrderExecPrepared(
+      pkg.order_id,
+      storeCode,
+      JSON.stringify(payload),
+    );
+    if (!claimed) {
+      return { ok: true, detail: "Sudah menunggu persetujuan", created: false };
+    }
+    created = true;
+  } else {
+    await saveLazadaOrderExec({
+      order_id: pkg.order_id,
+      store_code: storeCode,
+      status: "menunggu",
+      payload: JSON.stringify(payload),
+      aneka_payment_id: existing?.aneka_payment_id ?? "",
+      aneka_order_id: existing?.aneka_order_id ?? "",
+      detail: "",
+      executed_at: "",
+    });
+  }
 
   // Senyap = notif dikirim pemanggil SETELAH autopack (supaya nomor resi
   // yang tercantum sudah resi asli, bukan KT... yang mungkin berubah).
@@ -426,7 +446,7 @@ export async function prepareLazadaExec(
   if (!notice.startsWith("ok")) {
     return { ok: false, detail: `Tersimpan, tetapi notif WA gagal: ${notice}` };
   }
-  return { ok: true, detail: "Menunggu persetujuan" };
+  return { ok: true, detail: "Menunggu persetujuan", created };
 }
 
 /** Kemas otomatis (pack → rts → label) saat deteksi — supaya status

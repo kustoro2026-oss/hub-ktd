@@ -34,6 +34,7 @@ import { buildAnekaCartItems } from "@/lib/aneka-exec";
 import { blibliEnv, getBlibliOrderDetail } from "@/lib/blibli";
 import {
   appendBlibliOrderExecLog,
+  claimBlibliOrderExecPrepared,
   claimBlibliOrderExecRunning,
   getBlibliOrderExec,
   getBlibliProductMap,
@@ -222,19 +223,34 @@ export async function prepareBlibliExec(
     total_modal: total,
   };
 
-  // Persiapan ulang = antrean baru. Jejak pembayaran percobaan lama
-  // DIPERTAHANKAN (aneka_payment_id/aneka_order_id + log) — bahan pengaman
-  // anti-dobel bila baris ini dieksekusi lagi.
-  await saveBlibliOrderExec({
-    package_id: pkg.package_id,
-    store_code: blibliEnv().storeCode,
-    status: "menunggu",
-    payload: JSON.stringify(payload),
-    aneka_payment_id: existing?.aneka_payment_id ?? "",
-    aneka_order_id: existing?.aneka_order_id ?? "",
-    detail: "",
-    executed_at: "",
-  });
+  // Baris BARU disimpan lewat klaim atomik: dua ronde pengecekan yang
+  // tumpang tindih (tab admin + ping eksternal + tick webhook berjalan
+  // tanpa mutex lintas ronde) sama-sama bisa membaca "belum ada baris" lalu
+  // sama-sama menyimpan dan mengirim notif Setuju. Hanya pemenang klaim
+  // yang menyimpan dan mengirim — yang kalah melewati kirim. Jalur
+  // persiapan ulang (baris lama, mis. notif WA gagal terkirim) tetap
+  // memakai upsert — jejak pembayaran lama tidak boleh hilang.
+  if (!existing) {
+    const claimed = await claimBlibliOrderExecPrepared(
+      pkg.package_id,
+      blibliEnv().storeCode,
+      JSON.stringify(payload),
+    );
+    if (!claimed) {
+      return { ok: true, detail: "Sudah menunggu persetujuan" };
+    }
+  } else {
+    await saveBlibliOrderExec({
+      package_id: pkg.package_id,
+      store_code: blibliEnv().storeCode,
+      status: "menunggu",
+      payload: JSON.stringify(payload),
+      aneka_payment_id: existing?.aneka_payment_id ?? "",
+      aneka_order_id: existing?.aneka_order_id ?? "",
+      detail: "",
+      executed_at: "",
+    });
+  }
 
   const baris = check.items
     .map(
