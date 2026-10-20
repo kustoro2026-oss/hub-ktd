@@ -2844,6 +2844,46 @@ export async function claimTiktokOrderExecRunning(
   return !!r;
 }
 
+/** Klaim atomik PERSIAPAN antrean eksekusi: sisipkan baris "menunggu" hanya
+ *  bila belum ada baris untuk pesanan ini. Dua ronde pengecekan yang
+ *  tumpang tindih sama-sama bisa lolos gerbang seen (snapshot dibaca di
+ *  awal ronde) — tanpa klaim ini keduanya menyimpan dan KEDUANYA mengirim
+ *  notif Setuju (peristiwa nyata 20 Okt 2026, order 586681679392114078).
+ *  Kembali true bila ronde ini yang menang (boleh mengirim notif). */
+export async function claimTiktokOrderExecPrepared(
+  orderId: string,
+  shopId: string,
+  payload: string,
+): Promise<boolean> {
+  const r = await queryOne<{ order_id: string }>(
+    `INSERT INTO tiktok_order_exec (order_id, shop_id, status, payload, aneka_payment_id, aneka_order_id, detail, executed_at)
+     VALUES (?, ?, 'menunggu', ?, '', '', '', '')
+     ON CONFLICT (order_id) DO NOTHING
+     RETURNING order_id`,
+    [orderId, shopId, payload],
+  );
+  return !!r;
+}
+
+/** Compare-and-set kolom payload: tulis payload baru HANYA bila isinya
+ *  masih persis payload lama yang dibaca pemanggil. Dipakai saat pengisian
+ *  label (isi-label) — dua ronde tumpang tindih sama-sama melihat label
+ *  kosong, tetapi hanya ronde yang benar-benar menimpa payload kosong yang
+ *  boleh mengirim notif ulang. Kembali true bila CAS berhasil. */
+export async function updateTiktokOrderExecPayloadIfUnchanged(
+  orderId: string,
+  oldPayload: string,
+  newPayload: string,
+): Promise<boolean> {
+  const r = await queryOne<{ order_id: string }>(
+    `UPDATE tiktok_order_exec SET payload = ?
+     WHERE order_id = ? AND payload = ?
+     RETURNING order_id`,
+    [newPayload, orderId, oldPayload],
+  );
+  return !!r;
+}
+
 // ---------- Cache snapshot keuangan Aneka (dashboard keuangan) ----------
 // Situs Aneka tidak punya API resmi — riwayat pembayaran + saldo hasil
 // scrape disimpan sebagai satu baris JSON (data) dengan stempel fetched_at

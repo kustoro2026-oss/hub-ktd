@@ -28,6 +28,7 @@ import {
 } from "@/lib/aneka-checkout";
 import {
   appendTiktokOrderExecLog,
+  claimTiktokOrderExecPrepared,
   claimTiktokOrderExecRunning,
   getAnekaProductMap,
   getTiktokOrderExec,
@@ -233,19 +234,34 @@ export async function prepareAnekaExec(
     total_modal: total,
   };
 
-  // Persiapan ulang = antrean baru. Jejak pembayaran percobaan lama
-  // DIPERTAHANKAN (aneka_payment_id/aneka_order_id + log) — bahan pengaman
-  // anti-dobel bila baris ini dieksekusi lagi.
-  await saveTiktokOrderExec({
-    order_id: order.order_id,
-    shop_id: shop.shop_id,
-    status: "menunggu",
-    payload: JSON.stringify(payload),
-    aneka_payment_id: existing?.aneka_payment_id ?? "",
-    aneka_order_id: existing?.aneka_order_id ?? "",
-    detail: "",
-    executed_at: "",
-  });
+  // Baris BARU disimpan lewat klaim atomik: dua ronde pengecekan yang
+  // tumpang tindih (tab admin + ping Actions + tick webhook berjalan tanpa
+  // mutex lintas ronde) sama-sama bisa membaca "belum ada baris" lalu
+  // sama-sama menyimpan dan mengirim notif Setuju. Hanya pemenang klaim
+  // yang menyimpan dan mengirim — yang kalah melewati kirim. Jalur
+  // persiapan ulang (baris lama, mis. notif WA gagal terkirim) tetap
+  // memakai upsert — jejak pembayaran lama tidak boleh hilang.
+  if (!existing) {
+    const claimed = await claimTiktokOrderExecPrepared(
+      order.order_id,
+      shop.shop_id,
+      JSON.stringify(payload),
+    );
+    if (!claimed) {
+      return { ok: true, detail: "Sudah menunggu persetujuan" };
+    }
+  } else {
+    await saveTiktokOrderExec({
+      order_id: order.order_id,
+      shop_id: shop.shop_id,
+      status: "menunggu",
+      payload: JSON.stringify(payload),
+      aneka_payment_id: existing?.aneka_payment_id ?? "",
+      aneka_order_id: existing?.aneka_order_id ?? "",
+      detail: "",
+      executed_at: "",
+    });
+  }
 
   const notice = await sendExecNotice(notifSiapEksekusiTikTok(payload));
   if (!notice.startsWith("ok")) {

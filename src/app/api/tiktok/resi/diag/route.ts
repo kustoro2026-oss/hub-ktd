@@ -276,12 +276,24 @@ export async function GET(request: Request) {
     out.exec_check = await checkAnekaExecutable(summary);
     const row = await getTiktokOrderExec(orderId);
     if (row) {
+      let payloadTracking = "";
+      try {
+        const p = JSON.parse(row.payload) as { tracking_number?: string };
+        payloadTracking = p.tracking_number ?? "";
+      } catch {
+        /* payload rusak — lewati */
+      }
       out.exec_row = {
         status: row.status,
         detail: row.detail,
         aneka_payment_id: row.aneka_payment_id,
         aneka_order_id: row.aneka_order_id,
         executed_at: row.executed_at,
+        // Jejak langkah (log) + resi di payload dipakai untuk mendiagnosis
+        // notif dobel (isi-label / persiapan ganda) — read-only.
+        log: row.log,
+        created_at: row.created_at,
+        tracking_payload: payloadTracking,
       };
     }
     break;

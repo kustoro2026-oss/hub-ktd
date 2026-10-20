@@ -32,7 +32,7 @@ import {
   listTiktokShopTokens,
   markTiktokOrderSeen,
   recordTiktokOrderFailure,
-  saveTiktokOrderExec,
+  updateTiktokOrderExecPayloadIfUnchanged,
 } from "@/lib/db";
 import {
   cancelAnekaExec,
@@ -258,18 +258,26 @@ async function isiLabelEksekusi(
   if (official.ok) {
     payload.tracking_number = official.tracking_number;
     payload.label_pdf_base64 = official.pdf.toString("base64");
-    await saveTiktokOrderExec({
-      order_id: orderId,
-      status: "menunggu",
-      payload: JSON.stringify(payload),
-    });
-    // Label baru terisi — kirim ulang notif Setuju dengan format lengkap
-    // (termasuk nomor resi) supaya pesan terbaru sama seperti pesanan yang
-    // labelnya tersedia sejak persiapan.
-    const notice = await sendOwnerNotice(notifSiapEksekusiTikTok(payload));
-    stempel += ` | notif ulang: ${
-      notice.startsWith("ok") ? "ok" : `GAGAL — ${notice}`
-    }`;
+    // CAS: hanya ronde yang benar-benar menimpa payload kosong yang boleh
+    // mengirim notif ulang — dua ronde tumpang tindih sama-sama melihat
+    // label kosong dan sama-sama lolos gerbang jejak log, sehingga tanpa
+    // CAS keduanya mengisi dan KEDUANYA mengirim notif ulang.
+    const menang = await updateTiktokOrderExecPayloadIfUnchanged(
+      orderId,
+      row.payload,
+      JSON.stringify(payload),
+    );
+    if (menang) {
+      // Label baru terisi — kirim ulang notif Setuju dengan format lengkap
+      // (termasuk nomor resi) supaya pesan terbaru sama seperti pesanan yang
+      // labelnya tersedia sejak persiapan.
+      const notice = await sendOwnerNotice(notifSiapEksekusiTikTok(payload));
+      stempel += ` | notif ulang: ${
+        notice.startsWith("ok") ? "ok" : `GAGAL — ${notice}`
+      }`;
+    } else {
+      stempel += " | label sudah diisi ronde lain — notif ulang dilewati";
+    }
   }
   await appendTiktokOrderExecLog(orderId, stempel);
 }
