@@ -7,7 +7,10 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-function dbUrl(): string {
+function dbUrl(target?: string): string {
+  if (target === "store") {
+    return (process.env.STORE_DATABASE_URL ?? "").trim();
+  }
   return (
     process.env.SUPABASE_DATABASE_URL ??
     process.env.DATABASE_URL ??
@@ -22,9 +25,9 @@ async function isCronAuth(req: Request): Promise<boolean> {
   return req.headers.get("authorization") === `Bearer ${secret}`;
 }
 
-async function runSql(sql: string): Promise<{ rows: unknown[]; rowCount: number }> {
+async function runSql(sql: string, target?: string): Promise<{ rows: unknown[]; rowCount: number }> {
   const { Pool } = await import("pg");
-  const url = dbUrl();
+  const url = dbUrl(target);
   if (!url) throw new Error("Database URL tidak ditemukan");
   const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
   try {
@@ -36,9 +39,9 @@ async function runSql(sql: string): Promise<{ rows: unknown[]; rowCount: number 
 }
 
 // Jalankan banyak SQL dalam satu koneksi (penting: REVOKE 39 tabel = 80 statement).
-async function runSqlBatch(sqls: string[]): Promise<number> {
+async function runSqlBatch(sqls: string[], target?: string): Promise<number> {
   const { Pool } = await import("pg");
-  const url = dbUrl();
+  const url = dbUrl(target);
   if (!url) throw new Error("Database URL tidak ditemukan");
   const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
   const client = await pool.connect();
@@ -79,8 +82,8 @@ async function checkGrants(): Promise<unknown[]> {
   return rows;
 }
 
-// Versi lebih sederhana — cek information_schema.
-async function checkGrantsSimple(): Promise<unknown[]> {
+// Cek tabel + grant yang terbuka ke role anon / authenticated.
+async function checkGrantsSimple(target?: string): Promise<unknown[]> {
   const { rows } = await runSql(`
     SELECT
       table_schema,
@@ -91,12 +94,12 @@ async function checkGrantsSimple(): Promise<unknown[]> {
     WHERE table_schema = 'public'
       AND grantee IN ('anon', 'authenticated')
     ORDER BY table_name, grantee, privilege_type
-  `);
+  `, target);
   return rows;
 }
 
-async function revokeAll(): Promise<{ revoked_tables: string[]; total_statements: number }> {
-  const tables = await checkGrantsSimple();
+async function revokeAll(target?: string): Promise<{ revoked_tables: string[]; total_statements: number }> {
+  const tables = await checkGrantsSimple(target);
   const tableNames = [...new Set((tables as { table_name: string }[]).map((t) => t.table_name))];
 
   // Bangun semua statement dalam 1 batch — 1 koneksi, tidak timeout.
@@ -109,7 +112,7 @@ async function revokeAll(): Promise<{ revoked_tables: string[]; total_statements
   stmts.push(`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon`);
   stmts.push(`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM authenticated`);
 
-  const done = await runSqlBatch(stmts);
+  const done = await runSqlBatch(stmts, target);
   return { revoked_tables: tableNames, total_statements: done };
 }
 
@@ -118,10 +121,14 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "forbidden" }, { status: 401 });
   }
 
+  const url = new URL(req.url);
+  const target = url.searchParams.get("db") ?? undefined;
+
   try {
-    const grants = await checkGrantsSimple();
+    const grants = await checkGrantsSimple(target);
     return NextResponse.json({
       ok: true,
+      db: target ?? "hub",
       total_open_tables: [...new Set((grants as { table_name: string }[]).map((t) => t.table_name))].length,
       grants,
     });
@@ -138,9 +145,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "forbidden" }, { status: 401 });
   }
 
+  const url = new URL(req.url);
+  const target = url.searchParams.get("db") ?? undefined;
+
   try {
-    const result = await revokeAll();
-    return NextResponse.json({ ok: true, ...result });
+    const result = await revokeAll(target);
+    return NextResponse.json({ ok: true, db: target ?? "hub", ...result });
   } catch (e) {
     return NextResponse.json(
       { ok: false, error: e instanceof Error ? e.message : "gagal" },
