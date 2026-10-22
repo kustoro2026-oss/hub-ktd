@@ -3,7 +3,7 @@
 // cocok, alamat tidak diubah. Menampilkan halaman HTML sederhana berbahasa
 // Indonesia (bukan JSON) supaya nyaman dibuka dari email.
 import { getEmailContactByEmail, setEmailContactStatus } from "@/lib/db";
-import { verifyUnsubscribeToken } from "@/lib/gmail";
+import { verifyUnsubscribeToken } from "@/lib/email-smtp";
 
 function page(title: string, message: string): Response {
   const html = `<!doctype html>

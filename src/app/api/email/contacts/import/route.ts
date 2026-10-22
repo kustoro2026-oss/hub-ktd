@@ -1,15 +1,36 @@
-// Import massal kontak email: body { text, groupId? }. Satu baris = satu
-// kontak dengan format "Nama, email" atau email saja (pemisah koma
-// terakhir — nama boleh mengandung koma). Baris kosong dilewati, alamat
-// tidak valid dilaporkan, alamat ganda tidak diduplikasi.
+// Import massal kontak email ke SATU grup wajib.
+//
+// Semua baris diproses dulu di memori (bukan per baris ke database) supaya
+// angka laporan bisa direkonsiliasi dengan isi grup:
+//   total baris → valid → unik → baru / diperbarui / dipindah
+// Setiap import dicatat di email_import_runs sehingga kejadian "import 400
+// tapi grup hanya 300" bisa ditelusuri kapan saja.
+//
+// Format baris yang diterima: "Nama, email", "Nama; email", "email, Nama",
+// "Nama <email>", atau email saja. Alamat di mana pun dalam baris dikenali.
 import { isAuthed } from "@/lib/auth";
 import {
-  addEmailContact,
-  addEmailContactsToGroup,
+  bulkUpsertEmailContacts,
+  countEmailContactsInGroup,
   listEmailGroups,
+  logEmailImportRun,
 } from "@/lib/db";
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+
+function parseLine(line: string): { name: string; email: string } | null {
+  const match = line.match(EMAIL_RE);
+  if (!match) return null;
+  const email = match[0].trim().toLowerCase();
+  // Nama = sisa baris setelah alamat dibuang, pemisah & tanda kutip dibuang.
+  const name = line
+    .replace(match[0], " ")
+    .replace(/[<>"';,|\t]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 120);
+  return { name, email };
+}
 
 export async function POST(request: Request) {
   if (!(await isAuthed())) {
@@ -21,51 +42,95 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ error: "Body tidak valid" }, { status: 400 });
   }
-  const groupId = body.groupId ?? 0;
-  if (groupId > 0) {
-    const groups = await listEmailGroups();
-    if (!groups.some((g) => g.id === groupId)) {
-      return Response.json({ error: "Grup tidak ditemukan" }, { status: 400 });
-    }
+
+  const groupId = Number(body.groupId ?? 0);
+  if (!groupId) {
+    return Response.json(
+      { error: "Grup wajib dipilih — buat grup dulu di Langkah 1" },
+      { status: 400 },
+    );
+  }
+  const groups = await listEmailGroups();
+  const group = groups.find((g) => g.id === groupId);
+  if (!group) {
+    return Response.json({ error: "Grup tidak ditemukan" }, { status: 400 });
   }
 
-  const rows = (body.text ?? "")
+  const lines = (body.text ?? "")
     .split(/\r?\n/)
     .map((l) => l.trim())
     .filter((l) => l.length > 0);
-  if (rows.length === 0) {
-    return Response.json({ error: "Tidak ada baris untuk diimpor" }, { status: 400 });
+  if (lines.length === 0) {
+    return Response.json(
+      { error: "Tidak ada baris untuk diimpor" },
+      { status: 400 },
+    );
   }
 
-  let added = 0;
-  let skipped = 0;
+  let validLines = 0;
+  let duplicates = 0;
   const invalid: string[] = [];
-  const importedIds: number[] = [];
-  for (const line of rows) {
-    const comma = line.lastIndexOf(",");
-    const name = comma >= 0 ? line.slice(0, comma).trim() : "";
-    const email = (comma >= 0 ? line.slice(comma + 1) : line).trim();
-    if (!EMAIL_RE.test(email)) {
-      invalid.push(line.length > 60 ? `${line.slice(0, 60)}…` : line);
-      skipped++;
+  const seen = new Set<string>();
+  const rows: { name: string; email: string }[] = [];
+
+  for (const line of lines) {
+    const parsed = parseLine(line);
+    if (!parsed) {
+      invalid.push(line.length > 80 ? `${line.slice(0, 80)}…` : line);
       continue;
     }
-    try {
-      const contact = await addEmailContact(name, email);
-      importedIds.push(contact.id);
-      added++;
-    } catch {
-      skipped++;
+    validLines++;
+    if (seen.has(parsed.email)) {
+      duplicates++;
+      continue;
     }
+    seen.add(parsed.email);
+    rows.push(parsed);
   }
-  if (groupId > 0 && importedIds.length > 0) {
-    await addEmailContactsToGroup(importedIds, groupId);
+
+  if (rows.length === 0) {
+    return Response.json(
+      {
+        ok: false,
+        error: "Tidak ada alamat email valid yang bisa diimpor",
+        totalLines: lines.length,
+        validLines,
+        invalid: invalid.slice(0, 20),
+      },
+      { status: 400 },
+    );
   }
+
+  const saved = await bulkUpsertEmailContacts(rows, groupId);
+  const memberCount = await countEmailContactsInGroup(groupId);
+
+  await logEmailImportRun({
+    group_id: groupId,
+    group_name: group.name,
+    total_lines: lines.length,
+    valid_lines: validLines,
+    unique_emails: rows.length,
+    added: saved.added,
+    updated: saved.updated,
+    moved: saved.moved,
+    duplicates,
+    invalid: invalid.length,
+    detail: invalid.slice(0, 20).join(" | ").slice(0, 2000),
+  });
+
   return Response.json({
     ok: true,
-    added,
-    skipped,
-    invalid: invalid.slice(0, 10),
-    groupId: groupId > 0 ? groupId : undefined,
+    groupId,
+    groupName: group.name,
+    totalLines: lines.length,
+    validLines,
+    uniqueEmails: rows.length,
+    added: saved.added,
+    updated: saved.updated,
+    moved: saved.moved,
+    duplicates,
+    invalid,
+    invalidCount: invalid.length,
+    memberCount,
   });
 }

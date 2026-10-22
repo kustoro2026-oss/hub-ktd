@@ -1,14 +1,31 @@
 "use client";
 
-// Import banyak kontak email sekaligus — tempel daftar alamat
-// (dengan/tanpa nama) atau unggah file Excel/CSV, boleh langsung
-// dimasukkan ke satu grup. Satu baris = "Nama, email" (pemisah koma
-// terakhir) atau email saja.
+// Import banyak kontak email ke SATU grup. Grup wajib dipilih — tidak ada
+// daftar umum. Laporan hasil import memecah angka supaya bisa direkonsiliasi
+// dengan isi grup: total baris → valid → unik → baru / diperbarui / dipindah,
+// plus duplikat & tidak valid (bisa diunduh).
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { EmailGroup } from "@/lib/db";
 
+const EMAIL_FIND = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+type ImportResult = {
+  ok?: boolean;
+  error?: string;
+  groupName?: string;
+  totalLines?: number;
+  validLines?: number;
+  uniqueEmails?: number;
+  added?: number;
+  updated?: number;
+  moved?: number;
+  duplicates?: number;
+  invalid?: string[];
+  invalidCount?: number;
+  memberCount?: number;
+};
 
 export default function EmailImportForm({
   groups,
@@ -17,24 +34,24 @@ export default function EmailImportForm({
 }) {
   const router = useRouter();
   const [text, setText] = useState("");
-  const [groupId, setGroupId] = useState(0);
-  const [result, setResult] = useState<{
-    added?: number;
-    skipped?: number;
-    invalid?: string[];
-    error?: string;
-    groupName?: string;
-  } | null>(null);
+  const [groupId, setGroupId] = useState(groups[0]?.id ?? 0);
+  const [result, setResult] = useState<ImportResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [fileNote, setFileNote] = useState("");
 
-  // Baca file Excel/CSV → ubah jadi daftar "Nama, email" di textarea.
-  // Kolom nama & email dikenali dari baris judul (nama/name/email/mail/dll);
-  // tanpa judul, kolom pertama = nama dan kedua = email — kecuali kolom
-  // pertama berisi "@", maka dianggap email saja.
+  useEffect(() => {
+    if (!groups.some((g) => g.id === groupId)) {
+      setGroupId(groups[0]?.id ?? 0);
+    }
+  }, [groups, groupId]);
+
+  // Baca file Excel/CSV → daftar "Nama, email" di textarea. Kolom nama &
+  // email dikenali dari baris judul; tanpa judul, alamat dicari di seluruh
+  // kolom. Baris tanpa email tetap dimasukkan supaya dihitung "tidak valid"
+  // oleh server (laporan import jadi jujur).
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
-    e.target.value = ""; // biar file yang sama bisa dipilih ulang
+    e.target.value = "";
     if (!file) return;
     try {
       const XLSX = await import("xlsx");
@@ -62,28 +79,26 @@ export default function EmailImportForm({
         if (row.every((c) => c === "")) continue;
         let name = nameCol >= 0 ? (row[nameCol] ?? "") : "";
         let email = emailCol >= 0 ? (row[emailCol] ?? "") : "";
-        if (emailCol < 0 && nameCol < 0) {
-          const first = row[0] ?? "";
-          if (first.includes("@") && EMAIL_RE.test(first)) {
-            email = first;
-            name = row[1] ?? "";
-          } else {
-            name = first;
-            email = row[1] ?? "";
-          }
+        if (emailCol < 0) {
+          const found = row.find((c) => EMAIL_FIND.test(c));
+          if (found) email = found.match(EMAIL_FIND)?.[0] ?? "";
         }
         email = email.toLowerCase();
-        if (!EMAIL_RE.test(email)) continue;
+        if (!EMAIL_RE.test(email)) {
+          // Tanpa email valid — biarkan server menghitung sebagai invalid.
+          lines.push(row.join(", "));
+          continue;
+        }
+        if (!name) {
+          const idx = row.findIndex((c) => EMAIL_FIND.test(c));
+          name = row.find((c, i) => i !== idx && c !== "") ?? "";
+        }
         lines.push(
-          name
-            ? `${name.replace(/[,;\n]/g, " ").trim()}, ${email}`
-            : email,
+          name ? `${name.replace(/[,;\n]/g, " ").trim()}, ${email}` : email,
         );
       }
       if (lines.length === 0) {
-        setFileNote(
-          "Tidak ada baris dengan alamat email yang terbaca dari file ini",
-        );
+        setFileNote("Tidak ada baris yang terbaca dari file ini");
         return;
       }
       setText(lines.join("\n"));
@@ -97,25 +112,20 @@ export default function EmailImportForm({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    if (!groupId) {
+      setResult({ error: "Buat grup dulu di Langkah 1" });
+      return;
+    }
     setBusy(true);
     setResult(null);
-    const target = groups.find((g) => g.id === groupId);
     try {
       const res = await fetch("/api/email/contacts/import", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text,
-          groupId: groupId > 0 ? groupId : undefined,
-        }),
+        body: JSON.stringify({ text, groupId }),
       });
-      const data = (await res.json().catch(() => ({}))) as {
-        added?: number;
-        skipped?: number;
-        invalid?: string[];
-        error?: string;
-      };
-      setResult({ ...data, groupName: target?.name });
+      const data = (await res.json().catch(() => ({}))) as ImportResult;
+      setResult(data);
       if (res.ok) {
         setText("");
         router.refresh();
@@ -125,6 +135,20 @@ export default function EmailImportForm({
     } finally {
       setBusy(false);
     }
+  }
+
+  function downloadInvalid() {
+    const rows = result?.invalid ?? [];
+    if (rows.length === 0) return;
+    const blob = new Blob([rows.join("\n")], {
+      type: "text/plain;charset=utf-8",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "baris-tidak-valid.txt";
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -157,26 +181,25 @@ export default function EmailImportForm({
         />
       </label>
       <p className="text-xs text-slate-400">
-        Contoh benar: <code>Budi, budi@gmail.com</code> atau{" "}
-        <code>budi@gmail.com</code>. Nama harus dipisah koma dari alamatnya —
-        tanpa koma baris dianggap alamat saja. Alamat yang sudah ada tidak
-        diduplikasi.
+        Alamat email dikenali di mana pun dalam baris — pemisah koma, titik
+        koma, atau format <code>Nama &lt;email&gt;</code> semuanya diterima.
+        Alamat yang sudah ada di grup lain akan <strong>dipindahkan</strong> ke
+        grup tujuan (satu kontak = satu grup).
       </p>
       <div className="flex flex-wrap items-end gap-3">
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-slate-600">
-            Grup tujuan
+            Grup tujuan (wajib)
           </span>
           <select
             value={groupId}
             onChange={(e) => setGroupId(Number(e.target.value))}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500"
+            disabled={groups.length === 0}
+            required
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-emerald-500 disabled:bg-slate-50"
           >
-            <option value={0}>Tanpa grup (daftar umum)</option>
             {groups.length === 0 && (
-              <option value={-1} disabled>
-                Belum ada grup — buat di Langkah 1
-              </option>
+              <option value={0}>Belum ada grup — buat di Langkah 1</option>
             )}
             {groups.map((g) => (
               <option key={g.id} value={g.id}>
@@ -187,29 +210,44 @@ export default function EmailImportForm({
         </label>
         <button
           type="submit"
-          disabled={busy || !text.trim()}
+          disabled={busy || !text.trim() || groups.length === 0}
           className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60"
         >
           {busy ? "Mengimpor…" : "Import"}
         </button>
       </div>
-      {result?.added !== undefined && (
-        <p className="text-sm text-emerald-700">
-          Berhasil: {result.added} kontak
-          {result.groupName ? ` — dimasukkan ke grup "${result.groupName}"` : ""}
-          {(result.skipped ?? 0) > 0 && (
-            <span className="text-slate-500">
-              {" "}
-              — dilewati {result.skipped} (tidak valid / sudah ada)
-              {result.invalid && result.invalid.length > 0 && (
-                <span>
-                  {" "}
-                  — contoh tidak valid: {result.invalid.slice(0, 3).join(", ")}
-                </span>
-              )}
-            </span>
+
+      {result?.ok && (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+          <p className="font-medium">
+            Import selesai ke grup &quot;{result.groupName}&quot; — grup kini
+            berisi {result.memberCount} kontak.
+          </p>
+          <ul className="mt-1 grid grid-cols-2 gap-x-4 gap-y-0.5 sm:grid-cols-4">
+            <li>Total baris: {result.totalLines}</li>
+            <li>Email valid: {result.validLines}</li>
+            <li>Unik: {result.uniqueEmails}</li>
+            <li>Baru: {result.added}</li>
+            <li>Diperbarui: {result.updated}</li>
+            <li>Dipindah dari grup lain: {result.moved}</li>
+            <li>Duplikat di file: {result.duplicates}</li>
+            <li>Tidak valid: {result.invalidCount}</li>
+          </ul>
+          {(result.invalid?.length ?? 0) > 0 && (
+            <div className="mt-1">
+              <button
+                type="button"
+                onClick={downloadInvalid}
+                className="underline hover:text-emerald-700"
+              >
+                Unduh baris tidak valid
+              </button>
+              <span className="ml-2 text-emerald-700/80">
+                contoh: {result.invalid?.slice(0, 3).join(" | ")}
+              </span>
+            </div>
           )}
-        </p>
+        </div>
       )}
       {result?.error && <p className="text-sm text-red-600">{result.error}</p>}
     </form>

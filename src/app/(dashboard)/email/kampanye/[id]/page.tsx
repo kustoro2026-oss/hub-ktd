@@ -1,14 +1,16 @@
 // Detail kampanye email — ringkasan statistik (terkirim, gagal, dibuka,
-// berhenti berlangganan) + tombol kirim batch + daftar penerima. Gmail
-// tidak menyediakan webhook statistik: "dibuka" dilacak via pixel 1x1,
-// sedangkan sampai/klik/bounce tidak tersedia.
+// berhenti berlangganan), panel pengiriman satu klik dengan progres live,
+// dan daftar penerima. "Dibuka" dilacak via pixel 1x1 karena SMTP tidak
+// menyediakan webhook statistik.
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   emailCampaignProgress,
   getEmailCampaign,
+  getEmailSmtpAccount,
   getEmailTemplate,
   listEmailCampaignItems,
+  listEmailGroups,
 } from "@/lib/db";
 import { toWib } from "@/lib/format";
 import EmailSendButton from "@/components/email-send-button";
@@ -52,21 +54,30 @@ function StatCard({
 
 export default async function EmailCampaignDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  const { id } = await params;
+  const [{ id }, sp] = await Promise.all([params, searchParams]);
+  const autoStart = sp.start === "1";
   const campaign = await getEmailCampaign(Number(id));
   if (!campaign) notFound();
 
-  const [progress, items, template] = await Promise.all([
+  const [progress, items, template, account, groups] = await Promise.all([
     emailCampaignProgress(campaign.id),
     listEmailCampaignItems(campaign.id),
     getEmailTemplate(campaign.template_id),
+    campaign.smtp_account_id
+      ? getEmailSmtpAccount(campaign.smtp_account_id)
+      : Promise.resolve(undefined),
+    listEmailGroups(),
   ]);
 
+  const groupName = groups.find((g) => g.id === campaign.group_id)?.name;
   const failedItems = items.filter((i) => i.status === "failed");
   const isScheduled = campaign.status === "draft" && campaign.scheduled_at !== "";
+  const accountLabel = account?.name ?? "Akun SMTP terhapus";
 
   // Nilai variabel kampanye (mis. link produk) — JSON di kolom vars.
   const vars = (() => {
@@ -93,6 +104,8 @@ export default async function EmailCampaignDetailPage({
           <h1 className="text-xl font-bold text-slate-900">{campaign.name}</h1>
           <p className="text-sm text-slate-500">
             {template ? `Template ${template.name}` : "Template terhapus"} ·{" "}
+            {accountLabel}
+            {groupName ? ` · grup ${groupName}` : ""} ·{" "}
             {isScheduled
               ? `dijadwalkan ${toWib(campaign.scheduled_at)} WIB`
               : `dibuat ${campaign.created_at}`}
@@ -109,7 +122,11 @@ export default async function EmailCampaignDetailPage({
       </div>
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard label="Terkirim" value={String(progress.sent)} sub="diterima SMTP Gmail" />
+        <StatCard
+          label="Terkirim"
+          value={String(progress.sent)}
+          sub={`diterima server ${accountLabel}`}
+        />
         <StatCard
           label="Dibuka"
           value={String(campaign.opened)}
@@ -119,7 +136,7 @@ export default async function EmailCampaignDetailPage({
           label="Gagal"
           value={String(progress.failed)}
           tone="red"
-          sub="ditolak SMTP Gmail"
+          sub={`ditolak server ${accountLabel}`}
         />
         <StatCard
           label="Berhenti"
@@ -140,15 +157,30 @@ export default async function EmailCampaignDetailPage({
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <EmailSendButton
             campaignId={campaign.id}
-            pending={progress.pending}
-            disabled={progress.pending === 0}
+            initialStatus={campaign.status}
+            initialProgress={progress}
+            autoStart={autoStart}
           />
-          <p className="mt-3 text-xs text-slate-400">
-            Tiap klik memproses satu batch (±40 penerima, jeda 1 detik antar
-            email). Klik tombol lagi sampai semua terkirim. Statistik dibuka
-            masuk otomatis dari pixel buka di badan email (bisa terlambat
-            beberapa menit) — Gmail tidak menyediakan data sampai/klik/bounce.
-          </p>
+        </div>
+      )}
+
+      {campaign.status === "paused" && campaign.pause_reason === "fatal" && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800">
+          <div className="mb-1 font-semibold">Pengiriman dijeda</div>
+          Periksa kredensial akun <strong>{accountLabel}</strong> di halaman{" "}
+          <Link href="/email/smtp" className="underline">
+            Pengaturan SMTP
+          </Link>{" "}
+          (tes koneksi), lalu klik Lanjutkan di atas.
+        </div>
+      )}
+      {campaign.status === "paused" && campaign.pause_reason === "cooldown" && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+          Kampanye sedang jeda batch / kuota. Sisa penerima akan dilanjutkan
+          otomatis{account ? ` oleh akun ${account.name}` : ""}
+          {campaign.next_run_at
+            ? ` sekitar ${toWib(campaign.next_run_at)} WIB`
+            : ""}.
         </div>
       )}
 
@@ -170,15 +202,16 @@ export default async function EmailCampaignDetailPage({
           Penerima ({items.length})
         </h2>
         <p className="mb-3 text-xs text-slate-400">
-          Terkirim = diterima SMTP Gmail · Dibuka = pixel buka di badan email.
-          Gmail tidak menyediakan statistik sampai/klik/bounce.
+          Terkirim = diterima server SMTP akun · Dibuka = pixel buka di badan
+          email. Provider SMTP tidak menyediakan statistik sampai/klik/bounce.
         </p>
         <div className="max-h-96 overflow-y-auto">
           <table className="w-full text-left text-sm">
             <thead className="sticky top-0 bg-white">
               <tr className="border-b border-slate-200 text-xs uppercase text-slate-400">
                 <th className="py-2 pr-4 font-medium">Penerima</th>
-                <th className="py-2 font-medium">Status</th>
+                <th className="py-2 pr-4 font-medium">Status</th>
+                <th className="py-2 font-medium">Waktu kirim</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -190,7 +223,7 @@ export default async function EmailCampaignDetailPage({
                       {i.email}
                     </div>
                   </td>
-                  <td className="py-1.5">
+                  <td className="py-1.5 pr-4">
                     <span
                       className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                         i.status === "clicked"
@@ -203,7 +236,9 @@ export default async function EmailCampaignDetailPage({
                                 ? "bg-teal-100 text-teal-700"
                                 : i.status === "failed"
                                   ? "bg-red-100 text-red-700"
-                                  : "bg-slate-100 text-slate-500"
+                                  : i.status === "queued"
+                                    ? "bg-amber-100 text-amber-700"
+                                    : "bg-slate-100 text-slate-500"
                       }`}
                     >
                       {i.status === "clicked"
@@ -216,8 +251,13 @@ export default async function EmailCampaignDetailPage({
                               ? "Terkirim"
                               : i.status === "failed"
                                 ? "Gagal"
-                                : "Menunggu"}
+                                : i.status === "queued"
+                                  ? "Diproses"
+                                  : "Menunggu"}
                     </span>
+                  </td>
+                  <td className="py-1.5 text-xs text-slate-500">
+                    {i.sent_at || "—"}
                   </td>
                 </tr>
               ))}

@@ -6,7 +6,7 @@
 //
 // Respons gambar GIF transparan 1x1 tanpa cache supaya tiap buka terhitung.
 import { applyEmailEvent } from "@/lib/db";
-import { verifyOpenPixelToken } from "@/lib/gmail";
+import { verifyOpenPixelToken } from "@/lib/email-smtp";
 
 const GIF = Buffer.from(
   "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7",

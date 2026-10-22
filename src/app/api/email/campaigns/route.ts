@@ -1,19 +1,22 @@
-// Buat kampanye email baru + daftar kampanye.
+// Buat kampanye email baru.
 //
-// Penerima: seluruh anggota satu grup (groupId), kontak pilihan
-// (contactIds), atau semua kontak berstatus subscribed. Kontak yang sudah
-// berhenti berlangganan atau bounce otomatis dilewati. vars = nilai
-// variabel {{namaVariabel}} sebagai objek (mis. link produk), subject
-// default dari template, scheduledAt opsional = waktu kirim otomatis UTC
-// "YYYY-MM-DD HH:MM:SS".
+// Satu kampanye = satu grup penerima + satu akun SMTP. Tidak ada sasaran
+// "semua kontak" karena setiap kontak wajib punya grup. Kontak yang berhenti
+// berlangganan / bounce otomatis dilewati.
+//
+// mode:
+//   "send"     → buat lalu langsung kirim (UI menyusul lewat ?start=1)
+//   "schedule" → buat dengan jadwal (scheduledAt UTC "YYYY-MM-DD HH:MM:SS")
+//   "draft"    → buat sebagai draft, kirim nanti dari halaman detail
 import { isAuthed } from "@/lib/auth";
-import type { EmailContact } from "@/lib/db";
 import {
   createEmailCampaignWithItems,
+  getEmailSmtpAccount,
   getEmailTemplate,
   listEmailCampaigns,
-  listEmailContacts,
   listEmailContactsByGroup,
+  listEmailGroups,
+  updateEmailCampaignRun,
 } from "@/lib/db";
 
 // Waktu kirim otomatis minimal 2 menit di depan (pola broadcast WhatsApp).
@@ -39,8 +42,9 @@ export async function POST(request: Request) {
     templateId?: number;
     subject?: string;
     groupId?: number;
-    contactIds?: number[];
+    smtpAccountId?: number;
     vars?: Record<string, string>;
+    mode?: "send" | "schedule" | "draft";
     scheduledAt?: string;
   } = {};
   try {
@@ -48,6 +52,7 @@ export async function POST(request: Request) {
   } catch {
     return Response.json({ error: "Body tidak valid" }, { status: 400 });
   }
+
   if (!body.name?.trim()) {
     return Response.json(
       { error: "Nama kampanye wajib diisi" },
@@ -65,23 +70,67 @@ export async function POST(request: Request) {
     return Response.json({ error: "Template tidak ditemukan" }, { status: 400 });
   }
 
-  // Penerima: grup > kontak pilihan > semua — kontak unsubscribe/bounce
-  // dilewati supaya tidak mengirim ke orang yang sudah minta berhenti.
-  const active = (list: EmailContact[]) =>
-    list.filter((c) => c.status === "subscribed");
-  let selected: EmailContact[];
-  if (body.groupId) {
-    selected = await listEmailContactsByGroup(body.groupId);
-  } else if (body.contactIds?.length) {
-    const all = await listEmailContacts();
-    selected = all.filter((c) => body.contactIds!.includes(c.id));
-  } else {
-    selected = await listEmailContacts();
+  const groupId = Number(body.groupId ?? 0);
+  if (!groupId) {
+    return Response.json(
+      { error: "Grup penerima wajib dipilih" },
+      { status: 400 },
+    );
   }
-  selected = active(selected);
+  const groups = await listEmailGroups();
+  if (!groups.some((g) => g.id === groupId)) {
+    return Response.json({ error: "Grup tidak ditemukan" }, { status: 400 });
+  }
+
+  const smtpAccountId = Number(body.smtpAccountId ?? 0);
+  if (!smtpAccountId) {
+    return Response.json(
+      { error: "Akun SMTP wajib dipilih — atur di halaman Pengaturan SMTP" },
+      { status: 400 },
+    );
+  }
+  const account = await getEmailSmtpAccount(smtpAccountId);
+  if (!account) {
+    return Response.json({ error: "Akun SMTP tidak ditemukan" }, { status: 400 });
+  }
+  if (account.active !== 1) {
+    return Response.json(
+      { error: `Akun SMTP "${account.name}" sedang dinonaktifkan` },
+      { status: 400 },
+    );
+  }
+
+  const mode = body.mode ?? "draft";
+  if (!["send", "schedule", "draft"].includes(mode)) {
+    return Response.json({ error: "mode tidak dikenal" }, { status: 400 });
+  }
+
+  let scheduledAt = (body.scheduledAt ?? "").trim();
+  if (mode === "schedule") {
+    if (!scheduledAt || !isValidSchedule(scheduledAt)) {
+      return Response.json(
+        {
+          error:
+            'Jadwal tidak valid — kirim waktu UTC "YYYY-MM-DD HH:MM:SS" minimal 2 menit ke depan',
+        },
+        { status: 400 },
+      );
+    }
+  } else {
+    scheduledAt = "";
+  }
+
+  // Penerima: anggota grup yang masih berlangganan.
+  const members = await listEmailContactsByGroup(groupId);
+  const selected = members.filter((c) => c.status === "subscribed");
   if (selected.length === 0) {
     return Response.json(
-      { error: "Tidak ada kontak berlangganan — tambahkan kontak dulu" },
+      {
+        error:
+          members.length === 0
+            ? "Grup masih kosong — import kontak dulu"
+            : "Semua kontak di grup ini berhenti berlangganan / bounce",
+      },
       { status: 400 },
     );
   }
@@ -93,25 +142,39 @@ export async function POST(request: Request) {
     }
   }
 
-  let scheduledAt = (body.scheduledAt ?? "").trim();
-  if (scheduledAt && !isValidSchedule(scheduledAt)) {
-    return Response.json(
-      {
-        error:
-          "Jadwal tidak valid — kirim waktu UTC \"YYYY-MM-DD HH:MM:SS\" minimal 2 menit ke depan",
-      },
-      { status: 400 },
-    );
-  }
-
-  const campaign = await createEmailCampaignWithItems(
-    body.name,
-    tpl.id,
-    (body.subject ?? tpl.subject).trim() || tpl.subject,
-    selected.map((c) => ({ contactId: c.id, name: c.name, email: c.email })),
-    body.groupId ?? null,
+  const campaign = await createEmailCampaignWithItems({
+    name: body.name,
+    templateId: tpl.id,
+    smtpAccountId: account.id,
+    groupId,
+    subject: (body.subject ?? tpl.subject).trim() || tpl.subject,
     vars,
     scheduledAt,
+    items: selected.map((c) => ({
+      contactId: c.id,
+      name: c.name,
+      email: c.email,
+    })),
+  });
+
+  // "send" langsung berstatus sending supaya tab yang terputus tetap
+  // dilanjutkan penjadwal; "schedule" menunggu jadwal; "draft" menunggu
+  // tombol kirim di halaman detail.
+  if (mode === "send") {
+    await updateEmailCampaignRun(campaign.id, {
+      status: "sending",
+      next_run_at: "",
+      pause_reason: "",
+    });
+  }
+
+  return Response.json(
+    {
+      ok: true,
+      campaign: { ...campaign, status: mode === "send" ? "sending" : "draft" },
+      startNow: mode === "send",
+      recipients: selected.length,
+    },
+    { status: 201 },
   );
-  return Response.json({ ok: true, campaign }, { status: 201 });
 }

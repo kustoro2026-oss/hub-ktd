@@ -1,7 +1,8 @@
 "use client";
 
-// Kelola grup kontak email: buat, ganti nama, dan hapus grup. Menghapus
-// grup TIDAK menghapus kontak anggotanya — hanya label pengelompokannya.
+// Kelola grup kontak email: buat, ganti nama, dan hapus grup. Grup hanya
+// bisa dihapus bila sudah kosong — kontak tidak punya daftar umum tempat
+// mendarat, jadi menghapus grup berisi kontak akan membuat data yatim.
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Pencil, Trash2, X } from "lucide-react";
@@ -48,19 +49,26 @@ export default function EmailGroupsManager({
     }
   }
 
-  async function remove(id: number, gname: string) {
-    if (
-      !confirm(
-        `Hapus grup "${gname}"? Kontak di dalamnya TIDAK ikut terhapus — hanya pengelompokannya.`,
-      )
-    )
+  async function remove(id: number, gname: string, count: number) {
+    if (count > 0) {
+      setError(
+        `Grup "${gname}" masih berisi ${count} kontak — pindahkan atau hapus kontaknya dulu.`,
+      );
       return;
+    }
+    if (!confirm(`Hapus grup kosong "${gname}"?`)) return;
+    setError("");
     try {
-      await fetch("/api/email/groups", {
+      const res = await fetch("/api/email/groups", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
+      if (!res.ok) {
+        const d = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(d.error ?? "Gagal menghapus grup");
+        return;
+      }
       router.refresh();
     } catch {
       setError("Jaringan bermasalah — coba lagi");
@@ -117,8 +125,8 @@ export default function EmailGroupsManager({
       {groups.length === 0 ? (
         <p className="mt-3 text-sm text-slate-500">
           Belum ada grup. Ketik nama lalu klik &quot;Buat grup&quot; — grup ini
-          nanti bisa dipilih langsung saat menambah kontak satuan maupun
-          import massal, atau lewat tabel di Langkah 3.
+          WAJIB ada sebelum menambah kontak, dan kontak hanya bisa berada di
+          satu grup.
         </p>
       ) : (
         <div className="mt-3 flex flex-wrap gap-2">
@@ -168,7 +176,7 @@ export default function EmailGroupsManager({
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
                   <button
-                    onClick={() => remove(g.id, g.name)}
+                    onClick={() => remove(g.id, g.name, g.member_count)}
                     className="rounded-full p-1 text-slate-400 hover:bg-red-100 hover:text-red-600"
                     aria-label={`Hapus grup ${g.name}`}
                   >

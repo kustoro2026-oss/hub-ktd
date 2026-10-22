@@ -40,6 +40,7 @@ import {
   Mail,
   AtSign,
   Database,
+  Server,
 } from "lucide-react";
 
 export type NavItem = {
@@ -91,6 +92,7 @@ export const NAV: NavSection[] = [
       { href: "/broadcast", label: "Broadcast", Icon: Send },
       { href: "/email/kampanye", label: "Email Marketing", Icon: Mail },
       { href: "/email/kontak", label: "Kontak Email", Icon: AtSign },
+      { href: "/email/smtp", label: "Pengaturan SMTP", Icon: Server },
       { href: "/email/template", label: "Template Email", Icon: FileText },
       { href: "/template", label: "Template", Icon: FileText },
       { href: "/pesan", label: "Pesan Masuk", Icon: MessageSquare },

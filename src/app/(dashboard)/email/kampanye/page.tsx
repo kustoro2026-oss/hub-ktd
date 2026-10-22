@@ -1,16 +1,19 @@
-// Halaman Kampanye Email — panel kuota harian Gmail, form buat kampanye
-// baru, dan riwayat kampanye dengan ringkasan statistik.
+// Halaman Kampanye Email — form "buat & kirim satu klik", ringkasan
+// pemakaian tiap akun SMTP, dan riwayat kampanye.
+//
+// Pengaturan akun SMTP dipindah ke halaman /email/smtp supaya halaman ini
+// fokus ke pengiriman.
 import Link from "next/link";
 import {
+  countEmailsSentTodayByAccounts,
   listEmailCampaigns,
-  listEmailContacts,
   listEmailGroups,
+  listEmailSmtpAccounts,
   listEmailTemplates,
 } from "@/lib/db";
 import { toWib } from "@/lib/format";
 import EmailCampaignCreate from "@/components/email-campaign-create";
 import EmailSendLimitPanel from "@/components/email-send-limit-panel";
-import EmailSmtpSettings from "@/components/email-smtp-settings";
 import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
@@ -19,44 +22,54 @@ export const metadata = { title: "Kampanye Email" };
 const STATUS_LABEL: Record<string, string> = {
   draft: "Draft",
   sending: "Sedang dikirim",
+  paused: "Dijeda",
   done: "Selesai",
 };
 
 export default async function EmailKampanyePage() {
-  const [campaigns, contacts, groups, templates] = await Promise.all([
+  const [campaigns, groups, templates, smtpAccounts] = await Promise.all([
     listEmailCampaigns(),
-    listEmailContacts(),
     listEmailGroups(),
     listEmailTemplates(),
+    listEmailSmtpAccounts(false),
   ]);
 
-  // Penerima "semua kontak" = kontak berstatus subscribed saja.
-  const subscribedCount = contacts.filter((c) => c.status === "subscribed").length;
+  const usage = await countEmailsSentTodayByAccounts(
+    smtpAccounts.map((a) => a.id),
+  );
+  const accountsWithUsage = smtpAccounts.map((a) => ({
+    ...a,
+    sentToday: usage[a.id] ?? 0,
+  }));
+  const accountName = new Map(smtpAccounts.map((a) => [a.id, a.name]));
+  const groupName = new Map(groups.map((g) => [g.id, g.name]));
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Kampanye Email"
-        subtitle="Kirim email massal via Gmail (batas 500/hari)"
+        subtitle="Satu klik untuk ratusan email — aturan batch tiap akun SMTP dijalankan otomatis"
       />
 
       <EmailSendLimitPanel />
 
-      <EmailSmtpSettings />
-
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-sm font-semibold text-slate-900">
-          Kampanye baru
-        </h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-sm font-semibold text-slate-900">
+            Kampanye baru
+          </h2>
+          <Link
+            href="/email/smtp"
+            className="text-xs font-medium text-emerald-700 hover:underline"
+          >
+            Kelola akun SMTP →
+          </Link>
+        </div>
         <EmailCampaignCreate
-          contactCount={subscribedCount}
           groups={groups}
           templates={templates}
+          smtpAccounts={accountsWithUsage}
         />
-        <p className="mt-3 text-xs text-slate-400">
-          Kampanye &quot;Kirim manual&quot; berstatus Draft — kirim lewat tombol
-          di halaman detail. Kampanye terjadwal berjalan otomatis.
-        </p>
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -71,6 +84,8 @@ export default async function EmailKampanyePage() {
           <ul className="divide-y divide-slate-100">
             {campaigns.map((c) => {
               const isScheduled = c.status === "draft" && c.scheduled_at !== "";
+              const isPausedCooldown =
+                c.status === "paused" && c.pause_reason === "cooldown";
               return (
                 <li key={c.id}>
                   <Link
@@ -81,8 +96,15 @@ export default async function EmailKampanyePage() {
                       <div className="font-medium text-slate-900">{c.name}</div>
                       <div className="text-xs text-slate-400">
                         {isScheduled
-                          ? `Dijadwalkan: ${toWib(c.scheduled_at)} WIB — ${c.total} penerima`
-                          : `${c.created_at} — ${c.total} penerima`}
+                          ? `Dijadwalkan: ${toWib(c.scheduled_at)} WIB`
+                          : c.created_at}{" "}
+                        — {c.total} penerima
+                        {c.group_id
+                          ? ` · ${groupName.get(c.group_id) ?? "grup terhapus"}`
+                          : ""}
+                        {c.smtp_account_id
+                          ? ` · ${accountName.get(c.smtp_account_id) ?? "akun SMTP terhapus"}`
+                          : ""}
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
@@ -97,11 +119,17 @@ export default async function EmailKampanyePage() {
                             : c.status === "done"
                               ? "bg-emerald-100 text-emerald-700"
                               : c.status === "sending"
-                                ? "bg-amber-100 text-amber-700"
-                                : "bg-slate-100 text-slate-600"
+                                ? "bg-sky-100 text-sky-700"
+                                : c.status === "paused"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-slate-100 text-slate-600"
                         }`}
                       >
-                        {isScheduled ? "Terjadwal" : STATUS_LABEL[c.status] ?? c.status}
+                        {isScheduled
+                          ? "Terjadwal"
+                          : isPausedCooldown
+                            ? "Jeda batch"
+                            : STATUS_LABEL[c.status] ?? c.status}
                       </span>
                     </div>
                   </Link>
