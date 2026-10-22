@@ -35,6 +35,26 @@ async function runSql(sql: string): Promise<{ rows: unknown[]; rowCount: number 
   }
 }
 
+// Jalankan banyak SQL dalam satu koneksi (penting: REVOKE 39 tabel = 80 statement).
+async function runSqlBatch(sqls: string[]): Promise<number> {
+  const { Pool } = await import("pg");
+  const url = dbUrl();
+  if (!url) throw new Error("Database URL tidak ditemukan");
+  const pool = new Pool({ connectionString: url, ssl: { rejectUnauthorized: false } });
+  const client = await pool.connect();
+  try {
+    let done = 0;
+    for (const sql of sqls) {
+      await client.query(sql);
+      done++;
+    }
+    return done;
+  } finally {
+    client.release();
+    await pool.end();
+  }
+}
+
 // Cek tabel + grant yang terbuka ke role anon / authenticated.
 async function checkGrants(): Promise<unknown[]> {
   const { rows } = await runSql(`
@@ -78,20 +98,19 @@ async function checkGrantsSimple(): Promise<unknown[]> {
 async function revokeAll(): Promise<{ revoked_tables: string[]; total_statements: number }> {
   const tables = await checkGrantsSimple();
   const tableNames = [...new Set((tables as { table_name: string }[]).map((t) => t.table_name))];
-  const revoked: string[] = [];
 
+  // Bangun semua statement dalam 1 batch — 1 koneksi, tidak timeout.
+  const stmts: string[] = [];
   for (const tbl of tableNames) {
-    // Cabut semua privilege dari anon dan authenticated.
-    await runSql(`REVOKE ALL ON TABLE public."${tbl}" FROM anon`);
-    await runSql(`REVOKE ALL ON TABLE public."${tbl}" FROM authenticated`);
-    revoked.push(tbl);
+    stmts.push(`REVOKE ALL ON TABLE public."${tbl}" FROM anon`);
+    stmts.push(`REVOKE ALL ON TABLE public."${tbl}" FROM authenticated`);
   }
+  // Cabut grant default untuk tabel masa depan.
+  stmts.push(`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon`);
+  stmts.push(`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM authenticated`);
 
-  // Juga cabut grant default untuk tabel yang akan dibuat di masa depan.
-  await runSql(`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon`);
-  await runSql(`ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM authenticated`);
-
-  return { revoked_tables: revoked, total_statements: revoked.length * 2 + 2 };
+  const done = await runSqlBatch(stmts);
+  return { revoked_tables: tableNames, total_statements: done };
 }
 
 export async function GET(req: Request) {
