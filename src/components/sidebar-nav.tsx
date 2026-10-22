@@ -39,6 +39,7 @@ import {
   UserPlus,
   Mail,
   AtSign,
+  Database,
 } from "lucide-react";
 
 export type NavItem = {
@@ -223,7 +224,10 @@ export const NAV: NavSection[] = [
   },
   {
     title: "Lainnya",
-    items: [{ href: "/pengaturan", label: "Pengaturan", Icon: Settings }],
+    items: [
+      { href: "/ops/pemakaian", label: "Pemakaian DB", Icon: Database },
+      { href: "/pengaturan", label: "Pengaturan", Icon: Settings },
+    ],
   },
 ];
 
