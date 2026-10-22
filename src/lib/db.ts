@@ -878,8 +878,8 @@ function migrateSqlite(db: DatabaseSync) {
       status TEXT NOT NULL DEFAULT 'subscribed',
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
-    CREATE INDEX IF NOT EXISTS idx_email_contacts_group
-      ON email_contacts (group_id);
+    -- Indeks group_id dibuat di blok migrasi setelah ALTER TABLE, karena
+    -- tabel lama belum punya kolom itu saat blok DDL ini dijalankan.
 
     CREATE TABLE IF NOT EXISTS email_groups (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -1633,8 +1633,8 @@ async function migratePg(pool: Pool) {
       status TEXT NOT NULL DEFAULT 'subscribed',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
-    CREATE INDEX IF NOT EXISTS idx_email_contacts_group
-      ON email_contacts (group_id);
+    -- Indeks group_id dibuat setelah ALTER TABLE (lihat migrasi di bawah):
+    -- tabel lama belum punya kolom itu saat DDL ini dijalankan.
 
     CREATE TABLE IF NOT EXISTS email_groups (
       id SERIAL PRIMARY KEY,
