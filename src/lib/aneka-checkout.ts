@@ -333,6 +333,38 @@ const COLOR_WORDS = [
   "navy", "maroon", "tosca",
 ];
 
+/** Kata yang menandakan perbedaan kemasan/packing saja (bukan produk fisik
+ *  yang berbeda). Digunakan untuk auto-pick saat sku_name "Default". */
+const KEMASAN_WORDS = [
+  "bubble", "bubble wrap", "extra bubble", "wrapping", "packaging",
+  "paket", "pack", "tanpa", "bonus", "free", "gratis", "tanpa spons",
+  "tanpa kuas", "tanpa microfiber", "botol saja",
+];
+
+/** True bila hint tidak memberi informasi varian spesifik ("Default", kosong,
+ *  atau kata generik serupa) — sistem tidak bisa menebak warna/ukuran/tipe. */
+function isGenericHint(hint: string): boolean {
+  const h = hint.trim().toLowerCase();
+  if (!h) return true;
+  return /^(default|standar|standard|regular|basic|umum|general)$/.test(h);
+}
+
+/** True bila semua varian hanya berbeda di kata-kata kemasan (bubble wrap,
+ *  paket bonus, dll) — produk fisiknya sama, pembeli tidak perlu pilih. */
+function isPackagingOnlyDifference(
+  variants: { name?: string; label?: string }[],
+): boolean {
+  if (variants.length < 2) return false;
+  const strip = (s: string) => {
+    let r = s.toLowerCase();
+    for (const kw of KEMASAN_WORDS)
+      r = r.replace(new RegExp(`\\b${kw}\\b`, "gi"), "");
+    return r.replace(/[^\w]/g, "").trim();
+  };
+  const bases = variants.map((v) => strip(v.name ?? "") + "|" + strip(v.label ?? ""));
+  return new Set(bases).size === 1;
+}
+
 /** Tentukan variant_id untuk produk Aneka (data varian disematkan sebagai
  *  JSON di atribut onclick halaman produk — harus login). Tanpa varian →
  *  ok tanpa variantId. Satu varian → dipakai langsung dengan guard ukuran/
@@ -446,6 +478,13 @@ export async function anekaResolveVariant(
       .sort((a, b) => b.score - a.score);
     if (scored.length === 1 || (scored.length > 1 && scored[0].score > scored[1].score)) {
       const v = scored[0].v;
+      return { ok: true, variantId: String(v.id), label: v.label ?? v.name };
+    }
+    // Fallback: bila petunjuk generik ("Default") dan varian hanya beda
+    // kemasan (bubble wrap, paket bonus, dll), auto-pick varian pertama —
+    // produk fisiknya sama, pembeli tidak perlu memilih.
+    if (isGenericHint(variantHint) && isPackagingOnlyDifference(list)) {
+      const v = list.sort((a, b) => Number(a.id) - Number(b.id))[0];
       return { ok: true, variantId: String(v.id), label: v.label ?? v.name };
     }
     return {
