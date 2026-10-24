@@ -28,7 +28,6 @@ import {
   countSeenTiktokOrders,
   getTiktokOrderExec,
   listSeenTiktokOrders,
-  listTiktokOrderExecs,
   listTiktokShopTokens,
   markTiktokOrderSeen,
   recordTiktokOrderFailure,
@@ -314,11 +313,10 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
   const errors: string[] = [];
   let newOrders = 0;
 
-  // Baris eksekusi Aneka per pesanan — dipakai untuk notifikasi refund.
-  const execByOrder = new Map(
-    (await listTiktokOrderExecs()).map((e) => [e.order_id, e]),
-  );
-
+  // Baris eksekusi Aneka per pesanan diambil LAZY per pesanan lewat
+  // getTiktokOrderExec — memuat semua baris (termasuk payload+log) tiap
+  // ronde menghabiskan kuota egress database (cek bisa berjalan tiap
+  // menit), padahal map hanya dibutuhkan untuk kasus batal/refund.
   /** Potongan pesan "minta refund ke CS Aneka" berdasar baris eksekusi
    *  (bila ada) — sebutkan ID pembayaran, kode pesanan, dan total modal
    *  supaya admin tinggal membacakan datanya ke CS Aneka. */
@@ -440,7 +438,7 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
         // Pesanan yang SUDAH diproses (resi terkirim, eksekusi disiapkan,
         // atau sudah ada pembayaran Aneka) lalu dibatalkan = uang sudah
         // keluar ke Aneka — ingatkan admin untuk minta refund ke CS Aneka.
-        const exec = execByOrder.get(o.order_id);
+        const exec = (await getTiktokOrderExec(o.order_id)) ?? undefined;
         const terlanjurBayar =
           resiTerlanjur ||
           prev?.notify.startsWith("eksekusi") ||
@@ -495,7 +493,7 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
                       : ""
                   }`
                 : "";
-            const exec = execByOrder.get(o.order_id);
+            const exec = (await getTiktokOrderExec(o.order_id)) ?? undefined;
             const msg = `Paket pesanan TikTok Shop dikembalikan/gagal antar: ${o.order_id}${itemsTxt} (status paket: ${pkg.package_status}${
               pkg.package_sub_status ? ` / ${pkg.package_sub_status}` : ""
             }).${refundAnekaInfo(exec)}`;

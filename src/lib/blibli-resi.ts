@@ -26,8 +26,8 @@
 //     dibuka manual dari halaman Pesanan).
 import {
   countSeenBlibliOrders,
+  getBlibliOrderExec,
   listSeenBlibliOrders,
-  listBlibliOrderExecs,
   markBlibliOrderSeen,
   recordBlibliOrderFailure,
   touchBlibliOrderSeen,
@@ -378,11 +378,9 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
   const errors: string[] = [];
   let newOrders = 0;
 
-  // Baris eksekusi Aneka per paket — dipakai untuk notifikasi refund.
-  const execByPkg = new Map(
-    (await listBlibliOrderExecs()).map((e) => [e.package_id, e]),
-  );
-
+  // Baris eksekusi Aneka per paket diambil LAZY lewat getBlibliOrderExec —
+  // memuat semua baris (termasuk payload+log) tiap ronde menghabiskan kuota
+  // egress database, padahal map hanya dipakai untuk kasus batal/refund.
   /** Potongan pesan "minta refund ke CS Aneka" berdasar baris eksekusi
    *  (bila ada) — sebutkan ID pembayaran, kode pesanan, dan total modal
    *  supaya admin tinggal membacakan datanya ke CS Aneka. */
@@ -464,7 +462,7 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
         // Item yang SUDAH diproses (label terkirim, eksekusi disiapkan,
         // atau sudah ada pembayaran Aneka) lalu dibatalkan = uang sudah
         // keluar ke Aneka — ingatkan admin untuk minta refund ke CS Aneka.
-        const exec = execByPkg.get(p.packageId);
+        const exec = (await getBlibliOrderExec(p.packageId)) ?? undefined;
         const terlanjurBayar =
           resiTerlanjur ||
           prev?.notify.startsWith("eksekusi") ||
@@ -520,7 +518,7 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
           if (m) returnHit = m[0];
         }
         if (returnHit) {
-          const exec = execByPkg.get(p.packageId);
+          const exec = (await getBlibliOrderExec(p.packageId)) ?? undefined;
           const msg = `Paket pesanan Blibli dikembalikan/gagal antar: ${itemId} — ${it.product.itemName} (riwayat: ${returnHit}).${refundAnekaInfo(exec)}`;
           const res = await sendOwnerNotice(msg);
           if (res.startsWith("ok")) {
