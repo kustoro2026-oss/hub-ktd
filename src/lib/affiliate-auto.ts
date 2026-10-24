@@ -15,6 +15,7 @@
 //      per-kreator) sampai cap tercapai, jurnal tiap batch.
 import {
   checkCreatorOutreachEligibility,
+  collaborationNameStamp,
   journalInviteBatch,
   prepareAffiliateShop,
   searchMarketplaceCreators,
@@ -22,6 +23,7 @@ import {
   sleep,
   type AffiliateCreatorRow,
 } from "@/lib/tiktok-affiliate";
+import { filterActiveProductIds } from "@/lib/tiktok-products";
 import {
   countAffiliateInvitesSentSince,
   getAffiliateSettings,
@@ -55,6 +57,7 @@ export type AffiliateAutoResult = {
   checked?: number;
   sent_today?: number;
   daily_cap?: number;
+  invalid_products?: number;
 };
 
 /** Jalankan satu siklus undangan afiliasi otomatis. */
@@ -177,6 +180,22 @@ export async function runAffiliateAutoCron(): Promise<AffiliateAutoResult> {
         "Pengaturan produk belum diisi — pilih produk dulu di halaman Afiliasi.",
     };
   }
+  // Validasi produk terhadap daftar toko live: produk terhapus/ternonaktifkan
+  // membuat TikTok membalas 200 TANPA membuat kolaborasi (kegagalan senyap
+  // yang dulu lolos tercatat "sent"). Saring di sini + hentikan bila kosong.
+  const prodCheck = await filterActiveProductIds(prep.ctx, productIds);
+  if (!prodCheck.ok) {
+    return { ok: false, searched: fresh.length, detail: prodCheck.detail };
+  }
+  if (prodCheck.valid.length === 0) {
+    return {
+      ok: false,
+      searched: fresh.length,
+      detail:
+        "Semua produk di pengaturan sudah tidak aktif/terhapus di TikTok — perbarui daftar produk di halaman Afiliasi.",
+    };
+  }
+  productIds = prodCheck.valid;
 
   // 2) Kolam kandidat: hasil pencarian baru + cache lama.
   const cached = await listAffiliateCreatorCandidates({
@@ -268,10 +287,7 @@ export async function runAffiliateAutoCron(): Promise<AffiliateAutoResult> {
   const summary = await sendTargetCollaborationInvites(
     prep.ctx,
     {
-      name: `Undangan Auto KTD ${new Date()
-        .toISOString()
-        .slice(0, 16)
-        .replace("T", " ")}`,
+      name: `UndanganAutoKTD${collaborationNameStamp()}`,
       endTime: String(Math.floor(Date.now() / 1000) + 30 * 86400),
       products,
       creatorUserOpenIds: target,
@@ -292,14 +308,32 @@ export async function runAffiliateAutoCron(): Promise<AffiliateAutoResult> {
   if (!summary.ok) {
     return { ok: false, detail: summary.detail };
   }
+  const failedCount = summary.batches.filter((b) => !b.ok).length;
+  // Semua batch gagal = tidak ada satu pun undangan terkirim. Kembalikan
+  // ok:false supaya worker/route tahu ada masalah (bukan ok:true senyap).
+  if (failedCount > 0 && failedCount === summary.batches.length) {
+    const first = summary.batches.find((b) => !b.ok);
+    return {
+      ok: false,
+      invited: 0,
+      batches_total: summary.batches.length,
+      batches_failed: failedCount,
+      candidates_checked: pool.length,
+      eligible: target.length,
+      sent_today: sentToday,
+      daily_cap: dailyCap,
+      detail: `Semua batch undangan gagal — ${first?.detail ?? "tanpa keterangan"}`,
+    };
+  }
   return {
     ok: true,
     invited: summary.invitedCount,
     batches_total: summary.batches.length,
-    batches_failed: summary.batches.filter((b) => !b.ok).length,
+    batches_failed: failedCount,
     candidates_checked: pool.length,
     eligible: target.length,
     sent_today: sentToday,
     daily_cap: dailyCap,
+    invalid_products: prodCheck.invalid.length,
   };
 }

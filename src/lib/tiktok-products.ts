@@ -209,6 +209,57 @@ export async function searchTiktokProducts(
   }
 }
 
+// ---------- Saring produk aktif ----------
+
+/** Hasil penyaringan produk terhadap daftar toko live. */
+export type ActiveProductFilterResult =
+  | { ok: true; valid: string[]; invalid: string[] }
+  | { ok: false; detail: string };
+
+/** Periksa ID produk terhadap daftar produk toko yang masih aktif
+ *  (status ACTIVATE dan dijual). Dipakai pengundang otomatis supaya produk
+ *  yang terhapus/ternonaktifkan tidak membuat TikTok membalas 200 tanpa
+ *  membuat kolaborasi (kegagalan senyap). Berhenti lebih awal bila semua
+ *  ID yang dicari sudah ditemukan. */
+export async function filterActiveProductIds(
+  ctx: TiktokShopCtx,
+  ids: string[],
+): Promise<ActiveProductFilterResult> {
+  const wanted = [...new Set(ids.filter((s) => s !== ""))];
+  if (wanted.length === 0) return { ok: true, valid: [], invalid: [] };
+  const statusById = new Map<string, { active: boolean }>();
+  let pageToken = "";
+  for (let p = 0; p < 10; p += 1) {
+    if (p > 0) await new Promise((r) => setTimeout(r, 2000));
+    const res = await searchTiktokProducts(ctx, {
+      pageSize: 100,
+      pageToken: pageToken || undefined,
+    });
+    if (!res.ok) {
+      // Halaman pertama gagal = daftar produk tidak bisa dibaca sama sekali.
+      if (p === 0) return { ok: false, detail: res.detail };
+      break; // halaman lanjutan gagal — lanjut dengan yang sudah terkumpul.
+    }
+    for (const it of res.items) {
+      if (wanted.includes(it.id)) {
+        statusById.set(it.id, {
+          active: it.status === "ACTIVATE" && !it.isNotForSale,
+        });
+      }
+    }
+    if (statusById.size === wanted.length) break;
+    if (!res.nextPageToken) break;
+    pageToken = res.nextPageToken;
+  }
+  const valid: string[] = [];
+  const invalid: string[] = [];
+  for (const id of wanted) {
+    if (statusById.get(id)?.active) valid.push(id);
+    else invalid.push(id);
+  }
+  return { ok: true, valid, invalid };
+}
+
 // ---------- Detail produk ----------
 
 export type TiktokSkuDetail = TiktokSkuRow & {

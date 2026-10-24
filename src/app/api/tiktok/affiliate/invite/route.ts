@@ -10,9 +10,11 @@
 // Auth: sesi admin (isAuthed) ATAU CRON_SECRET — pola route afiliasi.
 import { isAuthed } from "@/lib/auth";
 import {
+  collaborationNameStamp,
   describeAffiliateError,
   journalInviteBatch,
   prepareAffiliateShop,
+  sanitizeCollaborationName,
   sendTargetCollaborationInvites,
 } from "@/lib/tiktok-affiliate";
 import { getAffiliateSettings } from "@/lib/db";
@@ -101,9 +103,12 @@ export async function POST(request: Request) {
   const endTime =
     strOf(body.end_time) ||
     String(Math.floor(Date.now() / 1000) + 30 * 86400);
-  const name =
-    strOf(body.name) ||
-    `Undangan KTD ${new Date().toISOString().slice(0, 16).replace("T", " ")}`;
+  // Nama harus bebas karakter terlarang (':' '-' dst. memicu 98001004) —
+  // sanitasi nama dari UI, dan pakai stempel kompak bila kosong.
+  const rawName = strOf(body.name);
+  const name = rawName
+    ? sanitizeCollaborationName(rawName)
+    : `UndanganKTD${collaborationNameStamp()}`;
   const contentTypeRaw = strOf(body.preferred_content_type);
   const preferredContentType =
     contentTypeRaw === "LIVE" || contentTypeRaw === "VIDEO"

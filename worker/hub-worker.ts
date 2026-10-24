@@ -22,6 +22,7 @@ import { runOpsHealthCheck, runOpsWeeklyBackup } from "../src/lib/ops";
 import { runAffiliateAutoCron } from "../src/lib/affiliate-auto";
 import { ambilSnapshotAneka } from "../src/lib/keuangan";
 import { workerHeartbeatSet } from "../src/lib/db";
+import { sendOwnerNotice } from "../src/lib/wa";
 
 function wib(): string {
   return new Date(Date.now() + 7 * 3600_000).toISOString().slice(11, 19);
@@ -92,48 +93,38 @@ const DAILY_JOBS: {
   h: number;
   m: number;
   dow?: number;
-  run: () => Promise<void>;
+  run: () => Promise<unknown>;
 }[] = [
   {
     name: "ops-health",
     h: 1,
     m: 0,
-    run: async () => {
-      await runOpsHealthCheck();
-    },
+    run: () => runOpsHealthCheck(),
   },
   {
     name: "affiliate-auto-0130",
     h: 1,
     m: 30,
-    run: async () => {
-      await runAffiliateAutoCron();
-    },
+    run: () => runAffiliateAutoCron(),
   },
   {
     name: "ops-backup",
     h: 2,
     m: 0,
     dow: 0,
-    run: async () => {
-      await runOpsWeeklyBackup();
-    },
+    run: () => runOpsWeeklyBackup(),
   },
   {
     name: "affiliate-auto-0730",
     h: 7,
     m: 30,
-    run: async () => {
-      await runAffiliateAutoCron();
-    },
+    run: () => runAffiliateAutoCron(),
   },
   {
     name: "keuangan",
     h: 23,
     m: 0,
-    run: async () => {
-      await ambilSnapshotAneka(true);
-    },
+    run: () => ambilSnapshotAneka(true),
   },
 ];
 
@@ -156,8 +147,18 @@ async function runDaily(d: Date): Promise<void> {
     lastDaily.add(key);
     log(`jadwal harian: ${job.name}`);
     try {
-      await job.run();
-      log(`jadwal harian selesai: ${job.name}`);
+      const res = (await job.run()) as { ok?: boolean; detail?: string } | undefined;
+      if (res && res.ok === false) {
+        // Gagal senyap dulu tidak pernah sampai ke pemilik — kirim notif WA
+        // supaya masalah terlihat tanpa harus membuka log VPS.
+        const detail = String(res.detail ?? "tanpa keterangan");
+        log(`jadwal harian GAGAL: ${job.name} — ${detail}`);
+        await sendOwnerNotice(
+          `[KTD Hub] Pekerjaan harian ${job.name} gagal: ${detail}`,
+        );
+      } else {
+        log(`jadwal harian selesai: ${job.name}`);
+      }
     } catch (e) {
       log(
         `jadwal harian GAGAL: ${job.name} — ${

@@ -410,6 +410,29 @@ export type InviteBatchSummary =
   | { ok: true; batches: InviteBatchResult[]; invitedCount: number }
   | { ok: false; detail: string };
 
+/** Stempel WIB kompak (YYYYMMDDHHmm) untuk nama undangan — huruf+angka
+ *  saja karena TikTok menolak nama dengan karakter seperti ':' '-' dengan
+ *  kode 98001004 "invalid name or message" (terbukti lewat uji langsung). */
+export function collaborationNameStamp(): string {
+  const d = new Date(Date.now() + 7 * 3600_000);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(
+    d.getUTCHours(),
+  )}${p(d.getUTCMinutes())}`;
+}
+
+/** Bersihkan nama target collaboration: hanya huruf, angka, dan spasi.
+ *  Karakter lain (':' '-' '/' dst.) terbukti memicu 98001004. */
+export function sanitizeCollaborationName(raw: string): string {
+  return (
+    raw
+      .replace(/[^a-zA-Z0-9 ]+/g, " ")
+      .replace(/ {2,}/g, " ")
+      .trim()
+      .slice(0, 100) || "Undangan KTD"
+  );
+}
+
 /** POST /affiliate_seller/202508/target_collaborations — satu undangan
  *  target collaboration (maks 50 kreator, maks 100 produk). */
 export async function createTargetCollaboration(
@@ -464,9 +487,29 @@ export async function createTargetCollaboration(
   }
   const d = res.data;
   const tc = (d.target_collaboration ?? {}) as Record<string, unknown>;
+  const collaborationId = str(tc.id);
+  const invalidProductIds = ((d.invalid_product_id_list ?? []) as unknown[]).map(
+    str,
+  );
+  // TikTok bisa membalas 200 TANPA membuat kolaborasi (id kosong) bila semua
+  // produk di batch tidak valid — dulu dianggap sukses sehingga kreator
+  // tercatat "sent" padahal tidak ada undangan apa pun. Perlakukan gagal.
+  if (collaborationId === "") {
+    return {
+      ok: false,
+      creatorOpenIds: input.creatorUserOpenIds.slice(0, 50),
+      detail:
+        invalidProductIds.length > 0
+          ? `TikTok tidak membuat target collaboration — semua produk tidak valid: ${invalidProductIds
+              .slice(0, 5)
+              .join(", ")}${invalidProductIds.length > 5 ? " dan lainnya" : ""}`
+          : "TikTok tidak membuat target collaboration (respons tanpa kolaborasi).",
+      code: null,
+    };
+  }
   return {
     ok: true,
-    collaborationId: str(tc.id),
+    collaborationId,
     creatorOpenIds: input.creatorUserOpenIds.slice(0, 50),
     conflicts: (
       (d.target_collaboration_conflicts ?? []) as Record<string, unknown>[]
@@ -475,9 +518,7 @@ export async function createTargetCollaboration(
       productId: str(c.product_id),
     })),
     invalidOpenIds: ((d.invalid_open_id_list ?? []) as unknown[]).map(str),
-    invalidProductIds: ((d.invalid_product_id_list ?? []) as unknown[]).map(
-      str,
-    ),
+    invalidProductIds,
     createTime: num(d.create_time),
   };
 }
@@ -606,6 +647,13 @@ export async function journalInviteBatch(
     } else {
       status = "sent";
       sentIds.push(id);
+      // Kolaborasi bisa dibuat untuk sebagian produk saja; catat produk yang
+      // ditolak supaya jurnal tidak terlihat bersih padahal ada produk invalid.
+      if (result.invalidProductIds.length > 0) {
+        detail = `Produk tidak valid: ${result.invalidProductIds
+          .slice(0, 5)
+          .join(", ")}`;
+      }
     }
     await saveAffiliateInvite({
       shop_id: shopId,
