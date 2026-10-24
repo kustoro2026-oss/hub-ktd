@@ -35,6 +35,7 @@ import {
   listTiktokShopTokens,
   tandaiStokKanalSelesai,
   upsertKtdStoreStok,
+  workerHeartbeatFresh,
   type StokKanal,
   type StokPenyesuaianRow,
 } from "@/lib/db";
@@ -1157,8 +1158,21 @@ async function kumpulkanKejadianLazada(): Promise<number | string> {
 
 /** Jalankan sinkronisasi stok otomatis penuh: kumpulkan order selesai baru
  *  dari TikTok/Blibli/Lazada, lalu terapkan pengurangan ke kanal-kanal yang
- *  belum menerimanya. Aman dipanggil berulang (idempoten per kejadian). */
-export async function cekOrderSelesaiSemuaChannel(): Promise<HasilCekOrderSelesai> {
+ *  belum menerimanya. Aman dipanggil berulang (idempoten per kejadian). Bila
+ *  `skipIfWorkerFresh` dan worker VPS baru saja menjalankan ronde ini,
+ *  sinkron dilewati. */
+export async function cekOrderSelesaiSemuaChannel(opts?: {
+  skipIfWorkerFresh?: boolean;
+}): Promise<HasilCekOrderSelesai> {
+  if (opts?.skipIfWorkerFresh && (await workerHeartbeatFresh("stok:sync"))) {
+    return {
+      ok: true,
+      detail: "dilewati: worker VPS baru saja menjalankan",
+      eventBaru: 0,
+      diterapkan: {} as Record<StokKanal, number>,
+      gagalKanal: [],
+    };
+  }
   const masalah: string[] = [];
   let eventBaru = 0;
 

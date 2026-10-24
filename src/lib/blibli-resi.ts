@@ -31,6 +31,7 @@ import {
   markBlibliOrderSeen,
   recordBlibliOrderFailure,
   touchBlibliOrderSeen,
+  workerHeartbeatFresh,
 } from "@/lib/db";
 import {
   cancelBlibliExec,
@@ -340,8 +341,14 @@ export async function fulfillBlibliPackageForOrder(
 /** Jalankan satu ronde pengecekan item pesanan baru toko KTD STORE.
  *  Idempoten — tabel blibli_order_seen mencegah kirim ganda. Satu paket
  *  diproses SATU kali (dipicu item FP pertama yang melewati masa tunggu);
- *  item anggota lain ikut ditandai hasil yang sama. */
-export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
+ *  item anggota lain ikut ditandai hasil yang sama. Bila `skipIfWorkerFresh`
+ *  dan worker VPS baru saja menjalankan cek ini, ronde dilewati. */
+export async function checkNewBlibliOrders(opts?: {
+  skipIfWorkerFresh?: boolean;
+}): Promise<BlibliResiCheckResult> {
+  if (opts?.skipIfWorkerFresh && (await workerHeartbeatFresh("resi:blibli"))) {
+    return { ok: true, detail: "dilewati: worker VPS baru saja menjalankan" };
+  }
   const owner = ownerNumber();
   if (!owner) {
     return { ok: false, detail: "OWNER_WA_NUMBER belum diatur" };

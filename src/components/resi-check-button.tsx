@@ -24,7 +24,11 @@ export default function ResiCheckButton() {
     setBusy(true);
     setResult(null);
     try {
-      const res = await fetch("/api/tiktok/resi/check", { method: "POST" });
+      // ?force=1 — tombol manual selalu menjalankan cek penuh, walau worker
+      // VPS baru saja melakukannya.
+      const res = await fetch("/api/tiktok/resi/check?force=1", {
+        method: "POST",
+      });
       const data = (await res.json()) as CheckResult;
       setResult(data);
     } catch {

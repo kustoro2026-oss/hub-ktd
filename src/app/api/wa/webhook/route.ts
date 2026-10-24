@@ -298,7 +298,9 @@ export async function POST(request: Request) {
   // terbukti tidak tereksekusi di produksi pada build Next ini, sehingga
   // pesanan tetap terdeteksi walau tidak ada tab admin terbuka.
   try {
-    await runDueScheduledBroadcasts();
+    // Tick dilewati bila worker VPS baru saja menjalankan ronde ini
+    // (menghemat CPU serverless; worker adalah penjadwal utama).
+    await runDueScheduledBroadcasts({ skipIfWorkerFresh: true });
   } catch (e) {
     console.error("[wa-webhook] tick jadwal gagal:", e);
   }
@@ -306,17 +308,17 @@ export async function POST(request: Request) {
   if (now - lastOrderCheckAt >= 60_000) {
     lastOrderCheckAt = now;
     try {
-      await checkNewTiktokOrders();
+      await checkNewTiktokOrders({ skipIfWorkerFresh: true });
     } catch (e) {
       console.error("[wa-webhook] tick pesanan TikTok gagal:", e);
     }
     try {
-      await checkNewBlibliOrders();
+      await checkNewBlibliOrders({ skipIfWorkerFresh: true });
     } catch (e) {
       console.error("[wa-webhook] tick pesanan Blibli gagal:", e);
     }
     try {
-      await checkNewLazadaOrders();
+      await checkNewLazadaOrders({ skipIfWorkerFresh: true });
     } catch (e) {
       console.error("[wa-webhook] tick pesanan Lazada gagal:", e);
     }

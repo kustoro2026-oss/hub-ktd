@@ -297,6 +297,33 @@ async function queryRun(
   (await sqliteDb()).prepare(sql).run(...params);
 }
 
+// ---------- heartbeat worker VPS ----------
+
+/** Catat bahwa pekerjaan `name` baru saja dijalankan worker VPS. */
+export async function workerHeartbeatSet(name: string): Promise<void> {
+  const sql =
+    dbMode() === "pg"
+      ? "INSERT INTO worker_heartbeat (name, last_run) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET last_run = EXCLUDED.last_run"
+      : "INSERT INTO worker_heartbeat (name, last_run) VALUES (?, ?) ON CONFLICT (name) DO UPDATE SET last_run = excluded.last_run";
+  await queryRun(sql, [name, Date.now()]);
+}
+
+/** True bila worker VPS menjalankan `name` dalam `maxAgeMs` terakhir. */
+export async function workerHeartbeatFresh(
+  name: string,
+  maxAgeMs = 6 * 60_000,
+): Promise<boolean> {
+  const row = await queryOne<{ last_run: number | string }>(
+    "SELECT last_run FROM worker_heartbeat WHERE name = ?",
+    [name],
+  );
+  if (!row) return false;
+  const ts =
+    typeof row.last_run === "number" ? row.last_run : Number(row.last_run);
+  if (!Number.isFinite(ts) || ts <= 0) return false;
+  return Date.now() - ts < maxAgeMs;
+}
+
 // Baris dari node:sqlite berprototipe null — salin ke objek biasa sebelum
 // dikembalikan.
 function plainRows<T>(rows: unknown[]): T[] {
@@ -1296,6 +1323,17 @@ function migrateSqlite(db: DatabaseSync) {
       last_return_sweep_at TEXT NOT NULL DEFAULT ''
     );
   `);
+
+  // Heartbeat worker VPS — baris per pekerjaan, timestamp epoch ms.
+  // Titik-titik tick ringan (tab admin, webhook WA, pinger) memakainya
+  // untuk MELEWATI pekerjaan berat yang baru saja dijalankan worker,
+  // supaya CPU serverless tidak terpakai dua kali.
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS worker_heartbeat (
+      name TEXT PRIMARY KEY,
+      last_run INTEGER NOT NULL DEFAULT 0
+    );
+  `);
 }
 
 async function migratePg(pool: Pool) {
@@ -1775,6 +1813,11 @@ async function migratePg(pool: Pool) {
     CREATE TABLE IF NOT EXISTS resi_check_state (
       marketplace TEXT PRIMARY KEY,
       last_return_sweep_at TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS worker_heartbeat (
+      name TEXT PRIMARY KEY,
+      last_run BIGINT NOT NULL DEFAULT 0
     );
   `);
 

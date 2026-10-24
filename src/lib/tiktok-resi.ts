@@ -34,6 +34,7 @@ import {
   recordTiktokOrderFailure,
   setResiCheckState,
   updateTiktokOrderExecPayloadIfUnchanged,
+  workerHeartbeatFresh,
 } from "@/lib/db";
 import {
   cancelAnekaExec,
@@ -290,8 +291,15 @@ async function isiLabelEksekusi(
 }
 
 /** Jalankan satu ronde pengecekan pesanan baru untuk semua toko terotorisasi.
- *  Idempoten — tabel tiktok_order_seen mencegah kirim ganda. */
-export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
+ *  Idempoten — tabel tiktok_order_seen mencegah kirim ganda. Bila
+ *  `skipIfWorkerFresh` dan worker VPS baru saja menjalankan cek ini, ronde
+ *  dilewati (menghemat CPU serverless; worker adalah penjadwal utama). */
+export async function checkNewTiktokOrders(opts?: {
+  skipIfWorkerFresh?: boolean;
+}): Promise<ResiCheckResult> {
+  if (opts?.skipIfWorkerFresh && (await workerHeartbeatFresh("resi:tiktok"))) {
+    return { ok: true, detail: "dilewati: worker VPS baru saja menjalankan" };
+  }
   const owner = ownerNumber();
   if (!owner) {
     return { ok: false, detail: "OWNER_WA_NUMBER belum diatur" };

@@ -324,7 +324,8 @@ export default function StokSyncClient({
     setCekSibuk(true);
     setCekHasil(null);
     try {
-      const r = await fetch("/api/aneka/stok/check", { method: "POST" });
+      // ?force=1 — tombol manual selalu menjalankan cek penuh.
+      const r = await fetch("/api/aneka/stok/check?force=1", { method: "POST" });
       const data = (await r.json()) as HasilCek & { error?: string };
       if (data.error) {
         setCekHasil({ ok: false, detail: data.error, eventBaru: 0, diterapkan: {}, gagalKanal: [] });

@@ -27,6 +27,7 @@ import {
   requeueStaleQueuedEmailItems,
   updateEmailCampaignRun,
   updateEmailCampaignRunIfActive,
+  workerHeartbeatFresh,
   type EmailCampaign,
 } from "@/lib/db";
 import {
@@ -499,10 +500,17 @@ export async function runEmailCampaign(id: number): Promise<EmailRunResult> {
 
 // Jalankan kampanye yang jatuh tempo / terputus. Dipanggil dari tick tab
 // admin dan cron Vercel — satu ronde per kampanye, dibatasi waktu total.
-export async function runDueScheduledEmailCampaigns(): Promise<{
+// Bila `skipIfWorkerFresh` dan worker VPS baru saja menjalankan ronde ini,
+// panggilan dilewati.
+export async function runDueScheduledEmailCampaigns(opts?: {
+  skipIfWorkerFresh?: boolean;
+}): Promise<{
   started: number;
   results: { id: number; ok: boolean; error?: string }[];
 }> {
+  if (opts?.skipIfWorkerFresh && (await workerHeartbeatFresh("sched:email"))) {
+    return { started: 0, results: [] };
+  }
   const due = await listDueScheduledEmailCampaigns();
   const results: { id: number; ok: boolean; error?: string }[] = [];
   const deadline = Date.now() + 40_000;

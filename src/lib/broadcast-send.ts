@@ -16,6 +16,7 @@ import {
   requeueStaleQueuedItems,
   setBroadcastStatus,
   setContactWaStatus,
+  workerHeartbeatFresh,
 } from "@/lib/db";
 import { getTemplateStatus, getWaEnv, sendTemplate, sendTemplateParams } from "@/lib/wa";
 
@@ -130,11 +131,18 @@ export async function runBroadcast(id: number): Promise<BroadcastRunResult> {
 // Jalankan kampanye terjadwal yang waktunya sudah tiba. Dipanggil dari
 // titik-titik ringan — halaman admin dibuka, tab admin yang terbuka
 // (tick per menit), webhook pesan masuk, atau cron Vercel — supaya kiriman
-// berjalan tepat waktu tanpa ada yang menekan tombol kirim.
-export async function runDueScheduledBroadcasts(): Promise<{
+// berjalan tepat waktu tanpa ada yang menekan tombol kirim. Bila
+// `skipIfWorkerFresh` dan worker VPS baru saja menjalankan ronde ini,
+// panggilan dilewati (worker adalah penjadwal utama).
+export async function runDueScheduledBroadcasts(opts?: {
+  skipIfWorkerFresh?: boolean;
+}): Promise<{
   started: number;
   results: { id: number; ok: boolean; error?: string }[];
 }> {
+  if (opts?.skipIfWorkerFresh && (await workerHeartbeatFresh("sched:broadcast"))) {
+    return { started: 0, results: [] };
+  }
   const due = await listDueScheduledBroadcasts();
   const results: { id: number; ok: boolean; error?: string }[] = [];
   for (const bc of due) {

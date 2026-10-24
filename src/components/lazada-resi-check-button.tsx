@@ -25,7 +25,10 @@ export default function LazadaResiCheckButton() {
     setBusy(true);
     setResult(null);
     try {
-      const res = await fetch("/api/lazada/resi/check", { method: "POST" });
+      // ?force=1 — tombol manual selalu menjalankan cek penuh.
+      const res = await fetch("/api/lazada/resi/check?force=1", {
+        method: "POST",
+      });
       const data = (await res.json()) as CheckResult;
       setResult(data);
     } catch {

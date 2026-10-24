@@ -10,6 +10,7 @@ export async function POST() {
   if (!(await isAuthed())) {
     return Response.json({ error: "Belum masuk" }, { status: 401 });
   }
-  const res = await runDueScheduledEmailCampaigns();
+  // Tick tab admin dilewati bila worker VPS baru saja menjalankan ronde ini.
+  const res = await runDueScheduledEmailCampaigns({ skipIfWorkerFresh: true });
   return Response.json({ ok: true, ...res });
 }

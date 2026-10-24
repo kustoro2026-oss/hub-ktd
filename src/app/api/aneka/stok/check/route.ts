@@ -31,9 +31,13 @@ async function handle(request: Request) {
   if (!cronAuthorized(request) && !(await isAuthed())) {
     return Response.json({ error: "Belum masuk" }, { status: 401 });
   }
+  // Tombol manual menambah ?force=1 — jalankan selalu. Tick penjadwal/
+  // pinger/webhook tanpa force MELEWATI ronde bila worker VPS baru saja
+  // menjalankannya (menghemat CPU serverless).
+  const force = new URL(request.url).searchParams.get("force") === "1";
   let res;
   try {
-    res = await cekOrderSelesaiSemuaChannel();
+    res = await cekOrderSelesaiSemuaChannel({ skipIfWorkerFresh: !force });
   } catch (e) {
     res = {
       ok: false,

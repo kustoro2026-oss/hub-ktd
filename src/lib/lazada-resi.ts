@@ -42,6 +42,7 @@ import {
   setResiCheckState,
   touchLazadaOrderSeen,
   updateLazadaOrderExecPayload,
+  workerHeartbeatFresh,
 } from "@/lib/db";
 import {
   autoPackLazadaOrder,
@@ -504,8 +505,15 @@ let gRun: Promise<LazadaResiCheckResult> | null = null;
 /** Jalankan satu ronde pengecekan pesanan Lazada baru toko KTD STORE.
  *  Idempoten — tabel lazada_order_seen mencegah kirim ganda. Satu pesanan
  *  diproses SATU kali (dipicu item pending pertama yang melewati masa
- *  tunggu); item anggota lain ikut ditandai hasil yang sama. */
-export async function checkNewLazadaOrders(): Promise<LazadaResiCheckResult> {
+ *  tunggu); item anggota lain ikut ditandai hasil yang sama. Bila
+ *  `skipIfWorkerFresh` dan worker VPS baru saja menjalankan cek ini, ronde
+ *  dilewati. */
+export async function checkNewLazadaOrders(opts?: {
+  skipIfWorkerFresh?: boolean;
+}): Promise<LazadaResiCheckResult> {
+  if (opts?.skipIfWorkerFresh && (await workerHeartbeatFresh("resi:lazada"))) {
+    return { ok: true, detail: "dilewati: worker VPS baru saja menjalankan" };
+  }
   if (gRun) return gRun;
   gRun = runCheckNewLazadaOrders().finally(() => {
     gRun = null;
