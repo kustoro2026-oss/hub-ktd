@@ -410,7 +410,11 @@ export type InviteBatchResult =
       detail: string;
       code: number | null;
       /** Produk yang ditolak TikTok (respons 200 tanpa kolaborasi). */
-      invalidProductIds?: string[];
+      invalidProductIds: string[];
+      /** Pasangan kreator–produk yang sudah ada undangannya. */
+      conflicts: { creatorOpenId: string; productId: string }[];
+      /** Open id kreator tidak valid. */
+      invalidOpenIds: string[];
     };
 
 export type InviteBatchSummary =
@@ -490,6 +494,9 @@ export async function createTargetCollaboration(
       creatorOpenIds: input.creatorUserOpenIds.slice(0, 50),
       detail: res.detail,
       code: res.code,
+      invalidProductIds: [],
+      conflicts: [],
+      invalidOpenIds: [],
     };
   }
   const d = res.data;
@@ -498,35 +505,49 @@ export async function createTargetCollaboration(
   const invalidProductIds = ((d.invalid_product_id_list ?? []) as unknown[]).map(
     str,
   );
-  // TikTok bisa membalas 200 TANPA membuat kolaborasi (id kosong) bila ada
-  // produk tidak valid di batch — satu produk bermasalah menggagalkan seluruh
-  // batch. Perlakukan gagal dan bawa daftar produk invalid supaya pemanggil
-  // bisa mencoba ulang tanpa produk tersebut.
+  const conflicts = (
+    (d.target_collaboration_conflicts ?? []) as Record<string, unknown>[]
+  ).map((c) => ({
+    creatorOpenId: str(c.creator_user_open_id),
+    productId: str(c.product_id),
+  }));
+  const invalidOpenIds = ((d.invalid_open_id_list ?? []) as unknown[]).map(str);
+  // TikTok TIDAK membuat kolaborasi bila ada masalah apa pun di batch:
+  // produk invalid ATAU satu pasangan kreator–produk yang sudah diundang
+  // (conflict) menggagalkan seluruh request. Perlakukan gagal dan bawa
+  // rincian penyebab supaya pemanggil bisa mencoba ulang tanpa yang
+  // bermasalah.
   if (collaborationId === "") {
+    const parts: string[] = [];
+    if (invalidProductIds.length > 0) {
+      parts.push(
+        `produk tidak valid: ${invalidProductIds.slice(0, 5).join(", ")}`,
+      );
+    }
+    if (conflicts.length > 0) {
+      parts.push(`${conflicts.length} pasangan kreator–produk sudah diundang`);
+    }
+    if (invalidOpenIds.length > 0) {
+      parts.push(`${invalidOpenIds.length} open id tidak valid`);
+    }
     return {
       ok: false,
       creatorOpenIds: input.creatorUserOpenIds.slice(0, 50),
-      detail:
-        invalidProductIds.length > 0
-          ? `TikTok tidak membuat target collaboration — produk tidak valid: ${invalidProductIds
-              .slice(0, 5)
-              .join(", ")}${invalidProductIds.length > 5 ? " dan lainnya" : ""}`
-          : "TikTok tidak membuat target collaboration (respons tanpa kolaborasi).",
+      detail: `TikTok tidak membuat target collaboration — ${
+        parts.join("; ") || "respons tanpa kolaborasi"
+      }.`,
       code: null,
       invalidProductIds,
+      conflicts,
+      invalidOpenIds,
     };
   }
   return {
     ok: true,
     collaborationId,
     creatorOpenIds: input.creatorUserOpenIds.slice(0, 50),
-    conflicts: (
-      (d.target_collaboration_conflicts ?? []) as Record<string, unknown>[]
-    ).map((c) => ({
-      creatorOpenId: str(c.creator_user_open_id),
-      productId: str(c.product_id),
-    })),
-    invalidOpenIds: ((d.invalid_open_id_list ?? []) as unknown[]).map(str),
+    conflicts,
+    invalidOpenIds,
     invalidProductIds,
     createTime: num(d.create_time),
   };
@@ -574,38 +595,106 @@ async function createTargetCollaborationAdaptive(
 }
 
 /** Satu putaran undangan untuk satu chunk kreator dengan percobaan ulang
- *  produk: bila SEMUA hasil chunk gagal karena produk invalid (TikTok
- *  menolak seluruh batch bila ada satu produk tidak valid), buang produk
- *  bermasalah lalu coba lagi dengan produk tersisa. Tanpa ini, satu produk
- *  terhapus/terlarang kategori akan menggagalkan undangan selamanya. */
+ *  adaptif: TikTok TIDAK membuat kolaborasi bila ada masalah apa pun di
+ *  batch (produk invalid ATAU pasangan kreator–produk yang sudah diundang).
+ *  Buang penyebab yang dilaporkan (produk invalid, kreator konflik/open id
+ *  invalid) lalu coba lagi dengan sisanya — maksimal beberapa ronde. */
 async function inviteWithProductRetry(
   ctx: AffiliateShopCtx,
   input: TargetCollaborationInput,
-  chunk: string[],
+  chunkIn: string[],
 ): Promise<InviteBatchResult[]> {
   let products = input.products;
+  let chunk = chunkIn;
   let results: InviteBatchResult[] = [];
-  for (let round = 0; round < 4; round += 1) {
+  // Kreator yang dibuang pada ronde awal (konflik/open id invalid) — dijurnal
+  // sebagai hasil sintetis di akhir supaya tidak diuji ulang tiap hari.
+  const droppedConflicts = new Map<string, string[]>();
+  const droppedInvalid: string[] = [];
+  for (let round = 0; round < 6; round += 1) {
     results = await createTargetCollaborationAdaptive(ctx, {
       ...input,
       products,
       creatorUserOpenIds: chunk,
     });
-    // Hanya coba ulang bila SEMUA hasil chunk gagal (hindari undang ganda
-    // kreator yang sudah sukses di percobaan sebelumnya).
-    if (!results.every((r) => !r.ok)) break;
-    const badIds = new Set<string>();
+    // Ada hasil sukses — berhenti; kreator konflik tetap tercatat di hasil
+    // dan dijurnalkan pemanggil (ok:true dengan conflicts).
+    if (results.some((r) => r.ok)) break;
+    // Semua gagal: kumpulkan penyebab yang dilaporkan TikTok.
+    const badPids = new Set<string>();
+    const badCreators = new Set<string>();
     let found = false;
     for (const r of results) {
-      if (r.invalidProductIds && r.invalidProductIds.length > 0) {
+      for (const pid of r.invalidProductIds) {
+        badPids.add(pid);
         found = true;
-        for (const pid of r.invalidProductIds) badIds.add(pid);
+      }
+      for (const c of r.conflicts) {
+        badCreators.add(c.creatorOpenId);
+        const list = droppedConflicts.get(c.creatorOpenId) ?? [];
+        if (!list.includes(c.productId)) list.push(c.productId);
+        droppedConflicts.set(c.creatorOpenId, list);
+        found = true;
+      }
+      for (const oid of r.invalidOpenIds) {
+        badCreators.add(oid);
+        if (!droppedInvalid.includes(oid)) droppedInvalid.push(oid);
+        found = true;
       }
     }
-    if (!found || badIds.size === 0) break;
-    const remaining = products.filter((p) => !badIds.has(p.id));
-    if (remaining.length === 0 || remaining.length === products.length) break;
-    products = remaining;
+    if (!found) break;
+    let changed = false;
+    if (badPids.size > 0) {
+      const remaining = products.filter((p) => !badPids.has(p.id));
+      if (remaining.length > 0 && remaining.length < products.length) {
+        products = remaining;
+        changed = true;
+      }
+    }
+    if (badCreators.size > 0) {
+      const remainingC = chunk.filter((id) => !badCreators.has(id));
+      if (remainingC.length > 0 && remainingC.length < chunk.length) {
+        chunk = remainingC;
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+  // Bila akhirnya sukses, tambahkan hasil sintetis untuk kreator yang dibuang
+  // di ronde awal (belum tercakup hasil akhir) supaya jurnal lengkap.
+  if (results.some((r) => r.ok)) {
+    const finalConflicts = new Set(
+      results.flatMap((r) => r.conflicts.map((c) => c.creatorOpenId)),
+    );
+    const finalInvalid = new Set(results.flatMap((r) => r.invalidOpenIds));
+    const synthConflicts = [...droppedConflicts.entries()].filter(
+      ([id]) => !finalConflicts.has(id),
+    );
+    if (synthConflicts.length > 0) {
+      results.push({
+        ok: false,
+        creatorOpenIds: synthConflicts.map(([id]) => id),
+        detail: "Pasangan kreator–produk sudah diundang — dilewati.",
+        code: null,
+        invalidProductIds: [],
+        conflicts: synthConflicts.flatMap(([id, pids]) =>
+          pids.map((pid) => ({ creatorOpenId: id, productId: pid })),
+        ),
+        invalidOpenIds: [],
+      });
+    }
+    const synthInvalid = droppedInvalid.filter((id) => !finalInvalid.has(id));
+    if (synthInvalid.length > 0) {
+      results.push({
+        ok: false,
+        creatorOpenIds: synthInvalid,
+        detail: "Open id tidak valid menurut TikTok — dilewati.",
+        code: null,
+        invalidProductIds: [],
+        conflicts: [],
+        invalidOpenIds: synthInvalid,
+      });
+    }
   }
   return results;
 }
@@ -664,10 +753,8 @@ export async function journalInviteBatch(
   productIds: string[],
   result: InviteBatchResult,
 ): Promise<void> {
-  const invalid = new Set(result.ok ? result.invalidOpenIds : []);
-  const conflict = new Set(
-    result.ok ? result.conflicts.map((c) => c.creatorOpenId) : [],
-  );
+  const invalid = new Set(result.invalidOpenIds ?? []);
+  const conflict = new Set((result.conflicts ?? []).map((c) => c.creatorOpenId));
   const sentIds: string[] = [];
   const invalidIds: string[] = [];
   const conflictIds: string[] = [];
@@ -676,14 +763,7 @@ export async function journalInviteBatch(
     let status: string;
     let errorCode = "";
     let detail = "";
-    if (!result.ok) {
-      // Gagal transien (nama/produk/rate-limit) TIDAK ditandai di cache —
-      // menandai "failed" dulu mengeluarkan kreator dari kolam selamanya
-      // sehingga bug sekali jalan membakar ratusan kandidat.
-      status = "failed";
-      errorCode = result.code === null ? "" : String(result.code);
-      detail = result.detail;
-    } else if (invalid.has(id)) {
+    if (invalid.has(id)) {
       status = "invalid";
       detail = "Open id tidak valid menurut TikTok";
       invalidIds.push(id);
@@ -691,6 +771,13 @@ export async function journalInviteBatch(
       status = "conflict";
       detail = "Sudah ada undangan untuk pasangan kreator–produk ini";
       conflictIds.push(id);
+    } else if (!result.ok) {
+      // Gagal transien (nama/produk/rate-limit) TIDAK ditandai di cache —
+      // menandai "failed" dulu mengeluarkan kreator dari kolam selamanya
+      // sehingga bug sekali jalan membakar ratusan kandidat.
+      status = "failed";
+      errorCode = result.code === null ? "" : String(result.code);
+      detail = result.detail;
     } else {
       status = "sent";
       sentIds.push(id);
