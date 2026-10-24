@@ -669,25 +669,28 @@ export async function journalInviteBatch(
     result.ok ? result.conflicts.map((c) => c.creatorOpenId) : [],
   );
   const sentIds: string[] = [];
-  const failedIds: string[] = [];
+  const invalidIds: string[] = [];
+  const conflictIds: string[] = [];
   const productIdsJson = JSON.stringify(productIds);
   for (const id of result.creatorOpenIds) {
     let status: string;
     let errorCode = "";
     let detail = "";
     if (!result.ok) {
+      // Gagal transien (nama/produk/rate-limit) TIDAK ditandai di cache —
+      // menandai "failed" dulu mengeluarkan kreator dari kolam selamanya
+      // sehingga bug sekali jalan membakar ratusan kandidat.
       status = "failed";
       errorCode = result.code === null ? "" : String(result.code);
       detail = result.detail;
-      failedIds.push(id);
     } else if (invalid.has(id)) {
       status = "invalid";
       detail = "Open id tidak valid menurut TikTok";
-      failedIds.push(id);
+      invalidIds.push(id);
     } else if (conflict.has(id)) {
       status = "conflict";
       detail = "Sudah ada undangan untuk pasangan kreator–produk ini";
-      failedIds.push(id);
+      conflictIds.push(id);
     } else {
       status = "sent";
       sentIds.push(id);
@@ -710,8 +713,11 @@ export async function journalInviteBatch(
     });
   }
   if (sentIds.length > 0) await markAffiliateCreatorStatus(sentIds, "sent");
-  if (failedIds.length > 0) {
-    await markAffiliateCreatorStatus(failedIds, "failed");
+  if (invalidIds.length > 0) {
+    await markAffiliateCreatorStatus(invalidIds, "invalid");
+  }
+  if (conflictIds.length > 0) {
+    await markAffiliateCreatorStatus(conflictIds, "conflict");
   }
 }
 
