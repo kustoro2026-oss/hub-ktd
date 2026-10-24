@@ -477,7 +477,12 @@ export async function sendOwnerNotice(msg: string): Promise<string> {
 /** Dipanggil webhook saat Meta melaporkan status "failed" untuk sebuah
  *  wamid: bila wamid itu milik notif pemilik yang tercatat, kirim ulang
  *  pesan yang sama (maks 3x) supaya kegagalan pengiriman sesaat tidak
- *  membuat pemilik kehilangan notif selamanya. */
+ *  membuat pemilik kehilangan notif selamanya.
+ *
+ *  Template utility DIDAHULUKAN: teks bebas terbukti tetap diterima API
+ *  (HTTP 200) lalu gagal kirim async dengan "Re-engagement message" saat
+ *  window 24 jam tutup — jadi bila status failed sudah datang, teks bebas
+ *  tidak bisa diandalkan dan langsung pakai template (bebas window). */
 export async function resendFailedOwnerNotice(
   wamid: string,
   error: string,
@@ -487,10 +492,8 @@ export async function resendFailedOwnerNotice(
     if (!row || row.resends >= 3) return;
     const owner = ownerNumber();
     if (!owner) return;
-    const free = await sendText(owner, row.message);
-    const ok = free.ok
-      ? true
-      : (await sendTemplateParams(owner, NOTIF_TEMPLATE, [row.message])).ok;
+    const tpl = await sendTemplateParams(owner, NOTIF_TEMPLATE, [row.message]);
+    const ok = tpl.ok ? true : (await sendText(owner, row.message)).ok;
     await markWaOwnerNoticeResent(wamid);
     console.log(
       `[wa-resend] ${wamid.slice(0, 24)} err=${(error ?? "").slice(0, 100)} kirim-ulang=${ok ? "ok" : "gagal"}`,
@@ -521,7 +524,10 @@ Lihat & balas: https://admin.kustoro2026.com/pesan/${from}
 ${body}`;
 }
 
-/** Kirim pesan template dengan parameter teks (untuk body berisi {{1}} dst). */
+/** Kirim pesan template dengan parameter teks (untuk body berisi {{1}} dst).
+ *  Parameter disterilkan dari newline/tab: Meta menolak param ber-\n dengan
+ *  #132018 ("cannot have new-line/tab characters") — notif eksekusi dll.
+ *  selalu multi-baris, jadi tanpa sanitasi fallback template selalu gagal. */
 export async function sendTemplateParams(
   to: string,
   template: string,
@@ -549,7 +555,10 @@ export async function sendTemplateParams(
           components: [
             {
               type: "body",
-              parameters: params.map((p) => ({ type: "text", text: p })),
+              parameters: params.map((p) => ({
+                type: "text",
+                text: p.replace(/[\r\n\t]+/g, " ").replace(/ {2,}/g, " ").trim(),
+              })),
             },
           ],
         },

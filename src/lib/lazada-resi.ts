@@ -74,8 +74,8 @@ import {
   ownerNumber,
   sendDocument,
   sendDocumentTemplate,
+  sendOwnerNotice,
   sendTemplateParams,
-  sendText,
 } from "@/lib/wa";
 
 /** Batas percobaan kirim ulang untuk item yang resinya gagal terkirim.
@@ -189,17 +189,9 @@ export async function sendLazadaResiPdf(
   return `gagal: ${doc.error ?? "dokumen ditolak"} | template: ${tpl.error ?? "ditolak"}`;
 }
 
-/** Kirim notifikasi teks ke WA admin: teks bebas (window 24 jam) → template
- *  teks cadangan (bebas window, menunggu review Meta). */
-async function sendOwnerNotice(msg: string): Promise<string> {
-  const owner = ownerNumber();
-  if (!owner) return "gagal: OWNER_WA_NUMBER belum diatur";
-  const free = await sendText(owner, msg);
-  if (free.ok) return "ok";
-  const tpl = await sendTemplateParams(owner, NOTIF_TEMPLATE, [msg]);
-  if (tpl.ok) return "ok (template)";
-  return `gagal: ${free.error ?? "teks ditolak"} | template: ${tpl.error ?? "ditolak"}`;
-}
+/** Kirim notifikasi teks ke WA admin — memakai sendOwnerNotice bersama
+ *  (wa.ts) supaya wamid tercatat dan kegagalan kirim dilaporkan Meta bisa
+ *  dikirim ulang otomatis lewat webhook (lihat sendOwnerNotice). */
 
 /** Ambil nama + alamat pembeli dari address_shipping dengan bagian
  *  tersamar disaring. Lazada menyamarkan data pelanggan di API — nama
