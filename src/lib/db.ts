@@ -1286,6 +1286,16 @@ function migrateSqlite(db: DatabaseSync) {
       );
     `);
   }
+
+  // Satu baris per marketplace — menyimpan waktu sweep retur global
+  // terakhir (UTC "YYYY-MM-DD HH:MM:SS"). Dipakai sebagai pengatur jeda
+  // sweep retur pesanan terkirim (memori serverless Vercel tidak andal).
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS resi_check_state (
+      marketplace TEXT PRIMARY KEY,
+      last_return_sweep_at TEXT NOT NULL DEFAULT ''
+    );
+  `);
 }
 
 async function migratePg(pool: Pool) {
@@ -1760,6 +1770,11 @@ async function migratePg(pool: Pool) {
       name TEXT NOT NULL DEFAULT '',
       data TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS resi_check_state (
+      marketplace TEXT PRIMARY KEY,
+      last_return_sweep_at TEXT NOT NULL DEFAULT ''
     );
   `);
 
@@ -3848,6 +3863,33 @@ export async function touchLazadaOrderSeen(
     "UPDATE lazada_order_seen SET last_attempt_at = ? WHERE order_item_id = ?",
     [atUtc, orderItemId],
   );
+}
+
+// ---------- Status sweep retur global per marketplace ----------
+
+/** Waktu sweep retur global terakhir (UTC "YYYY-MM-DD HH:MM:SS") untuk
+ *  satu marketplace — '' berarti belum pernah disweep. Dipakai supaya
+ *  sweep retur pesanan terkirim tidak dijalankan setiap tick cron. */
+export async function getResiCheckState(
+  marketplace: string,
+): Promise<string> {
+  const row = await queryOne<{ last_return_sweep_at: string }>(
+    "SELECT last_return_sweep_at FROM resi_check_state WHERE marketplace = ?",
+    [marketplace],
+  );
+  return row?.last_return_sweep_at ?? "";
+}
+
+/** Catat waktu sweep retur global terakhir untuk satu marketplace. */
+export async function setResiCheckState(
+  marketplace: string,
+  atUtc: string,
+): Promise<void> {
+  const sql =
+    dbMode() === "pg"
+      ? "INSERT INTO resi_check_state (marketplace, last_return_sweep_at) VALUES (?, ?) ON CONFLICT (marketplace) DO UPDATE SET last_return_sweep_at = EXCLUDED.last_return_sweep_at"
+      : "INSERT INTO resi_check_state (marketplace, last_return_sweep_at) VALUES (?, ?) ON CONFLICT (marketplace) DO UPDATE SET last_return_sweep_at = excluded.last_return_sweep_at";
+  await queryRun(sql, [marketplace, atUtc]);
 }
 
 // ---------- Pemetaan produk Lazada (SellerSku) → Aneka ----------

@@ -26,11 +26,13 @@
 import {
   appendTiktokOrderExecLog,
   countSeenTiktokOrders,
+  getResiCheckState,
   getTiktokOrderExec,
   listSeenTiktokOrders,
   listTiktokShopTokens,
   markTiktokOrderSeen,
   recordTiktokOrderFailure,
+  setResiCheckState,
   updateTiktokOrderExecPayloadIfUnchanged,
 } from "@/lib/db";
 import {
@@ -45,6 +47,7 @@ import {
   getTiktokOrderDetail,
   getTiktokOrders,
   resolveLineQty,
+  searchTiktokReturns,
   type TiktokOrderDetail,
 } from "@/lib/tiktok";
 import { prepareShop } from "@/lib/tiktok-orders";
@@ -87,6 +90,11 @@ const EXHAUSTED_RETRY_MS = 4 * 60 * 60 * 1000;
  *  kegagalan sementara menghabiskan seluruh kuota percobaan dalam beberapa
  *  menit lalu pesanan diam selamanya. */
 const RETRY_COOLDOWN_MS = 30 * 60 * 1000;
+
+/** Jeda minimal antar sweep retur global (returns/search). Memori
+ *  serverless Vercel tidak andal untuk throttle — waktu sweep terakhir
+ *  disimpan di tabel resi_check_state. */
+const RETURN_SWEEP_INTERVAL_MS = 30 * 60 * 1000;
 
 /** Lama pesanan baru ditahan sebelum resi dikirim (env
  *  TIKTOK_RESI_DELAY_MINUTES, default 15 menit) — memberi kesempatan
@@ -346,6 +354,14 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
       : " SEGERA minta refund ke CS Aneka.";
   }
 
+  // Kredensial toko yang berhasil disiapkan — dipakai lagi untuk sweep
+  // retur global di akhir (satu panggilan returns/search per toko).
+  const sweepCreds: {
+    shopName: string;
+    shopId: string;
+    cred: { cipher: string; access_token: string };
+  }[] = [];
+
   for (const shop of shops) {
     const prep = await prepareShop(shop);
     if (!prep.ok) {
@@ -353,6 +369,7 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
       continue;
     }
     const cred = { cipher: prep.cipher, access_token: prep.access_token };
+    sweepCreds.push({ shopName: shop.shop_name, shopId: shop.shop_id, cred });
     const ord = await getTiktokOrders(cred, { daysBack: 7 });
     if (!ord.ok) {
       errors.push(`${shop.shop_name}: ${ord.detail}`);
@@ -703,6 +720,110 @@ export async function checkNewTiktokOrders(): Promise<ResiCheckResult> {
       } else {
         errors.push(`${shop.shop_name}: ${o.order_id}: ${result}`);
         await recordFailure(shop.shop_name, result);
+      }
+    }
+  }
+
+  // ---------- Sweep retur global (pesanan terkirim) ----------
+  // Retur pembeli TIDAK mengubah order_status pesanan — pesanan yang sudah
+  // terkirim/diterima lalu diretur tidak muncul di jendela update_time 7
+  // hari di atas (status ordernya tetap COMPLETED dan diskip gerbang).
+  // Retur punya identifier sendiri (/return_refund/202309/returns/search),
+  // jadi disweep terpisah dengan jeda 30 menit lewat resi_check_state.
+  const lastSweepAt = await getResiCheckState("tiktok");
+  if (
+    !baseline &&
+    (!lastSweepAt ||
+      Date.now() - parseUtcMs(lastSweepAt) >= RETURN_SWEEP_INTERVAL_MS)
+  ) {
+    const sweepNowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+    // Waktu sweep dicatat SELALU (gagal pun) supaya kegagalan sementara
+    // tidak memanggil API setiap tick.
+    await setResiCheckState("tiktok", sweepNowUtc);
+    // Timestamp TikTok = epoch DETIK.
+    const updateGe = Math.floor((Date.now() - 30 * 86400 * 1000) / 1000);
+    const statusDibatalkan = /REJECT|CANCEL/i;
+    for (const sc of sweepCreds) {
+      let pageToken = "";
+      for (let page = 0; page < 3; page++) {
+        const rev = await searchTiktokReturns(sc.cred, {
+          update_time_ge: updateGe,
+          page_size: 50,
+          page_token: pageToken || undefined,
+        });
+        if (!rev.ok) {
+          errors.push(`${sc.shopName}: sweep retur: ${rev.detail}`);
+          break;
+        }
+        for (const ro of rev.returns) {
+          // REPLACEMENT = ganti barang, bukan refund — lewati. Status
+          // ditolak/dibatalkan pembeli juga tidak perlu ditindaklanjuti.
+          if (
+            ro.return_type === "REPLACEMENT" ||
+            statusDibatalkan.test(ro.return_status)
+          )
+            continue;
+          const orderId = ro.order_id;
+          const prev = seen.get(orderId);
+          // Sudah dikabari pembatalan/pengembaliannya — lewati.
+          if (
+            prev &&
+            (prev.notify.startsWith("batal") || prev.notify.startsWith("refund"))
+          )
+            continue;
+          const diprosesPrev =
+            prev &&
+            (prev.notify.startsWith("ok") || prev.notify.startsWith("eksekusi"));
+          let exec:
+            | {
+                aneka_payment_id: string;
+                aneka_order_id: string;
+                payload: string;
+                status: string;
+              }
+            | undefined;
+          if (!diprosesPrev) {
+            const row = await getTiktokOrderExec(orderId);
+            exec = row ?? undefined;
+            const dibayarAneka =
+              exec &&
+              ((exec.aneka_payment_id ?? "") !== "" ||
+                exec.status === "selesai");
+            // Tanpa jejak proses/pembayaran Hub — lewati senyap (pesanan
+            // manual lama tidak perlu dikabari).
+            if (!dibayarAneka) continue;
+          }
+          const line = ro.return_line_items[0];
+          const itemsTxt =
+            line && line.product_name
+              ? ` — ${line.product_name}`
+              : ro.return_reason_text
+                ? ` — ${ro.return_reason_text}`
+                : "";
+          const msg =
+            `Pesanan TikTok Shop diretur pembeli SETELAH terkirim: ${orderId}` +
+            `${itemsTxt} (${ro.return_type}, ${ro.return_status}).` +
+            refundAnekaInfo(exec);
+          const res = await sendOwnerNotice(msg);
+          if (res.startsWith("ok")) {
+            await markTiktokOrderSeen(orderId, sc.shopId, `refund: ${res}`);
+            seen.set(orderId, {
+              notify: `refund: ${res}`,
+              attempts: 0,
+              last_attempt_at: "",
+            });
+            sent.push(`${sc.shopName} ${orderId} → refund: ${res}`);
+          } else {
+            errors.push(`${sc.shopName}: ${orderId}: ${res}`);
+            await recordTiktokOrderFailure(
+              orderId,
+              sc.shopId,
+              `gagal refund: ${res}`,
+            );
+          }
+        }
+        if (!rev.next_page_token) break;
+        pageToken = rev.next_page_token;
       }
     }
   }

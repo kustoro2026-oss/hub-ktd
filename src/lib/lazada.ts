@@ -502,6 +502,105 @@ export async function getLazadaOrderItems(
   };
 }
 
+// ---------- Retur (reverse orders) ----------
+
+/** Satu baris retur dari /reverse/getreverseordersforseller (field
+ *  reverse_order_lines[] tiap item). trade_order_line_id = order_item_id
+ *  pada tabel lazada_order_seen. Semua ID dinormalisasi ke string. */
+export type LazadaReverseOrderLine = {
+  reverse_order_line_id: string;
+  trade_order_line_id: string;
+  reverse_status: string;
+  ofc_status: string;
+  reason_text: string;
+  reason_code: string;
+  refund_amount: string;
+  tracking_number: string;
+  return_order_line_gmt_create: string;
+  return_order_line_gmt_modified: string;
+};
+
+/** Satu retur dari /reverse/getreverseordersforseller (result.items[]). */
+export type LazadaReverseOrder = {
+  reverse_order_id: string;
+  trade_order_id: string;
+  request_type: string; // CANCEL | RETURN | ONLY_REFUND
+  is_rtm: string;
+  reverse_order_lines: LazadaReverseOrderLine[];
+};
+
+export type LazadaReverseOrdersFilter = {
+  page_no?: number;
+  page_size?: number;
+  /** Batasi baris retur yang diubah dalam rentang waktu (epoch milidetik). */
+  modified_time_start?: number;
+  modified_time_end?: number;
+};
+
+/** GET /reverse/getreverseordersforseller — daftar retur toko (semua tipe:
+ *  CANCEL/RETURN/ONLY_REFUND). Hasil berada di `result` level atas body
+ *  (tanpa wrapper `data`) → payloadMode "full". */
+export async function getLazadaReverseOrders(
+  filter: LazadaReverseOrdersFilter = {},
+): Promise<LazadaResult<{ total: number; items: LazadaReverseOrder[] }>> {
+  const params: Record<string, string> = {
+    page_no: String(filter.page_no ?? 1),
+    page_size: String(filter.page_size ?? 50),
+  };
+  if (filter.modified_time_start !== undefined) {
+    params.ReverseOrderLineModifiedTimeRangeStart = String(
+      filter.modified_time_start,
+    );
+  }
+  if (filter.modified_time_end !== undefined) {
+    params.ReverseOrderLineModifiedTimeRangeEnd = String(
+      filter.modified_time_end,
+    );
+  }
+  const r = await callLazadaApi<{
+    result?: { total?: number | string; items?: unknown };
+  }>("/reverse/getreverseordersforseller", params, "GET", "full");
+  if (!r.ok) return r;
+  const toStr = (v: unknown): string =>
+    v === null || v === undefined ? "" : String(v);
+  const rawItems = Array.isArray(r.data.result?.items)
+    ? (r.data.result.items as Record<string, unknown>[])
+    : [];
+  return {
+    ok: true,
+    data: {
+      total: Number(r.data.result?.total ?? 0),
+      items: rawItems.map((it) => {
+        const rawLines = Array.isArray(it.reverse_order_lines)
+          ? (it.reverse_order_lines as Record<string, unknown>[])
+          : [];
+        return {
+          reverse_order_id: toStr(it.reverse_order_id),
+          trade_order_id: toStr(it.trade_order_id),
+          request_type: toStr(it.request_type),
+          is_rtm: toStr(it.is_rtm),
+          reverse_order_lines: rawLines.map((ln) => ({
+            reverse_order_line_id: toStr(ln.reverse_order_line_id),
+            trade_order_line_id: toStr(ln.trade_order_line_id),
+            reverse_status: toStr(ln.reverse_status),
+            ofc_status: toStr(ln.ofc_status),
+            reason_text: toStr(ln.reason_text),
+            reason_code: toStr(ln.reason_code),
+            refund_amount: toStr(ln.refund_amount),
+            tracking_number: toStr(ln.tracking_number),
+            return_order_line_gmt_create: toStr(
+              ln.return_order_line_gmt_create,
+            ),
+            return_order_line_gmt_modified: toStr(
+              ln.return_order_line_gmt_modified,
+            ),
+          })),
+        };
+      }),
+    },
+  };
+}
+
 // ---------- Fulfillment (pack → rts → label) ----------
 
 /** Satu penyedia pengiriman dari GET /shipment/providers/get. `name` adalah

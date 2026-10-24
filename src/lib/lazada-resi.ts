@@ -35,9 +35,11 @@
 import {
   countSeenLazadaOrders,
   getLazadaOrderExec,
+  getResiCheckState,
   listSeenLazadaOrders,
   markLazadaOrderSeen,
   recordLazadaOrderFailure,
+  setResiCheckState,
   touchLazadaOrderSeen,
   updateLazadaOrderExecPayload,
 } from "@/lib/db";
@@ -58,6 +60,7 @@ import {
   getLazadaCtx,
   getLazadaOrderItems,
   getLazadaOrders,
+  getLazadaReverseOrders,
   printLazadaAwbPdf,
   type LazadaOrderItemRow,
   type LazadaOrderRow,
@@ -1062,6 +1065,103 @@ async function runCheckNewLazadaOrders(): Promise<LazadaResiCheckResult> {
       for (const r of orderSeen) {
         if (diproses(r.notify)) {
           await touchLazadaOrderSeen(r.order_item_id, nowStr);
+        }
+      }
+    }
+  }
+
+  // ---------- Sweep retur global (pesanan terkirim) ----------
+  // Retur TIDAK mengubah status item di /orders/get — pesanan yang sudah
+  // terkirim lalu diretur pembeli tidak akan muncul di jendela 7 hari di
+  // atas. Retur punya identifier sendiri (/reverse/getreverseordersforseller),
+  // jadi disweep terpisah dengan jeda 30 menit lewat tabel resi_check_state
+  // (memori serverless Vercel tidak andal untuk throttle).
+  const lastSweepAt = await getResiCheckState("lazada");
+  if (
+    !baseline &&
+    (!lastSweepAt ||
+      Date.now() - parseUtcMs(lastSweepAt) >= RETURN_CHECK_INTERVAL_MS)
+  ) {
+    const sweepNowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
+    const rev = await getLazadaReverseOrders({
+      page_no: 1,
+      page_size: 50,
+      modified_time_start: Date.now() - 30 * 86400 * 1000,
+      modified_time_end: Date.now(),
+    });
+    // Waktu sweep dicatat SELALU (gagal pun) supaya kegagalan sementara
+    // tidak memanggil API setiap tick.
+    await setResiCheckState("lazada", sweepNowUtc);
+    if (!rev.ok) {
+      errors.push(`${LAZADA_STORE_NAME}: sweep retur: ${rev.detail}`);
+    } else {
+      const statusDibatalkan = /cancel|declin|reject/i;
+      for (const ro of rev.data.items) {
+        // CANCEL sudah ditangani jalur status item di atas (pembatalan).
+        if (ro.request_type === "CANCEL") continue;
+        const orderId = ro.trade_order_id;
+        const lines = (ro.reverse_order_lines ?? []).filter(
+          (ln) =>
+            ln.trade_order_line_id !== "" &&
+            !statusDibatalkan.test(ln.reverse_status) &&
+            !statusDibatalkan.test(ln.ofc_status),
+        );
+        if (lines.length === 0) continue;
+        // Baris eksekusi diambil LAZY — hanya saat ada baris retur tanpa
+        // jejak proses pada tabel seen.
+        let execFetched = false;
+        let exec: Awaited<ReturnType<typeof getLazadaOrderExec>> = null;
+        for (const ln of lines) {
+          const itemId = ln.trade_order_line_id;
+          const prev = seen.get(itemId);
+          // Sudah dikabari pembatalan/pengembaliannya — lewati.
+          if (
+            prev &&
+            (prev.notify.startsWith("batal") || prev.notify.startsWith("refund"))
+          )
+            continue;
+          const diprosesPrev =
+            prev &&
+            (prev.notify.startsWith("ok") || prev.notify.startsWith("eksekusi"));
+          if (!diprosesPrev) {
+            if (!execFetched) {
+              execFetched = true;
+              exec = await getLazadaOrderExec(orderId);
+            }
+            const dibayarAneka =
+              exec &&
+              ((exec.aneka_payment_id ?? "") !== "" || exec.status === "selesai");
+            // Tanpa jejak proses/pembayaran Hub — lewati senyap (pesanan
+            // manual lama tidak perlu dikabari, dan baris tetap bisa
+            // dikabari bila jejak pembayaran muncul kemudian).
+            if (!dibayarAneka) continue;
+          }
+          const statusTxt = [ln.reverse_status, ln.ofc_status]
+            .filter(Boolean)
+            .join(" / ");
+          const infoTxt = [
+            statusTxt ? `status: ${statusTxt}` : "",
+            ln.reason_text ? `alasan: ${ln.reason_text}` : "",
+          ]
+            .filter(Boolean)
+            .join(", ");
+          const msg =
+            `Pesanan Lazada diretur pembeli SETELAH terkirim: ${orderId}` +
+            ` (retur ${ro.reverse_order_id}${infoTxt ? `, ${infoTxt}` : ""}).` +
+            refundAnekaInfo(exec ?? undefined);
+          const res = await sendOwnerNotice(msg);
+          if (res.startsWith("ok")) {
+            await markSeen(itemId, orderId, `refund: ${res}`);
+            sent.push(`${LAZADA_STORE_NAME} ${orderId} → refund: ${res}`);
+          } else {
+            errors.push(`${LAZADA_STORE_NAME}: ${orderId}: ${res}`);
+            await recordLazadaOrderFailure(
+              itemId,
+              orderId,
+              storeCode,
+              `gagal refund: ${res}`,
+            );
+          }
         }
       }
     }

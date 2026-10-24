@@ -81,6 +81,13 @@ const NEW_ORDER_WAIT_MS =
  *  100 request/30 menit — tanpa jeda, tick tiap menit akan menghabiskannya. */
 const RETURN_CHECK_INTERVAL_MS = 30 * 60 * 1000;
 
+/** Batas panggilan detail (cek retur) per ronde — kuota API Blibli
+ *  100 req/30 menit dipakai bersama fitur lain (eksekusi, produk, probe);
+ *  cap ini menjaga sweep retur tidak menghabiskan jatah satu tick.
+ *  Item yang terlewat karena cap tetap dicek ronde berikutnya
+ *  (last_attempt_at tidak disentuh bila belum sempat dicek). */
+const MAX_RETURN_CHECKS_PER_TICK = 5;
+
 /** Status item yang relevan dengan pipeline (tanpa C/D/OS/BP/CX — bukan
  *  urusan penjual aktif, atau sudah ditangani). */
 const CHECK_STATUSES: BlibliItemStatus[] = [
@@ -412,6 +419,7 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
 
   const noticedPkgs = new Set<string>(); // notif "pesanan baru" sekali per paket
   const handledPkgs = new Set<string>(); // proses label/eksekusi sekali per paket
+  let returnChecks = 0; // hitungan cek detail retur ronde ini (lihat cap)
 
   for (const p of packages) {
     for (const it of p.orderItems) {
@@ -485,23 +493,28 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
       }
 
       // Deteksi paket dikembalikan / gagal antar untuk item yang SUDAH
-      // diproses dan sedang dikirim (PU/PF/CX). API Blibli tidak punya
-      // endpoint status paket — sumbernya riwayat status Order Detail V2
-      // (histories) yang memuat transisi berbahasa campur kode/prosa.
-      // Dijeda RETURN_CHECK_INTERVAL_MS per item supaya kuota 100 req/30
-      // menit tidak habis oleh tick tiap menit. Bila detail gagal diambil,
-      // cek diulang pada jendela berikutnya (tidak ada tindakan).
+      // diproses, baik sedang dikirim (PU/PF/CX) maupun sudah terkirim (D —
+      // retur pembeli setelah diterima). API Blibli tidak punya endpoint
+      // status paket — sumbernya riwayat status Order Detail V2 (histories)
+      // yang memuat transisi berbahasa campur kode/prosa. Dijeda
+      // RETURN_CHECK_INTERVAL_MS per item dan dibatasi cap per ronde supaya
+      // kuota 100 req/30 menit tidak habis oleh tick tiap menit. Bila
+      // detail gagal diambil, cek diulang pada jendela berikutnya.
       if (
         prev &&
         (prev.notify.startsWith("ok") || prev.notify.startsWith("eksekusi")) &&
         (it.order.itemStatus === "PU" ||
           it.order.itemStatus === "PF" ||
-          it.order.itemStatus === "CX")
+          it.order.itemStatus === "CX" ||
+          it.order.itemStatus === "D")
       ) {
         const lastCheck = prev.last_attempt_at
           ? parseUtcMs(prev.last_attempt_at)
           : 0;
         if (Date.now() - lastCheck < RETURN_CHECK_INTERVAL_MS) continue;
+        // Jatah cek detail ronde ini habis — item dicek ronde berikutnya.
+        if (returnChecks >= MAX_RETURN_CHECKS_PER_TICK) continue;
+        returnChecks++;
         const det = await getBlibliOrderDetail(itemId);
         let returnHit = "";
         if (det.ok) {
@@ -519,7 +532,10 @@ export async function checkNewBlibliOrders(): Promise<BlibliResiCheckResult> {
         }
         if (returnHit) {
           const exec = (await getBlibliOrderExec(p.packageId)) ?? undefined;
-          const msg = `Paket pesanan Blibli dikembalikan/gagal antar: ${itemId} — ${it.product.itemName} (riwayat: ${returnHit}).${refundAnekaInfo(exec)}`;
+          const statusD = it.order.itemStatus === "D";
+          const msg = statusD
+            ? `Paket pesanan Blibli diretur pembeli SETELAH terkirim: ${itemId} — ${it.product.itemName} (riwayat: ${returnHit}).${refundAnekaInfo(exec)}`
+            : `Paket pesanan Blibli dikembalikan/gagal antar: ${itemId} — ${it.product.itemName} (riwayat: ${returnHit}).${refundAnekaInfo(exec)}`;
           const res = await sendOwnerNotice(msg);
           if (res.startsWith("ok")) {
             await markSeen(itemId, `refund: ${res}`);

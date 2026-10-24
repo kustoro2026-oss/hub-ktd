@@ -425,6 +425,166 @@ export async function getTiktokOrders(
   }
 }
 
+// ---------- Retur (returns/search) ----------
+
+/** Satu baris retur dari /return_refund/202309/returns/search
+ *  (return_orders[].return_line_items[]). */
+export type TiktokReturnLineItem = {
+  return_line_item_id: string;
+  order_line_item_id: string;
+  sku_id: string;
+  sku_name: string;
+  product_name: string;
+  seller_sku: string;
+};
+
+/** Satu retur dari /return_refund/202309/returns/search
+ *  (data.return_orders[]). Semua ID dinormalisasi ke string; update_time
+ *  dalam epoch DETIK. */
+export type TiktokReturnOrder = {
+  order_id: string;
+  return_id: string;
+  return_type: string; // REFUND | RETURN_AND_REFUND | REPLACEMENT
+  return_status: string;
+  return_reason: string;
+  return_reason_text: string;
+  return_tracking_number: string;
+  update_time: number;
+  return_line_items: TiktokReturnLineItem[];
+};
+
+export type TiktokReturnsFilter = {
+  /** Batasi retur yang diperbarui sejak epoch detik ini. */
+  update_time_ge?: number;
+  update_time_lt?: number;
+  order_ids?: string[];
+  page_size?: number;
+  page_token?: string;
+};
+
+/** POST /return_refund/202309/returns/search — daftar retur toko (semua
+ *  tipe: REFUND / RETURN_AND_REFUND / REPLACEMENT). page_token halaman
+ *  berikutnya ada di hasil; timestamp TikTok = epoch DETIK. */
+export async function searchTiktokReturns(
+  shop: { cipher: string; access_token: string },
+  filter: TiktokReturnsFilter = {},
+): Promise<
+  | {
+      ok: true;
+      returns: TiktokReturnOrder[];
+      total_count: number;
+      next_page_token: string;
+    }
+  | { ok: false; detail: string }
+> {
+  const { appKey, appSecret, ready } = tiktokEnv();
+  if (!ready) {
+    return {
+      ok: false,
+      detail:
+        "Kredensial aplikasi belum diatur (env TIKTOK_APP_KEY dan TIKTOK_APP_SECRET).",
+    };
+  }
+  if (shop.cipher === "") {
+    return {
+      ok: false,
+      detail: "shop_cipher belum tersimpan — coba otorisasi ulang aplikasi.",
+    };
+  }
+  const path = "/return_refund/202309/returns/search";
+  const now = Math.floor(Date.now() / 1000);
+  const bodyObj: Record<string, unknown> = {};
+  if (
+    filter.update_time_ge !== undefined ||
+    filter.update_time_lt !== undefined
+  ) {
+    bodyObj.update_time_ge = filter.update_time_ge ?? now - 30 * 86400;
+    bodyObj.update_time_lt = filter.update_time_lt ?? now;
+  }
+  if (filter.order_ids && filter.order_ids.length > 0) {
+    bodyObj.order_ids = filter.order_ids.slice(0, 20);
+  }
+  const body = JSON.stringify(bodyObj);
+  const params: Record<string, string> = {
+    app_key: appKey,
+    shop_cipher: shop.cipher,
+    timestamp: now.toString(),
+    page_size: String(Math.min(filter.page_size ?? 50, 50)),
+    sort_field: "update_time",
+    sort_order: "DESC",
+  };
+  if (filter.page_token) params.page_token = filter.page_token;
+  const sign = signRequest(appSecret, path, params, body);
+  const qs = new URLSearchParams({ ...params, sign });
+  try {
+    const res = await fetch(`${API_HOST}${path}?${qs.toString()}`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-tts-access-token": shop.access_token,
+      },
+      body,
+      cache: "no-store",
+    });
+    const data = (await res.json().catch(() => ({}))) as {
+      code?: number;
+      message?: string;
+      data?: {
+        return_orders?: unknown[];
+        total_count?: number;
+        next_page_token?: string;
+      };
+    };
+    if (!res.ok || (data.code ?? 1) !== 0) {
+      return {
+        ok: false,
+        detail: `Gagal mengambil retur: ${String(data.message ?? res.status)}`,
+      };
+    }
+    const toStr = (v: unknown): string =>
+      v === null || v === undefined ? "" : String(v);
+    const returns: TiktokReturnOrder[] = (data.data?.return_orders ?? []).map(
+      (o) => {
+        const r = o as Record<string, unknown>;
+        const lines = Array.isArray(r.return_line_items)
+          ? (r.return_line_items as Record<string, unknown>[])
+          : [];
+        return {
+          order_id: toStr(r.order_id),
+          return_id: toStr(r.return_id),
+          return_type: toStr(r.return_type),
+          return_status: toStr(r.return_status),
+          return_reason: toStr(r.return_reason),
+          return_reason_text: toStr(r.return_reason_text),
+          return_tracking_number: toStr(r.return_tracking_number),
+          update_time: Number(r.update_time ?? 0),
+          return_line_items: lines.map((ln) => ({
+            return_line_item_id: toStr(ln.return_line_item_id),
+            order_line_item_id: toStr(ln.order_line_item_id),
+            sku_id: toStr(ln.sku_id),
+            sku_name: toStr(ln.sku_name),
+            product_name: toStr(ln.product_name),
+            seller_sku: toStr(ln.seller_sku),
+          })),
+        };
+      },
+    );
+    return {
+      ok: true,
+      returns,
+      total_count: Number(data.data?.total_count ?? returns.length),
+      next_page_token: toStr(data.data?.next_page_token),
+    };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Gagal menghubungi server TikTok: ${
+        e instanceof Error ? e.message : "kesalahan tidak dikenal"
+      }`,
+    };
+  }
+}
+
 // ---------- Detail pesanan (untuk cetak resi) ----------
 
 export type TiktokOrderDetail = {
