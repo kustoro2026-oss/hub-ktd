@@ -404,7 +404,14 @@ export type InviteBatchResult =
       invalidProductIds: string[];
       createTime: number;
     }
-  | { ok: false; creatorOpenIds: string[]; detail: string; code: number | null };
+  | {
+      ok: false;
+      creatorOpenIds: string[];
+      detail: string;
+      code: number | null;
+      /** Produk yang ditolak TikTok (respons 200 tanpa kolaborasi). */
+      invalidProductIds?: string[];
+    };
 
 export type InviteBatchSummary =
   | { ok: true; batches: InviteBatchResult[]; invitedCount: number }
@@ -491,20 +498,22 @@ export async function createTargetCollaboration(
   const invalidProductIds = ((d.invalid_product_id_list ?? []) as unknown[]).map(
     str,
   );
-  // TikTok bisa membalas 200 TANPA membuat kolaborasi (id kosong) bila semua
-  // produk di batch tidak valid — dulu dianggap sukses sehingga kreator
-  // tercatat "sent" padahal tidak ada undangan apa pun. Perlakukan gagal.
+  // TikTok bisa membalas 200 TANPA membuat kolaborasi (id kosong) bila ada
+  // produk tidak valid di batch — satu produk bermasalah menggagalkan seluruh
+  // batch. Perlakukan gagal dan bawa daftar produk invalid supaya pemanggil
+  // bisa mencoba ulang tanpa produk tersebut.
   if (collaborationId === "") {
     return {
       ok: false,
       creatorOpenIds: input.creatorUserOpenIds.slice(0, 50),
       detail:
         invalidProductIds.length > 0
-          ? `TikTok tidak membuat target collaboration — semua produk tidak valid: ${invalidProductIds
+          ? `TikTok tidak membuat target collaboration — produk tidak valid: ${invalidProductIds
               .slice(0, 5)
               .join(", ")}${invalidProductIds.length > 5 ? " dan lainnya" : ""}`
           : "TikTok tidak membuat target collaboration (respons tanpa kolaborasi).",
       code: null,
+      invalidProductIds,
     };
   }
   return {
@@ -564,10 +573,48 @@ async function createTargetCollaborationAdaptive(
   return [...left, ...right];
 }
 
+/** Satu putaran undangan untuk satu chunk kreator dengan percobaan ulang
+ *  produk: bila SEMUA hasil chunk gagal karena produk invalid (TikTok
+ *  menolak seluruh batch bila ada satu produk tidak valid), buang produk
+ *  bermasalah lalu coba lagi dengan produk tersisa. Tanpa ini, satu produk
+ *  terhapus/terlarang kategori akan menggagalkan undangan selamanya. */
+async function inviteWithProductRetry(
+  ctx: AffiliateShopCtx,
+  input: TargetCollaborationInput,
+  chunk: string[],
+): Promise<InviteBatchResult[]> {
+  let products = input.products;
+  let results: InviteBatchResult[] = [];
+  for (let round = 0; round < 4; round += 1) {
+    results = await createTargetCollaborationAdaptive(ctx, {
+      ...input,
+      products,
+      creatorUserOpenIds: chunk,
+    });
+    // Hanya coba ulang bila SEMUA hasil chunk gagal (hindari undang ganda
+    // kreator yang sudah sukses di percobaan sebelumnya).
+    if (!results.every((r) => !r.ok)) break;
+    const badIds = new Set<string>();
+    let found = false;
+    for (const r of results) {
+      if (r.invalidProductIds && r.invalidProductIds.length > 0) {
+        found = true;
+        for (const pid of r.invalidProductIds) badIds.add(pid);
+      }
+    }
+    if (!found || badIds.size === 0) break;
+    const remaining = products.filter((p) => !badIds.has(p.id));
+    if (remaining.length === 0 || remaining.length === products.length) break;
+    products = remaining;
+  }
+  return results;
+}
+
 /** Kirim undangan target collaboration untuk daftar kreator yang panjang:
  *  potong open id jadi batch maksimal 50 lalu panggil berurutan (dengan
- *  pemecahan adaptif untuk error per-kreator). `onBatch` dipanggil setelah
- *  tiap batch (dipakai route untuk menulis jurnal). */
+ *  pemecahan adaptif untuk error per-kreator + percobaan ulang produk).
+ *  `onBatch` dipanggil setelah tiap batch (dipakai route untuk menulis
+ *  jurnal). */
 export async function sendTargetCollaborationInvites(
   ctx: AffiliateShopCtx,
   input: TargetCollaborationInput,
@@ -591,10 +638,7 @@ export async function sendTargetCollaborationInvites(
   const batches: InviteBatchResult[] = [];
   for (let i = 0; i < unique.length; i += 50) {
     const chunk = unique.slice(i, i + 50);
-    const results = await createTargetCollaborationAdaptive(ctx, {
-      ...input,
-      creatorUserOpenIds: chunk,
-    });
+    const results = await inviteWithProductRetry(ctx, input, chunk);
     for (const result of results) {
       batches.push(result);
       if (onBatch) await onBatch(batches.length - 1, result);
