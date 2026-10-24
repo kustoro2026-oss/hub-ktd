@@ -1606,6 +1606,31 @@ async function migratePg(pool: Pool) {
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
+    CREATE TABLE IF NOT EXISTS ktd_store_stok (
+      aneka_id TEXT PRIMARY KEY,
+      stok INTEGER NOT NULL DEFAULT 0,
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE TABLE IF NOT EXISTS stok_penyesuaian (
+      id TEXT PRIMARY KEY,
+      channel TEXT NOT NULL DEFAULT '',
+      order_id TEXT NOT NULL DEFAULT '',
+      sku_key TEXT NOT NULL DEFAULT '',
+      aneka_id TEXT NOT NULL DEFAULT '',
+      nama TEXT NOT NULL DEFAULT '',
+      qty INTEGER NOT NULL DEFAULT 0,
+      tiktok_done INTEGER NOT NULL DEFAULT 0,
+      blibli_done INTEGER NOT NULL DEFAULT 0,
+      lazada_done INTEGER NOT NULL DEFAULT 0,
+      ktd_done INTEGER NOT NULL DEFAULT 0,
+      detail TEXT NOT NULL DEFAULT '',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_stok_penyesuaian_created
+      ON stok_penyesuaian (created_at DESC);
+
     CREATE TABLE IF NOT EXISTS topup_orders (
       id TEXT PRIMARY KEY,
       ref_id TEXT NOT NULL UNIQUE,
