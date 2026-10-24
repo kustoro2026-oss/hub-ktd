@@ -27,7 +27,13 @@ import {
   type ReplyKind,
   type WaMessage,
 } from "@/lib/replies";
-import { notifyOrderOwner, safeEqual, sendText, verifyWaSignature } from "@/lib/wa";
+import {
+  notifyOrderOwner,
+  resendFailedOwnerNotice,
+  safeEqual,
+  sendText,
+  verifyWaSignature,
+} from "@/lib/wa";
 import { extractTopupOrderId, replyForTopupOrder } from "@/lib/topup-reply";
 import { answerWithAi } from "@/lib/ai-reply";
 import { SPAM_WINDOW_MINUTES, spamDecision } from "@/lib/spam";
@@ -279,11 +285,16 @@ export async function POST(request: Request) {
         const statuses = change.value?.statuses ?? [];
         for (const s of statuses) {
           if (!s.id || !s.status) continue;
-          await applyBroadcastDeliveryStatus(
-            s.id,
-            s.status,
-            s.errors?.[0]?.message ?? "",
+          const errorText = s.errors?.[0]?.message ?? "";
+          console.log(
+            `[wa-status] ${s.status} wamid=${s.id.slice(0, 24)} err=${errorText.slice(0, 100)}`,
           );
+          await applyBroadcastDeliveryStatus(s.id, s.status, errorText);
+          // Notifikasi admin (eksekusi pesanan dll.) yang ternyata gagal
+          // terkirim dikirim ulang otomatis — lihat catatan sendOwnerNotice.
+          if (s.status === "failed") {
+            await resendFailedOwnerNotice(s.id, errorText);
+          }
         }
       }
     }

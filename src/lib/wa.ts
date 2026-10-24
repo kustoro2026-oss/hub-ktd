@@ -1,6 +1,11 @@
 // Klien WhatsApp Cloud API untuk KTD Hub — kirim template broadcast dan
 // balasan teks. Kredensial dibaca dari env (WA_TOKEN, WA_PHONE_NUMBER_ID).
 import crypto from "node:crypto";
+import {
+  findWaOwnerNotice,
+  markWaOwnerNoticeResent,
+  saveWaOwnerNotice,
+} from "@/lib/db";
 
 const GRAPH_VERSION = "v24.0";
 
@@ -445,6 +450,54 @@ export const NOTIF_TEMPLATE = "order_alert_ktd2";
  *  085171157938; bisa diganti lewat env OWNER_WA_NUMBER (format 62...). */
 export function ownerNumber(): string | null {
   return normalizePhone(process.env.OWNER_WA_NUMBER ?? "6285171157938");
+}
+
+/** Kirim notif WA ke pemilik (admin): teks bebas (gratis dalam window 24 jam)
+ *  → template utility cadangan. wamid + isi pesan disimpan ke tabel
+ *  wa_owner_notices supaya webhook bisa KIRIM ULANG otomatis bila Meta
+ *  menerima panggilan (HTTP 200) tapi status pengiriman akhirnya "failed"
+ *  — kasus nyata: notif BERHASIL eksekusi tidak sampai walau log berkata
+ *  "ok" (pesan diterima API tapi tidak pernah terkirim ke HP). */
+export async function sendOwnerNotice(msg: string): Promise<string> {
+  const owner = ownerNumber();
+  if (!owner) return "gagal: OWNER_WA_NUMBER belum diatur";
+  const free = await sendText(owner, msg);
+  if (free.ok) {
+    await saveWaOwnerNotice(free.waId ?? "", msg);
+    return "ok";
+  }
+  const tpl = await sendTemplateParams(owner, NOTIF_TEMPLATE, [msg]);
+  if (tpl.ok) {
+    await saveWaOwnerNotice(tpl.waId ?? "", msg);
+    return "ok (template)";
+  }
+  return `gagal: ${free.error ?? "teks ditolak"} | template: ${tpl.error ?? "ditolak"}`;
+}
+
+/** Dipanggil webhook saat Meta melaporkan status "failed" untuk sebuah
+ *  wamid: bila wamid itu milik notif pemilik yang tercatat, kirim ulang
+ *  pesan yang sama (maks 3x) supaya kegagalan pengiriman sesaat tidak
+ *  membuat pemilik kehilangan notif selamanya. */
+export async function resendFailedOwnerNotice(
+  wamid: string,
+  error: string,
+): Promise<void> {
+  try {
+    const row = await findWaOwnerNotice(wamid);
+    if (!row || row.resends >= 3) return;
+    const owner = ownerNumber();
+    if (!owner) return;
+    const free = await sendText(owner, row.message);
+    const ok = free.ok
+      ? true
+      : (await sendTemplateParams(owner, NOTIF_TEMPLATE, [row.message])).ok;
+    await markWaOwnerNoticeResent(wamid);
+    console.log(
+      `[wa-resend] ${wamid.slice(0, 24)} err=${(error ?? "").slice(0, 100)} kirim-ulang=${ok ? "ok" : "gagal"}`,
+    );
+  } catch (e) {
+    console.error("[wa-resend] gagal memproses:", e);
+  }
 }
 
 /** Waktu sekarang dalam WIB (UTC+7), format "DD/MM/YYYY HH.MM WIB". */

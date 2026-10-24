@@ -308,6 +308,39 @@ export async function workerHeartbeatSet(name: string): Promise<void> {
   await queryRun(sql, [name, Date.now()]);
 }
 
+/** Simpan notif WA pemilik beserta wamid-nya — dipakai webhook untuk
+ *  kirim ulang otomatis bila Meta melaporkan status "failed" (pesan yang
+ *  diterima HTTP 200 tapi gagal terkirim). */
+export async function saveWaOwnerNotice(
+  wamid: string,
+  message: string,
+): Promise<void> {
+  if (!wamid) return;
+  await queryRun(
+    "INSERT INTO wa_owner_notices (wamid, message) VALUES (?, ?)",
+    [wamid, message],
+  );
+}
+
+/** Ambil notif pemilik berdasarkan wamid (null bila bukan notif eksekusi). */
+export async function findWaOwnerNotice(
+  wamid: string,
+): Promise<{ wamid: string; message: string; resends: number } | null> {
+  const row = await queryOne<{ wamid: string; message: string; resends: number }>(
+    "SELECT wamid, message, resends FROM wa_owner_notices WHERE wamid = ?",
+    [wamid],
+  );
+  return row ?? null;
+}
+
+/** Naikkan penghitung kirim ulang notif pemilik (batas 3x per notif). */
+export async function markWaOwnerNoticeResent(wamid: string): Promise<void> {
+  await queryRun(
+    "UPDATE wa_owner_notices SET resends = resends + 1 WHERE wamid = ?",
+    [wamid],
+  );
+}
+
 /** True bila worker VPS menjalankan `name` dalam `maxAgeMs` terakhir. */
 export async function workerHeartbeatFresh(
   name: string,
@@ -1329,6 +1362,13 @@ function migrateSqlite(db: DatabaseSync) {
   // untuk MELEWATI pekerjaan berat yang baru saja dijalankan worker,
   // supaya CPU serverless tidak terpakai dua kali.
   db.exec(`
+    CREATE TABLE IF NOT EXISTS wa_owner_notices (
+      wamid TEXT PRIMARY KEY,
+      message TEXT NOT NULL DEFAULT '',
+      resends INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+    );
+
     CREATE TABLE IF NOT EXISTS worker_heartbeat (
       name TEXT PRIMARY KEY,
       last_run INTEGER NOT NULL DEFAULT 0
@@ -1840,7 +1880,14 @@ async function migratePg(pool: Pool) {
       last_return_sweep_at TEXT NOT NULL DEFAULT ''
     );
 
-    CREATE TABLE IF NOT EXISTS worker_heartbeat (
+    CREATE TABLE IF NOT EXISTS wa_owner_notices (
+      wamid TEXT PRIMARY KEY,
+      message TEXT NOT NULL DEFAULT '',
+      resends INTEGER NOT NULL DEFAULT 0,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    );
+
+CREATE TABLE IF NOT EXISTS worker_heartbeat (
       name TEXT PRIMARY KEY,
       last_run BIGINT NOT NULL DEFAULT 0
     );

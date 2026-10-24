@@ -54,12 +54,7 @@ import {
   printLazadaAwbPdf,
 } from "@/lib/lazada";
 import { LAZADA_STORE_NAME } from "@/lib/lazada-orders";
-import {
-  NOTIF_TEMPLATE,
-  ownerNumber,
-  sendTemplateParams,
-  sendText,
-} from "@/lib/wa";
+import { sendOwnerNotice } from "@/lib/wa";
 
 const EKSEKUSI_URL = "https://admin.kustoro2026.com/marketplace/lazada/eksekusi";
 
@@ -128,15 +123,12 @@ function fmtRp(n: number): string {
 }
 
 /** Kirim notifikasi teks ke WA admin: teks bebas (window 24 jam) → template
- *  teks cadangan (bebas window, menunggu review Meta). */
+ *  teks cadangan. Memakai sendOwnerNotice yang mencatat wamid kiriman
+ *  (tabel wa_owner_notices) supaya status "failed" dari webhook Meta bisa
+ *  dikirim ulang otomatis — peristiwa 24 Okt 2026: pesan diterima Meta
+ *  (HTTP 200) tapi gagal terkirim diam-diam karena window 24 jam habis. */
 export async function sendExecNotice(msg: string): Promise<string> {
-  const owner = ownerNumber();
-  if (!owner) return "gagal: OWNER_WA_NUMBER belum diatur";
-  const free = await sendText(owner, msg);
-  if (free.ok) return "ok";
-  const tpl = await sendTemplateParams(owner, NOTIF_TEMPLATE, [msg]);
-  if (tpl.ok) return "ok (template)";
-  return `gagal: ${free.error ?? "teks ditolak"} | template: ${tpl.error ?? "ditolak"}`;
+  return sendOwnerNotice(msg);
 }
 
 /** Kirim notif WA dengan konfirmasi hasil: bila percobaan pertama gagal,
