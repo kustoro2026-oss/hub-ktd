@@ -64,6 +64,7 @@ export type EmailContact = {
   note: string;
   group_id: number; // wajib > 0 — tidak ada daftar umum
   status: string; // subscribed / unsubscribed / bounced
+  bounce_strikes: number; // akumulasi soft-bounce (NDR "Delivery incomplete")
   created_at: string;
 };
 
@@ -96,6 +97,8 @@ export type EmailCampaign = {
   next_run_at: string;
   pause_reason: string;
   batch_sent: number;
+  repeat_daily: number; // 1 = kirim ulang dari awal tiap hari (loop)
+  repeat_start_hour: number; // jam WIB mulai siklus berikutnya (0-23)
   started_at: string;
   total: number;
   sent: number;
@@ -123,6 +126,9 @@ export type EmailSmtpAccount = {
   delay_ms: number;
   daily_limit: number;
   active: number;
+  imap_host: string; // kosong = tidak dipantau bounce via IMAP
+  imap_port: number;
+  imap_secure: number; // 1 = SSL langsung (993), 0 = STARTTLS (143)
   created_at: string;
 };
 
@@ -936,6 +942,7 @@ function migrateSqlite(db: DatabaseSync) {
       note TEXT NOT NULL DEFAULT '',
       group_id INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'subscribed',
+      bounce_strikes INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
     -- Indeks group_id dibuat di blok migrasi setelah ALTER TABLE, karena
@@ -974,6 +981,8 @@ function migrateSqlite(db: DatabaseSync) {
       next_run_at TEXT NOT NULL DEFAULT '',
       pause_reason TEXT NOT NULL DEFAULT '',
       batch_sent INTEGER NOT NULL DEFAULT 0,
+      repeat_daily INTEGER NOT NULL DEFAULT 0,
+      repeat_start_hour INTEGER NOT NULL DEFAULT 8,
       started_at TEXT NOT NULL DEFAULT '',
       total INTEGER NOT NULL DEFAULT 0,
       sent INTEGER NOT NULL DEFAULT 0,
@@ -1039,6 +1048,9 @@ function migrateSqlite(db: DatabaseSync) {
       delay_ms INTEGER NOT NULL DEFAULT 1000,
       daily_limit INTEGER NOT NULL DEFAULT 500,
       active INTEGER NOT NULL DEFAULT 1,
+      imap_host TEXT NOT NULL DEFAULT '',
+      imap_port INTEGER NOT NULL DEFAULT 993,
+      imap_secure INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
 
@@ -1118,6 +1130,8 @@ function migrateSqlite(db: DatabaseSync) {
     ["pause_reason", "TEXT NOT NULL DEFAULT ''"],
     ["batch_sent", "INTEGER NOT NULL DEFAULT 0"],
     ["started_at", "TEXT NOT NULL DEFAULT ''"],
+    ["repeat_daily", "INTEGER NOT NULL DEFAULT 0"],
+    ["repeat_start_hour", "INTEGER NOT NULL DEFAULT 8"],
   ];
   for (const [col, def] of campaignAdd) {
     if (!emCampaignCols.some((c) => c.name === col)) {
@@ -1140,6 +1154,35 @@ function migrateSqlite(db: DatabaseSync) {
   db.exec(
     "CREATE INDEX IF NOT EXISTS idx_email_items_account ON email_campaign_items (smtp_account_id, sent_at)",
   );
+
+  // Migrasi email marketing 3 (loop harian + pantau bounce IMAP): kolom
+  // pengulangan kampanye, pencacah soft-bounce kontak, dan konfigurasi IMAP
+  // per akun SMTP.
+  const emContactCols2 = db
+    .prepare("PRAGMA table_info(email_contacts)")
+    .all() as { name: string }[];
+  if (
+    emContactCols2.length > 0 &&
+    !emContactCols2.some((c) => c.name === "bounce_strikes")
+  ) {
+    db.exec(
+      "ALTER TABLE email_contacts ADD COLUMN bounce_strikes INTEGER NOT NULL DEFAULT 0",
+    );
+  }
+
+  const emSmtpCols = db
+    .prepare("PRAGMA table_info(email_smtp_accounts)")
+    .all() as { name: string }[];
+  const smtpAdd: [string, string][] = [
+    ["imap_host", "TEXT NOT NULL DEFAULT ''"],
+    ["imap_port", "INTEGER NOT NULL DEFAULT 993"],
+    ["imap_secure", "INTEGER NOT NULL DEFAULT 1"],
+  ];
+  for (const [col, def] of smtpAdd) {
+    if (!emSmtpCols.some((c) => c.name === col)) {
+      db.exec(`ALTER TABLE email_smtp_accounts ADD COLUMN ${col} ${def}`);
+    }
+  }
 
   // Akun SMTP pertama diisi dari pengaturan Gmail lama bila ada — supaya
   // kredensial yang sudah tersimpan langsung tampil di halaman SMTP baru.
@@ -1744,6 +1787,7 @@ async function migratePg(pool: Pool) {
       note TEXT NOT NULL DEFAULT '',
       group_id INTEGER NOT NULL DEFAULT 0,
       status TEXT NOT NULL DEFAULT 'subscribed',
+      bounce_strikes INTEGER NOT NULL DEFAULT 0,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
     -- Indeks group_id dibuat setelah ALTER TABLE (lihat migrasi di bawah):
@@ -1782,6 +1826,8 @@ async function migratePg(pool: Pool) {
       next_run_at TEXT NOT NULL DEFAULT '',
       pause_reason TEXT NOT NULL DEFAULT '',
       batch_sent INTEGER NOT NULL DEFAULT 0,
+      repeat_daily INTEGER NOT NULL DEFAULT 0,
+      repeat_start_hour INTEGER NOT NULL DEFAULT 8,
       started_at TEXT NOT NULL DEFAULT '',
       total INTEGER NOT NULL DEFAULT 0,
       sent INTEGER NOT NULL DEFAULT 0,
@@ -1847,6 +1893,9 @@ async function migratePg(pool: Pool) {
       delay_ms INTEGER NOT NULL DEFAULT 1000,
       daily_limit INTEGER NOT NULL DEFAULT 500,
       active INTEGER NOT NULL DEFAULT 1,
+      imap_host TEXT NOT NULL DEFAULT '',
+      imap_port INTEGER NOT NULL DEFAULT 993,
+      imap_secure INTEGER NOT NULL DEFAULT 1,
       created_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
 
@@ -1931,6 +1980,8 @@ CREATE TABLE IF NOT EXISTS worker_heartbeat (
     ["pause_reason", "TEXT NOT NULL DEFAULT ''"],
     ["batch_sent", "INTEGER NOT NULL DEFAULT 0"],
     ["started_at", "TEXT NOT NULL DEFAULT ''"],
+    ["repeat_daily", "INTEGER NOT NULL DEFAULT 0"],
+    ["repeat_start_hour", "INTEGER NOT NULL DEFAULT 8"],
   ];
   for (const [col, def] of campaignCols2) {
     await pool.query(
@@ -1945,6 +1996,21 @@ CREATE TABLE IF NOT EXISTS worker_heartbeat (
   );
   await pool.query(
     "CREATE INDEX IF NOT EXISTS idx_email_items_account ON email_campaign_items (smtp_account_id, sent_at)",
+  );
+
+  // Migrasi email marketing 3 (padanan SQLite): kolom pengulangan kampanye,
+  // pencacah soft-bounce kontak, dan konfigurasi IMAP per akun SMTP.
+  await pool.query(
+    "ALTER TABLE email_contacts ADD COLUMN IF NOT EXISTS bounce_strikes INTEGER NOT NULL DEFAULT 0",
+  );
+  await pool.query(
+    "ALTER TABLE email_smtp_accounts ADD COLUMN IF NOT EXISTS imap_host TEXT NOT NULL DEFAULT ''",
+  );
+  await pool.query(
+    "ALTER TABLE email_smtp_accounts ADD COLUMN IF NOT EXISTS imap_port INTEGER NOT NULL DEFAULT 993",
+  );
+  await pool.query(
+    "ALTER TABLE email_smtp_accounts ADD COLUMN IF NOT EXISTS imap_secure INTEGER NOT NULL DEFAULT 1",
   );
 
   // Akun SMTP pertama diisi dari pengaturan Gmail lama bila ada.
@@ -5069,6 +5135,68 @@ export async function deleteEmailContacts(ids: number[]): Promise<number> {
   return ids.length;
 }
 
+/** Hapus kontak berdasarkan alamat email (dipakai pembersih email tidak
+ *  aktif — hasil scan bounce IMAP / daftar paste). Mengembalikan jumlah
+ *  kontak yang benar-benar terhapus. */
+export async function deleteEmailContactsByEmails(
+  emails: string[],
+): Promise<number> {
+  const clean = [
+    ...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean)),
+  ];
+  if (clean.length === 0) return 0;
+  let deleted = 0;
+  for (let i = 0; i < clean.length; i += 400) {
+    const chunk = clean.slice(i, i + 400);
+    const ph = chunk.map(() => "?").join(", ");
+    const rows = await queryAll<{ id: number }>(
+      `DELETE FROM email_contacts WHERE email IN (${ph}) RETURNING id`,
+      chunk,
+    );
+    const ids = rows.map((r) => Number(r.id)).filter((n) => n > 0);
+    if (ids.length > 0) {
+      for (let j = 0; j < ids.length; j += 400) {
+        const idChunk = ids.slice(j, j + 400);
+        const idPh = idChunk.map(() => "?").join(", ");
+        await queryRun(
+          `UPDATE email_campaign_items SET contact_id = NULL WHERE contact_id IN (${idPh})`,
+          idChunk,
+        );
+        await queryRun(
+          `DELETE FROM email_group_members WHERE contact_id IN (${idPh})`,
+          idChunk,
+        );
+      }
+      deleted += ids.length;
+    }
+  }
+  return deleted;
+}
+
+/** Tambah satu cacahan soft-bounce untuk kontak (NDR "Delivery incomplete").
+ *  Tidak melakukan apa-apa bila alamat tidak ada di daftar kontak.
+ *  Mengembalikan jumlah cacahan terbaru (0 = kontak tidak ditemukan). */
+export async function incrementEmailContactBounceStrike(
+  email: string,
+): Promise<number> {
+  const row = await queryOne<{ bounce_strikes: string | number }>(
+    "UPDATE email_contacts SET bounce_strikes = bounce_strikes + 1 WHERE email = ? RETURNING bounce_strikes",
+    [email.trim().toLowerCase()],
+  );
+  return Number(row?.bounce_strikes ?? 0);
+}
+
+/** Kiriman sukses membuktikan alamat hidup — cacahan soft-bounce direset. */
+export async function resetEmailContactBounceStrikes(
+  contactId: number,
+): Promise<void> {
+  if (!contactId) return;
+  await queryRun(
+    "UPDATE email_contacts SET bounce_strikes = 0 WHERE id = ?",
+    [contactId],
+  );
+}
+
 // ---------- Grup kontak email (wajib, satu grup per kontak) ----------
 
 export async function listEmailGroups(): Promise<EmailGroup[]> {
@@ -5285,6 +5413,8 @@ function normalizeSmtpAccount(row: EmailSmtpAccount): EmailSmtpAccount {
     delay_ms: Math.max(0, Number(row.delay_ms) || 0),
     daily_limit: Math.max(0, Number(row.daily_limit) || 0),
     active: Number(row.active) ? 1 : 0,
+    imap_port: Math.max(1, Number(row.imap_port) || 993),
+    imap_secure: Number(row.imap_secure) ? 1 : 0,
   };
 }
 
@@ -5328,8 +5458,8 @@ export async function createEmailSmtpAccount(
     `INSERT INTO email_smtp_accounts
        (name, host, port, secure, username, password, sender_email,
         sender_name, batch_size, batch_pause_seconds, delay_ms,
-        daily_limit, active)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+        daily_limit, active, imap_host, imap_port, imap_secure)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
     [
       input.name.trim(),
       input.host.trim(),
@@ -5344,6 +5474,9 @@ export async function createEmailSmtpAccount(
       input.delay_ms,
       input.daily_limit,
       input.active,
+      input.imap_host.trim(),
+      input.imap_port,
+      input.imap_secure,
     ],
   );
   if (!row) throw new Error("gagal menyimpan akun SMTP");
@@ -5365,7 +5498,7 @@ export async function updateEmailSmtpAccount(
     `UPDATE email_smtp_accounts SET name = ?, host = ?, port = ?, secure = ?,
        username = ?, password = ?, sender_email = ?, sender_name = ?,
        batch_size = ?, batch_pause_seconds = ?, delay_ms = ?, daily_limit = ?,
-       active = ? WHERE id = ?`,
+       active = ?, imap_host = ?, imap_port = ?, imap_secure = ? WHERE id = ?`,
     [
       next.name.trim(),
       next.host.trim(),
@@ -5380,6 +5513,9 @@ export async function updateEmailSmtpAccount(
       next.delay_ms,
       next.daily_limit,
       next.active,
+      next.imap_host.trim(),
+      next.imap_port,
+      next.imap_secure,
       id,
     ],
   );
@@ -5527,6 +5663,8 @@ export type EmailCampaignCreateInput = {
   subject: string;
   vars?: Record<string, string>;
   scheduledAt?: string;
+  repeatDaily?: number; // 1 = loop harian otomatis
+  repeatStartHour?: number; // jam WIB mulai siklus berikutnya
   items: { contactId: number | null; name: string; email: string }[];
 };
 
@@ -5535,8 +5673,9 @@ export async function createEmailCampaignWithItems(
 ): Promise<EmailCampaign> {
   const campaign = await queryOne<EmailCampaign>(
     `INSERT INTO email_campaigns
-       (name, template_id, group_id, smtp_account_id, subject, vars, scheduled_at, total)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
+       (name, template_id, group_id, smtp_account_id, subject, vars,
+        scheduled_at, total, repeat_daily, repeat_start_hour)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *`,
     [
       input.name.trim(),
       input.templateId,
@@ -5546,6 +5685,8 @@ export async function createEmailCampaignWithItems(
       JSON.stringify(input.vars ?? {}),
       input.scheduledAt ?? "",
       input.items.length,
+      input.repeatDaily ? 1 : 0,
+      Math.min(23, Math.max(0, Math.floor(Number(input.repeatStartHour ?? 8)))),
     ],
   );
   if (!campaign) throw new Error("gagal membuat kampanye email");
@@ -5577,6 +5718,7 @@ export type EmailCampaignRunPatch = Partial<
     | "pause_reason"
     | "batch_sent"
     | "started_at"
+    | "total"
     | "sent"
     | "failed"
   >
@@ -5674,6 +5816,57 @@ export async function requeueStaleQueuedEmailItems(
     "UPDATE email_campaign_items SET status = 'pending', claimed_at = '' WHERE campaign_id = ? AND status = 'queued' AND claimed_at != '' AND claimed_at <= ?",
     [campaignId, cutoff],
   );
+}
+
+/** Siapkan siklus berikutnya kampanye loop harian:
+ *  1. Item terkirim siklus lalu kembali ke antrean (status pending, jejak
+ *     kirim dibersihkan). Item "failed" dibiarkan — alamat mati tidak
+ *     dicoba ulang tiap hari.
+ *  2. Item menunggu yang alamatnya sudah bukan kontak berlangganan di grup
+ *     (dihapus / berhenti / bounce / pindah grup) dibuang supaya email
+ *     mati tidak dikirimi lagi. Pencocokan memakai alamat email karena
+ *     contact_id bisa sudah NULL akibat penghapusan kontak.
+ *  3. Kontak grup yang masih berlangganan tapi belum ada di kampanye
+ *     (baru diimport / pindah grup) ikut ditambahkan.
+ *  Mengembalikan jumlah total item setelah penyesuaian. */
+export async function resetEmailCampaignForLoop(
+  campaignId: number,
+  groupId: number | null,
+  smtpAccountId: number,
+): Promise<number> {
+  await queryRun(
+    `UPDATE email_campaign_items
+     SET status = 'pending', claimed_at = '', sent_at = '', message_id = '', error = ''
+     WHERE campaign_id = ? AND status IN ('sent', 'delivered', 'opened', 'clicked')`,
+    [campaignId],
+  );
+  await queryRun(
+    `DELETE FROM email_campaign_items
+     WHERE campaign_id = ? AND status = 'pending'
+       AND email NOT IN (
+         SELECT email FROM email_contacts
+         WHERE status = 'subscribed' AND group_id = ?
+       )`,
+    [campaignId, groupId ?? 0],
+  );
+  if (groupId) {
+    await queryRun(
+      `INSERT INTO email_campaign_items
+         (campaign_id, contact_id, smtp_account_id, name, email)
+       SELECT ?, c.id, ?, c.name, c.email FROM email_contacts c
+       WHERE c.group_id = ? AND c.status = 'subscribed'
+         AND NOT EXISTS (
+           SELECT 1 FROM email_campaign_items i
+           WHERE i.campaign_id = ? AND i.contact_id = c.id
+         )`,
+      [campaignId, smtpAccountId, groupId, campaignId],
+    );
+  }
+  const row = await queryOne<{ n: string | number }>(
+    "SELECT COUNT(*) AS n FROM email_campaign_items WHERE campaign_id = ?",
+    [campaignId],
+  );
+  return Number(row?.n ?? 0);
 }
 
 export async function markEmailCampaignItem(

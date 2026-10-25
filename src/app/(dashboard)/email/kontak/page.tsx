@@ -16,6 +16,7 @@ import EmailContactForm from "@/components/email-contact-form";
 import EmailImportForm from "@/components/email-import-form";
 import EmailContactsTable from "@/components/email-contacts-table";
 import EmailGroupsManager from "@/components/email-groups-manager";
+import EmailBounceCleaner from "@/components/email-bounce-cleaner";
 import PageHeader from "@/components/page-header";
 
 export const dynamic = "force-dynamic";
@@ -143,6 +144,23 @@ export default async function EmailKontakPage() {
         </div>
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
           <EmailContactsTable contacts={contacts} groups={groups} />
+        </div>
+      </div>
+
+      {/* Pembersih email tidak aktif — tempel notifikasi Gmail atau
+          pindai inbox IMAP otomatis. */}
+      <div className="space-y-3">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">
+            Pembersih email tidak aktif
+          </h2>
+          <p className="text-xs text-slate-500">
+            Hapus alamat yang gagal terkirim (&quot;Delivery incomplete&quot; /
+            bounce) supaya tidak dikirimi lagi pada kampanye loop harian.
+          </p>
+        </div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <EmailBounceCleaner />
         </div>
       </div>
 

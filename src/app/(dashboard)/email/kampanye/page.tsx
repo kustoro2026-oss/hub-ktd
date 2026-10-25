@@ -108,6 +108,12 @@ export default async function EmailKampanyePage() {
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
+                      {c.repeat_daily === 1 && (
+                        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                          Loop {String(c.repeat_start_hour).padStart(2, "0")}:00
+                          WIB
+                        </span>
+                      )}
                       <span className="text-xs text-slate-500">
                         {c.sent} terkirim · {c.failed} gagal
                         {c.opened > 0 && ` · ${c.opened} dibuka`}

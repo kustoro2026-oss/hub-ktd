@@ -45,6 +45,28 @@ export function sanitizeSmtpAccountInput(
         : 0
       : (current?.secure ?? (port === 465 ? 1 : 0));
   const password = str("password") || current?.password || "";
+  // Konfigurasi IMAP (pantau bounce dari notifikasi gagal kirim). Kolom
+  // PATCH parsial wajib fallback ke nilai tersimpan — sama seperti port.
+  const imapPortProvided =
+    raw.imap_port !== undefined && raw.imap_port !== null && raw.imap_port !== "";
+  const imapPort = clampInt(
+    raw.imap_port,
+    1,
+    65535,
+    current?.imap_port ?? 993,
+  );
+  const imapSecureRaw = raw.imap_secure;
+  const imapSecureProvided =
+    imapSecureRaw !== undefined && imapSecureRaw !== null && imapSecureRaw !== "";
+  const imapSecure = imapSecureProvided
+    ? imapSecureRaw === true || imapSecureRaw === 1 || imapSecureRaw === "1"
+      ? 1
+      : 0
+    : imapPortProvided
+      ? imapPort === 993
+        ? 1
+        : 0
+      : (current?.imap_secure ?? 1);
   return {
     name: str("name") || current?.name || username,
     host: str("host") || current?.host || "",
@@ -74,6 +96,9 @@ export function sanitizeSmtpAccountInput(
         : raw.active === true || raw.active === 1 || raw.active === "1"
           ? 1
           : 0,
+    imap_host: str("imap_host") || current?.imap_host || "",
+    imap_port: imapPort,
+    imap_secure: imapSecure,
   };
 }
 

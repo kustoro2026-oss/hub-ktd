@@ -17,6 +17,7 @@ import { checkNewBlibliOrders } from "../src/lib/blibli-resi";
 import { checkNewLazadaOrders } from "../src/lib/lazada-resi";
 import { runDueScheduledBroadcasts } from "../src/lib/broadcast-send";
 import { runDueScheduledEmailCampaigns } from "../src/lib/email-send";
+import { runEmailBounceScan } from "../src/lib/email-bounce";
 import { cekOrderSelesaiSemuaChannel } from "../src/lib/stok-sync";
 import { runOpsHealthCheck, runOpsWeeklyBackup } from "../src/lib/ops";
 import { runAffiliateAutoCron } from "../src/lib/affiliate-auto";
@@ -64,6 +65,11 @@ const FIVE_MIN_JOBS: {
     name: "email",
     heartbeat: "sched:email",
     run: () => runDueScheduledEmailCampaigns(),
+  },
+  {
+    name: "bounce-email",
+    heartbeat: "bounce:email",
+    run: () => runEmailBounceScan(),
   },
   {
     name: "stok-sync",

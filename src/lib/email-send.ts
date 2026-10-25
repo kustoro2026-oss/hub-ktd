@@ -25,6 +25,8 @@ import {
   markEmailCampaignItem,
   requeueEmailItems,
   requeueStaleQueuedEmailItems,
+  resetEmailCampaignForLoop,
+  resetEmailContactBounceStrikes,
   updateEmailCampaignRun,
   updateEmailCampaignRunIfActive,
   workerHeartbeatFresh,
@@ -62,6 +64,33 @@ function nextMidnight(): Date {
   const nowWib = Date.now() + WIB_OFFSET_MS;
   const startOfDayWib = Math.floor(nowWib / 86_400_000) * 86_400_000;
   return new Date(startOfDayWib + 86_400_000 - WIB_OFFSET_MS);
+}
+
+/** Kemunculan berikutnya dari jam WIB tertentu (mis. 08:00 WIB) sebagai
+ *  stempel waktu UTC — titik mulai siklus baru kampanye loop harian. */
+function nextRepeatStartUtc(hourWib: number): Date {
+  const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
+  const h = Math.min(23, Math.max(0, Math.floor(Number(hourWib) || 0)));
+  const nowWib = Date.now() + WIB_OFFSET_MS;
+  const startOfDayWib = Math.floor(nowWib / 86_400_000) * 86_400_000;
+  let candidate = startOfDayWib + h * 3_600_000;
+  if (candidate <= nowWib) candidate += 86_400_000;
+  return new Date(candidate - WIB_OFFSET_MS);
+}
+
+/** Label WIB "HH:MM" untuk tanggal UTC tertentu — dipakai pesan notis. */
+function wibClock(at: Date): string {
+  const wib = new Date(at.getTime() + 7 * 60 * 60 * 1000);
+  return `${String(wib.getUTCHours()).padStart(2, "0")}:${String(
+    wib.getUTCMinutes(),
+  ).padStart(2, "0")}`;
+}
+
+/** Jam mulai siklus kampanye loop — kolom wajib terisi (default 8 = 08:00
+ *  WIB); pemakaian `|| 8` salah karena jam 0 (tengah malam) sah. */
+function repeatStartHourOf(campaign: EmailCampaign): number {
+  const n = Number(campaign.repeat_start_hour);
+  return Number.isFinite(n) ? Math.min(23, Math.max(0, Math.floor(n))) : 8;
 }
 
 /** URL publik KTD Hub — dipakai di link berhenti berlangganan. */
@@ -166,6 +195,32 @@ export async function runEmailCampaign(id: number): Promise<EmailRunResult> {
 
   const initial = await emailCampaignProgress(id);
   if (campaign.status === "done" || (initial.total > 0 && initial.remaining === 0)) {
+    // Kampanye loop harian: siklus selesai → siapkan putaran berikutnya.
+    if (campaign.repeat_daily === 1 && initial.total > 0) {
+      const newTotal = await resetEmailCampaignForLoop(
+        id,
+        campaign.group_id,
+        campaign.smtp_account_id,
+      );
+      const resumeAt = nextRepeatStartUtc(repeatStartHourOf(campaign));
+      const scheduled = await updateEmailCampaignRunIfActive(id, {
+        status: "paused",
+        pause_reason: "cooldown",
+        next_run_at: utcStamp(resumeAt),
+        batch_sent: 0,
+        total: newTotal,
+        sent: 0,
+        failed: initial.failed,
+      });
+      if (!scheduled) return buildResult(id);
+      return buildResult(id, {
+        notice: `Siklus selesai — putaran berikutnya dimulai otomatis pukul ${wibClock(resumeAt)} WIB.`,
+        waitSeconds: Math.max(
+          60,
+          Math.ceil((resumeAt.getTime() - Date.now()) / 1000),
+        ),
+      });
+    }
     if (campaign.status !== "done") {
       await updateEmailCampaignRun(id, {
         status: "done",
@@ -364,6 +419,11 @@ export async function runEmailCampaign(id: number): Promise<EmailRunResult> {
 
       if (res.ok) {
         await markEmailCampaignItem(item.id, "sent", "", res.messageId ?? "");
+        // Kiriman sukses membuktikan alamat hidup — soft-bounce yang
+        // pernah tercatat (NDR "Delivery incomplete") direset.
+        if (item.contact_id) {
+          await resetEmailContactBounceStrikes(item.contact_id);
+        }
         sentNow++;
         batchSent++;
         if (Number.isFinite(dailyLeft)) dailyLeft--;
@@ -403,6 +463,38 @@ export async function runEmailCampaign(id: number): Promise<EmailRunResult> {
   };
 
   if (progress.remaining === 0) {
+    // Kampanye loop harian: siklus selesai → reset antrean dan jadwalkan
+    // putaran berikutnya pada jam mulai (default 08:00 WIB).
+    if (campaign.repeat_daily === 1 && progress.total > 0) {
+      const newTotal = await resetEmailCampaignForLoop(
+        id,
+        campaign.group_id,
+        campaign.smtp_account_id,
+      );
+      const resumeAt = nextRepeatStartUtc(repeatStartHourOf(campaign));
+      const scheduled = await updateEmailCampaignRunIfActive(id, {
+        ...base,
+        total: newTotal,
+        status: "paused",
+        pause_reason: "cooldown",
+        next_run_at: utcStamp(resumeAt),
+        batch_sent: 0,
+        sent: 0,
+      });
+      if (!scheduled) {
+        return buildResult(id, { sentNow, failedNow, smtpAccount: smtpInfo });
+      }
+      return buildResult(id, {
+        notice: `Siklus selesai — putaran berikutnya dimulai otomatis pukul ${wibClock(resumeAt)} WIB.`,
+        sentNow,
+        failedNow,
+        waitSeconds: Math.max(
+          60,
+          Math.ceil((resumeAt.getTime() - Date.now()) / 1000),
+        ),
+        smtpAccount: smtpInfo,
+      });
+    }
     await updateEmailCampaignRun(id, {
       ...base,
       status: "done",

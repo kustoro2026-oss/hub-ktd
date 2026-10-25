@@ -70,6 +70,8 @@ export default function EmailCampaignCreate({
   );
   const [mode, setMode] = useState<"send" | "schedule" | "draft">("send");
   const [scheduleAt, setScheduleAt] = useState("");
+  const [repeatDaily, setRepeatDaily] = useState(true);
+  const [repeatStartHour, setRepeatStartHour] = useState(8);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [testEmail, setTestEmail] = useState("");
@@ -241,6 +243,8 @@ export default function EmailCampaignCreate({
           vars: Object.fromEntries(
             vars.map((v) => [v, (varValues[v] ?? "").trim()]),
           ),
+          repeatDaily,
+          repeatStartHour,
           scheduledAt: mode === "schedule" ? scheduleUtc() : "",
         }),
       });
@@ -508,6 +512,51 @@ export default function EmailCampaignCreate({
             memproses batch demi batch sesuai aturan akun SMTP — kamu tidak
             perlu klik berulang.
           </p>
+        )}
+      </div>
+
+      <div className="rounded-lg border border-slate-200 px-3 py-2">
+        <label className="flex cursor-pointer items-start gap-2">
+          <input
+            type="checkbox"
+            checked={repeatDaily}
+            onChange={(e) => setRepeatDaily(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-emerald-600"
+          />
+          <span>
+            <span className="block text-sm font-medium text-slate-700">
+              Ulangi otomatis setiap hari (loop)
+            </span>
+            <span className="block text-[11px] text-slate-500">
+              Setelah email terakhir terkirim, kampanye dikirim ulang dari
+              awal pada jam mulai di bawah. Email tidak aktif yang terdeteksi
+              bounce otomatis dikeluarkan dari grup sehingga tidak dikirimi
+              lagi.
+            </span>
+          </span>
+        </label>
+        {repeatDaily && (
+          <div className="mt-2 flex flex-wrap items-end gap-3">
+            <label className="block">
+              <span className="mb-1 block text-xs font-medium text-slate-600">
+                Jam mulai siklus berikutnya (WIB)
+              </span>
+              <select
+                value={repeatStartHour}
+                onChange={(e) => setRepeatStartHour(Number(e.target.value))}
+                className={inputCls + " max-w-[10rem]"}
+              >
+                {Array.from({ length: 24 }, (_, h) => (
+                  <option key={h} value={h}>
+                    {String(h).padStart(2, "0")}:00 WIB
+                  </option>
+                ))}
+              </select>
+            </label>
+            <p className="pb-2 text-[11px] text-slate-500">
+              Kiriman berjalan otomatis tiap hari — tanpa perlu membuka Hub.
+            </p>
+          </div>
         )}
       </div>
 

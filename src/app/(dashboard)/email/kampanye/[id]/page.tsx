@@ -14,6 +14,7 @@ import {
 } from "@/lib/db";
 import { toWib } from "@/lib/format";
 import EmailSendButton from "@/components/email-send-button";
+import EmailFailedCleaner from "@/components/email-failed-cleaner";
 
 export const dynamic = "force-dynamic";
 
@@ -146,6 +147,19 @@ export default async function EmailCampaignDetailPage({
         />
       </div>
 
+      {campaign.repeat_daily === 1 && (
+        <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm text-violet-800">
+          <div className="mb-1 font-semibold">Loop harian aktif</div>
+          Setelah seluruh penerima terkirim, kampanye ini otomatis dikirim
+          ulang dari awal setiap hari mulai pukul{" "}
+          <strong>
+            {String(campaign.repeat_start_hour).padStart(2, "0")}:00 WIB
+          </strong>
+          . Email tidak aktif yang terdeteksi bounce dikeluarkan otomatis —
+          tanpa perlu tindakan apa pun.
+        </div>
+      )}
+
       {isScheduled ? (
         <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800">
           Kampanye ini dijadwalkan kirim otomatis pada{" "}
@@ -176,11 +190,24 @@ export default async function EmailCampaignDetailPage({
       )}
       {campaign.status === "paused" && campaign.pause_reason === "cooldown" && (
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-          Kampanye sedang jeda batch / kuota. Sisa penerima akan dilanjutkan
-          otomatis{account ? ` oleh akun ${account.name}` : ""}
-          {campaign.next_run_at
-            ? ` sekitar ${toWib(campaign.next_run_at)} WIB`
-            : ""}.
+          {campaign.repeat_daily === 1 && campaign.sent === 0 ? (
+            <>
+              Siklus selesai — putaran berikutnya dimulai otomatis
+              {campaign.next_run_at
+                ? ` sekitar ${toWib(campaign.next_run_at)} WIB`
+                : ""}
+              .
+            </>
+          ) : (
+            <>
+              Kampanye sedang jeda batch / kuota. Sisa penerima akan
+              dilanjutkan otomatis{account ? ` oleh akun ${account.name}` : ""}
+              {campaign.next_run_at
+                ? ` sekitar ${toWib(campaign.next_run_at)} WIB`
+                : ""}
+              .
+            </>
+          )}
         </div>
       )}
 
@@ -194,6 +221,7 @@ export default async function EmailCampaignDetailPage({
               </li>
             ))}
           </ul>
+          <EmailFailedCleaner emails={failedItems.map((i) => i.email)} />
         </div>
       )}
 

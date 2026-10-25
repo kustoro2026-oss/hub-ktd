@@ -46,6 +46,8 @@ export async function POST(request: Request) {
     vars?: Record<string, string>;
     mode?: "send" | "schedule" | "draft";
     scheduledAt?: string;
+    repeatDaily?: number;
+    repeatStartHour?: number;
   } = {};
   try {
     body = (await request.json()) as typeof body;
@@ -150,6 +152,8 @@ export async function POST(request: Request) {
     subject: (body.subject ?? tpl.subject).trim() || tpl.subject,
     vars,
     scheduledAt,
+    repeatDaily: body.repeatDaily ? 1 : 0,
+    repeatStartHour: body.repeatStartHour ?? 8,
     items: selected.map((c) => ({
       contactId: c.id,
       name: c.name,

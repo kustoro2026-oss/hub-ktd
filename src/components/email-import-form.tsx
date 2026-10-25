@@ -45,68 +45,83 @@ export default function EmailImportForm({
     }
   }, [groups, groupId]);
 
-  // Baca file Excel/CSV → daftar "Nama, email" di textarea. Kolom nama &
-  // email dikenali dari baris judul; tanpa judul, alamat dicari di seluruh
-  // kolom. Baris tanpa email tetap dimasukkan supaya dihitung "tidak valid"
-  // oleh server (laporan import jadi jujur).
+  // Baca file .txt (satu alamat per baris) atau Excel/CSV → daftar
+  // "Nama, email" di textarea. Bisa pilih lebih dari satu file sekaligus
+  // (mis. email_dipisah_per_400). Kolom nama & email dikenali dari baris
+  // judul; tanpa judul, alamat dicari di seluruh kolom. Baris tanpa email
+  // tetap dimasukkan supaya dihitung "tidak valid" oleh server.
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files ?? []);
     e.target.value = "";
-    if (!file) return;
+    if (files.length === 0) return;
     try {
-      const XLSX = await import("xlsx");
-      const buf = await file.arrayBuffer();
-      const wb = XLSX.read(buf, { type: "array" });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json<(string | number)[]>(ws, {
-        header: 1,
-        raw: false,
-        defval: "",
-      });
-      let nameCol = -1;
-      let emailCol = -1;
-      const head = (rows[0] ?? []).map((c) => String(c ?? "").toLowerCase());
-      head.forEach((h, i) => {
-        if (nameCol === -1 && /nama|name|pelanggan|customer|kontak/.test(h))
-          nameCol = i;
-        if (emailCol === -1 && /email|e-mail|mail|alamat/.test(h))
-          emailCol = i;
-      });
-      const start = nameCol >= 0 || emailCol >= 0 ? 1 : 0;
-      const lines: string[] = [];
-      for (let r = start; r < rows.length; r++) {
-        const row = (rows[r] ?? []).map((c) => String(c ?? "").trim());
-        if (row.every((c) => c === "")) continue;
-        let name = nameCol >= 0 ? (row[nameCol] ?? "") : "";
-        let email = emailCol >= 0 ? (row[emailCol] ?? "") : "";
-        if (emailCol < 0) {
-          const found = row.find((c) => EMAIL_FIND.test(c));
-          if (found) email = found.match(EMAIL_FIND)?.[0] ?? "";
-        }
-        email = email.toLowerCase();
-        if (!EMAIL_RE.test(email)) {
-          // Tanpa email valid — biarkan server menghitung sebagai invalid.
-          lines.push(row.join(", "));
+      const allLines: string[] = [];
+      for (const file of files) {
+        if (/\.txt$/i.test(file.name)) {
+          const raw = await file.text();
+          for (const line of raw.split(/\r?\n/)) {
+            const s = line.trim();
+            if (!s) continue;
+            const found = s.match(EMAIL_FIND)?.[0] ?? "";
+            allLines.push(
+              EMAIL_RE.test(found) ? found.toLowerCase() : s.replace(/[,;\n]/g, " "),
+            );
+          }
           continue;
         }
-        if (!name) {
-          const idx = row.findIndex((c) => EMAIL_FIND.test(c));
-          name = row.find((c, i) => i !== idx && c !== "") ?? "";
+        const XLSX = await import("xlsx");
+        const buf = await file.arrayBuffer();
+        const wb = XLSX.read(buf, { type: "array" });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json<(string | number)[]>(ws, {
+          header: 1,
+          raw: false,
+          defval: "",
+        });
+        let nameCol = -1;
+        let emailCol = -1;
+        const head = (rows[0] ?? []).map((c) => String(c ?? "").toLowerCase());
+        head.forEach((h, i) => {
+          if (nameCol === -1 && /nama|name|pelanggan|customer|kontak/.test(h))
+            nameCol = i;
+          if (emailCol === -1 && /email|e-mail|mail|alamat/.test(h))
+            emailCol = i;
+        });
+        const start = nameCol >= 0 || emailCol >= 0 ? 1 : 0;
+        for (let r = start; r < rows.length; r++) {
+          const row = (rows[r] ?? []).map((c) => String(c ?? "").trim());
+          if (row.every((c) => c === "")) continue;
+          let name = nameCol >= 0 ? (row[nameCol] ?? "") : "";
+          let email = emailCol >= 0 ? (row[emailCol] ?? "") : "";
+          if (emailCol < 0) {
+            const found = row.find((c) => EMAIL_FIND.test(c));
+            if (found) email = found.match(EMAIL_FIND)?.[0] ?? "";
+          }
+          email = email.toLowerCase();
+          if (!EMAIL_RE.test(email)) {
+            // Tanpa email valid — biarkan server menghitung sebagai invalid.
+            allLines.push(row.join(", "));
+            continue;
+          }
+          if (!name) {
+            const idx = row.findIndex((c) => EMAIL_FIND.test(c));
+            name = row.find((c, i) => i !== idx && c !== "") ?? "";
+          }
+          allLines.push(
+            name ? `${name.replace(/[,;\n]/g, " ").trim()}, ${email}` : email,
+          );
         }
-        lines.push(
-          name ? `${name.replace(/[,;\n]/g, " ").trim()}, ${email}` : email,
-        );
       }
-      if (lines.length === 0) {
-        setFileNote("Tidak ada baris yang terbaca dari file ini");
+      if (allLines.length === 0) {
+        setFileNote("Tidak ada baris yang terbaca dari file");
         return;
       }
-      setText(lines.join("\n"));
+      setText(allLines.join("\n"));
       setFileNote(
-        `Terbaca ${lines.length} baris dari file "${file.name}" — periksa lalu klik Import`,
+        `Terbaca ${allLines.length} baris dari ${files.length} file — periksa lalu klik Import`,
       );
     } catch {
-      setFileNote("Gagal membaca file — pastikan format .xlsx atau .csv");
+      setFileNote("Gagal membaca file — pastikan format .txt, .xlsx, atau .csv");
     }
   }
 
@@ -155,11 +170,13 @@ export default function EmailImportForm({
     <form onSubmit={submit} className="space-y-3">
       <label className="block">
         <span className="mb-1 block text-xs font-medium text-slate-600">
-          Atau unggah file Excel / CSV (kolom nama & email terbaca otomatis)
+          Atau unggah file .txt / Excel / CSV (bisa pilih beberapa file
+          sekaligus)
         </span>
         <input
           type="file"
-          accept=".xlsx,.xls,.csv"
+          accept=".txt,.xlsx,.xls,.csv"
+          multiple
           onChange={onFile}
           className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-emerald-600 file:px-3 file:py-2 file:text-xs file:font-medium file:text-white hover:file:bg-emerald-700"
         />

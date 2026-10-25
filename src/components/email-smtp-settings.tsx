@@ -30,6 +30,9 @@ type FormState = {
   delay_ms: number;
   daily_limit: number;
   active: number;
+  imap_host: string;
+  imap_port: number;
+  imap_secure: number;
 };
 
 const EMPTY: FormState = {
@@ -44,8 +47,11 @@ const EMPTY: FormState = {
   batch_size: 40,
   batch_pause_seconds: 60,
   delay_ms: 1000,
-  daily_limit: 500,
+  daily_limit: 400,
   active: 1,
+  imap_host: "",
+  imap_port: 993,
+  imap_secure: 1,
 };
 
 const PRESETS: Record<
@@ -59,6 +65,9 @@ const PRESETS: Record<
     | "batch_pause_seconds"
     | "delay_ms"
     | "daily_limit"
+    | "imap_host"
+    | "imap_port"
+    | "imap_secure"
   >
 > = {
   Gmail: {
@@ -68,7 +77,10 @@ const PRESETS: Record<
     batch_size: 40,
     batch_pause_seconds: 60,
     delay_ms: 1000,
-    daily_limit: 500,
+    daily_limit: 400,
+    imap_host: "imap.gmail.com",
+    imap_port: 993,
+    imap_secure: 1,
   },
   Outlook: {
     host: "smtp-mail.outlook.com",
@@ -78,6 +90,9 @@ const PRESETS: Record<
     batch_pause_seconds: 60,
     delay_ms: 1000,
     daily_limit: 300,
+    imap_host: "outlook.office365.com",
+    imap_port: 993,
+    imap_secure: 1,
   },
   "SMTP kustom": {
     host: "",
@@ -86,7 +101,10 @@ const PRESETS: Record<
     batch_size: 40,
     batch_pause_seconds: 60,
     delay_ms: 1000,
-    daily_limit: 500,
+    daily_limit: 400,
+    imap_host: "",
+    imap_port: 993,
+    imap_secure: 1,
   },
 };
 
@@ -168,6 +186,9 @@ export default function EmailSmtpSettings() {
       delay_ms: a.delay_ms,
       daily_limit: a.daily_limit,
       active: a.active,
+      imap_host: a.imap_host,
+      imap_port: a.imap_port,
+      imap_secure: a.imap_secure,
     });
     setResult(null);
   }
@@ -338,6 +359,11 @@ export default function EmailSmtpSettings() {
                     </div>
                     <div className="truncate text-xs text-slate-400">
                       Pengirim: {a.sender_name} &lt;{a.sender_email || a.username}&gt;
+                    </div>
+                    <div className="truncate text-xs text-slate-400">
+                      {a.imap_host
+                        ? `IMAP: ${a.imap_host}:${a.imap_port}`
+                        : "IMAP: tidak dipantau"}
                     </div>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
@@ -559,6 +585,39 @@ export default function EmailSmtpSettings() {
                 className={inputCls}
               />
             </Field>
+            <Field
+              label="IMAP host (pantau bounce)"
+              hint="kosongkan = inbox tidak dipindai"
+            >
+              <input
+                value={form.imap_host}
+                onChange={(e) => patch({ imap_host: e.target.value.trim() })}
+                placeholder="imap.gmail.com"
+                className={inputCls}
+              />
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="IMAP port">
+                <input
+                  type="number"
+                  value={form.imap_port}
+                  onChange={(e) => patch({ imap_port: Number(e.target.value) })}
+                  className={inputCls}
+                />
+              </Field>
+              <Field label="IMAP keamanan">
+                <select
+                  value={form.imap_secure}
+                  onChange={(e) =>
+                    patch({ imap_secure: Number(e.target.value) })
+                  }
+                  className={inputCls}
+                >
+                  <option value={1}>SSL (993)</option>
+                  <option value={0}>STARTTLS (143)</option>
+                </select>
+              </Field>
+            </div>
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-2">
