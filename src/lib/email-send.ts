@@ -53,6 +53,14 @@ function utcStamp(at: Date = new Date()): string {
   return at.toISOString().slice(0, 19).replace("T", " ");
 }
 
+/** Parsing "YYYY-MM-DD HH:MM:SS" (UTC) → epoch ms; NaN bila format salah. */
+function parseUtcStamp(s: string): number {
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/);
+  if (!m) return NaN;
+  const [, y, mo, d, h, mi, se] = m;
+  return Date.UTC(+y, +mo - 1, +d, +h, +mi, +se);
+}
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, Math.max(0, ms)));
 }
@@ -219,6 +227,7 @@ export async function runEmailCampaign(id: number): Promise<EmailRunResult> {
           60,
           Math.ceil((resumeAt.getTime() - Date.now()) / 1000),
         ),
+        shouldContinue: false,
       });
     }
     if (campaign.status !== "done") {
@@ -245,6 +254,26 @@ export async function runEmailCampaign(id: number): Promise<EmailRunResult> {
             : undefined,
       shouldContinue: false,
     });
+  }
+
+  // Cooldown dengan jadwal di masa depan (loop harian / kuota / jeda batch):
+  // jangan kirim sebelum next_run_at walau dipanggil langsung dari klien.
+  if (
+    campaign.status === "paused" &&
+    campaign.pause_reason === "cooldown" &&
+    campaign.next_run_at !== ""
+  ) {
+    const dueMs = parseUtcStamp(campaign.next_run_at);
+    if (Number.isFinite(dueMs) && dueMs > Date.now()) {
+      return buildResult(id, {
+        notice: `Pengiriman dilanjutkan otomatis pukul ${wibClock(new Date(dueMs))} WIB.`,
+        shouldContinue: false,
+        waitSeconds: Math.min(
+          1800,
+          Math.max(60, Math.ceil((dueMs - Date.now()) / 1000)),
+        ),
+      });
+    }
   }
 
   const account = campaign.smtp_account_id
@@ -492,6 +521,7 @@ export async function runEmailCampaign(id: number): Promise<EmailRunResult> {
           60,
           Math.ceil((resumeAt.getTime() - Date.now()) / 1000),
         ),
+        shouldContinue: false,
         smtpAccount: smtpInfo,
       });
     }
