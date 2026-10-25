@@ -18,9 +18,11 @@
 //     paket disiapkan sebagai antrean Setuju; bila tidak, label resmi dikirim
 //     ke WA admin. Satu paket = SATU proses (label + slot resi), item
 //     anggota lain ikut ditandai.
-//  6. Label resmi = API downloadShippingLabelV2 (PDF base64). Paket berstatus
-//     FP dikonfirmasi fulfill dulu (padanan "Atur Pengiriman" TikTok) supaya
-//     kurir dijadwalkan — untuk Dropship Cashless AWB sudah dibuat Blibli.
+//  6. Label resmi = API downloadShippingLabelV2 (PDF base64). Paket yang
+//     belum dibuat Blibli (flag packageCreated=false) dibuat dulu lewat
+//     Create Package V1 — tanpa paket label tidak bisa diunduh. Fulfill
+//     hanya untuk PICKUP (jadwalkan kurir); DROPSHIP tidak perlu fulfill —
+//     setelah paket diserahkan ke kurir, 3PL memperbarui status otomatis.
 //  7. Kirim gagal ditandai + hitungan percobaan naik — dicoba ulang pada
 //     pengecekan berikutnya sampai batas, lalu dihentikan (label tetap bisa
 //     dibuka manual dari halaman Pesanan).
@@ -42,6 +44,7 @@ import {
 import {
   blibliEnv,
   blibliProductSku,
+  createBlibliPackage,
   fulfillBlibliPackage,
   getBlibliOrderDetail,
   getBlibliShippingLabel,
@@ -126,8 +129,12 @@ export type BlibliOfficialResiResult =
       pdf: Buffer;
       tracking_number: string;
       /** true = pengiriman baru saja dikonfirmasi (fulfill) otomatis
-       *  karena paket masih berstatus Pesanan Baru (FP). */
+       *  karena paket masih berstatus Pesanan Baru (FP) — hanya untuk
+       *  pengiriman PICKUP (kurir dijadwalkan menjemput). */
       arranged: boolean;
+      /** Id paket final yang dipakai label — berbeda dari id masukan
+       *  bila paketnya baru saja dibuat lewat Create Package V1. */
+      packageId: string;
     }
   | { ok: false; detail: string; butuhAwb?: boolean };
 
@@ -137,6 +144,12 @@ export type BlibliPackageInfo = {
   awbNumber?: string;
   cashlessHandover?: boolean;
   sellerDeliveryType?: "PICKUP" | "DROPSHIP";
+  /** false = paket belum dibuat Blibli (flag packageCreated) — pesanan FP
+   *  dropship tidak dibuatkan paket otomatis, penjual/integrator yang
+   *  memanggil Create Package V1 dulu sebelum label bisa diunduh. */
+  packageCreated?: boolean;
+  /** Order item id anggota paket — bahan Create Package V1. */
+  orderItemIds?: string[];
 };
 
 /** Cari satu paket di pesanan terbaru (beberapa halaman pertama) — dipakai
@@ -159,44 +172,70 @@ async function findBlibliPackage(
   return { ok: false, detail: "Paket tidak ditemukan di pesanan terbaru" };
 }
 
-/** Ambil label RESMI Blibli untuk satu paket. Berbeda dengan TikTok (yang
- *  mencoba label dulu lalu menjadwalkan pickup bila gagal), paket Blibli
- *  berstatus FP dikonfirmasi fulfill DAHULU — label Dropship memang sudah
- *  tersedia saat FP, tetapi tanpa fulfill kurir tidak pernah dijadwalkan
- *  dan paket bisa kedaluwarsa. Fulfill = padanan "Atur Pengiriman" TikTok.
- *  Untuk Dropship Cashless, AWB dibuat Blibli (logistic.awbNumber); untuk
- *  Dropship biasa AWB wajib diisi kurir — tanpa AWB, kembalikan butuhAwb. */
+/** Ambil label RESMI Blibli untuk satu paket. Alur yang benar (terbukti
+ *  25 Okt 2026 lewat pesanan dropship cashless pertama):
+ *
+ *  1. Pesanan FP yang paketnya BELUM dibuat (flag packageCreated=false)
+ *     harus dibuat dulu lewat Create Package V1 — Blibli TIDAK membuatkan
+ *     paket otomatis; label hanya bisa diunduh setelah paket ada
+ *     (ERR-PA422065 sebelum itu), dan AWB cashless (IDB…) baru terbit
+ *     saat paket dibuat.
+ *  2. Fulfill via API (padanan "Atur Pengiriman" TikTok) HANYA untuk
+ *     PICKUP — menjadwalkan kurir menjemput. Untuk DROPSHIP, API menolak
+ *     fulfill di luar jendela 12 jam sebelum autocancel (ERR-PA422056):
+ *     setelah paket diserahkan ke kurir, 3PL memperbarui status otomatis
+ *     (PU → CX → D). Tombol "Atur Pengiriman" manual tetap tersedia
+ *     untuk jendela 12 jam itu bila diperlukan. */
 export async function getOfficialResiForPackage(
   packageId: string,
   info: BlibliPackageInfo,
 ): Promise<BlibliOfficialResiResult> {
   const isFP = info.itemStatus === "FP";
-  let fulfilled = true;
+  let finalPackageId = packageId;
+  let arranged = false;
   let fulfillErr = "";
 
-  if (isFP) {
-    const butuhAwb =
-      info.sellerDeliveryType !== "PICKUP" &&
-      !info.cashlessHandover &&
-      !info.awbNumber;
-    if (butuhAwb) {
+  // 1. Buat paket dulu bila belum dibuat Blibli. Bila pesanan sudah
+  //    digabung sebagian (item batal), hanya item aktif yang dibawa —
+  //    paket hanya boleh berisi item eligibel (Create Package V1).
+  if (isFP && !info.packageCreated && (info.orderItemIds?.length ?? 0) > 0) {
+    const created = await createBlibliPackage(info.orderItemIds!);
+    if (!created.ok) {
       return {
         ok: false,
-        detail: "Nomor AWB belum tersedia untuk paket ini",
-        butuhAwb: true,
+        detail: `Gagal buat paket pesanan: ${created.detail}`,
       };
     }
-    const r = await fulfillBlibliPackage(packageId, info.awbNumber);
-    fulfilled = r.ok;
-    fulfillErr = r.ok ? "" : r.detail;
-    // Gagal fulfill (mis. sudah ter-fulfill sebelumnya) tidak menghentikan
-    // cetak label — label tetap dicoba di bawah.
+    finalPackageId = created.data.packageId;
   }
 
-  const label = await getBlibliShippingLabel(packageId);
+  if (isFP) {
+    if (info.sellerDeliveryType === "PICKUP") {
+      // PICKUP: konfirmasi pengiriman = jadwalkan kurir menjemput.
+      // Nomor resi baru muncul SETELAH fulfill (shipment.airwayBill).
+      const r = await fulfillBlibliPackage(finalPackageId, info.awbNumber);
+      arranged = r.ok;
+      fulfillErr = r.ok ? "" : r.detail;
+      // Gagal fulfill (mis. sudah ter-fulfill sebelumnya) tidak
+      // menghentikan cetak label — label tetap dicoba di bawah.
+    } else {
+      // DROPSHIP: tanpa fulfill otomatis (lihat komentar fungsi). Tetap
+      // waspada paket non-cashless tanpa AWB — wajib diisi kurir.
+      const butuhAwb = !info.cashlessHandover && !info.awbNumber;
+      if (butuhAwb) {
+        return {
+          ok: false,
+          detail: "Nomor AWB belum tersedia untuk paket ini",
+          butuhAwb: true,
+        };
+      }
+    }
+  }
+
+  const label = await getBlibliShippingLabel(finalPackageId);
   if (!label.ok) {
     const extra =
-      isFP && !fulfilled
+      isFP && !arranged && info.sellerDeliveryType === "PICKUP"
         ? ` — dan gagal mengatur pengiriman: ${fulfillErr}`
         : "";
     return { ok: false, detail: label.detail + extra };
@@ -208,7 +247,8 @@ export async function getOfficialResiForPackage(
       ok: true,
       pdf,
       tracking_number: info.awbNumber ?? "",
-      arranged: isFP && fulfilled,
+      arranged,
+      packageId: finalPackageId,
     };
   } catch {
     return { ok: false, detail: "Label pengiriman rusak (bukan PDF base64 valid)" };
@@ -283,6 +323,8 @@ export async function getBlibliResiPdf(
     awbNumber: item?.logistic?.awbNumber,
     cashlessHandover: item?.flag?.cashlessHandover,
     sellerDeliveryType: item?.sellerDeliveryType,
+    packageCreated: item?.flag?.packageCreated === true,
+    orderItemIds: found.pkg.orderItems.map((x) => x.order.itemId),
   });
 }
 
@@ -294,12 +336,15 @@ export async function sendResiForBlibliPackage(
   const official = await getBlibliResiPdf(packageId);
   if (!official.ok) return { ok: false, result: official.detail };
 
-  const result = await sendBlibliResiPdf(packageId, {
+  // Paket bisa saja baru dibuat di dalam getOfficialResiForPackage —
+  // pakai id paket FINAL (bukan id masukan yang mungkin placeholder).
+  const finalPkg = official.packageId ?? packageId;
+  const result = await sendBlibliResiPdf(finalPkg, {
     pdf: official.pdf,
     label: resiDocsLabel(official),
   });
   if (result.startsWith("ok")) {
-    const found = await findBlibliPackage(packageId);
+    const found = await findBlibliPackage(finalPkg);
     if (found.ok) {
       for (const it of found.pkg.orderItems) {
         await markBlibliOrderSeen(it.order.itemId, blibliEnv().storeCode, result);
@@ -629,9 +674,27 @@ export async function checkNewBlibliOrders(opts?: {
         continue;
       }
 
-      // Sudah gagal berkali-kali — berhenti mencoba (label tetap bisa
-      // dibuka manual dari halaman Pesanan).
-      if (prev.attempts >= MAX_SEND_ATTEMPTS) continue;
+      // Sudah gagal berkali-kali — berhenti mencoba otomatis. Kabari admin
+      // SEKALI (bukan tiap tick) supaya kegagalan tidak diam senyap; label
+      // tetap bisa dibuka manual dari halaman Pesanan / tombol Siapkan ulang.
+      if (prev.attempts >= MAX_SEND_ATTEMPTS) {
+        if (
+          prev.notify.startsWith("gagal") &&
+          !prev.notify.startsWith("gagal-berhenti")
+        ) {
+          const res = await sendOwnerNotice(
+            `Pesanan Blibli ${itemId} gagal diproses otomatis setelah ${MAX_SEND_ATTEMPTS} percobaan: ${prev.notify}. Silakan proses manual di halaman Pesanan: ${PESANAN_URL}`,
+          );
+          const mark = `gagal-berhenti: ${res.startsWith("ok") ? "admin dikabari" : "tanpa notif"}`;
+          await markBlibliOrderSeen(itemId, env.storeCode, mark);
+          seen.set(itemId, {
+            notify: mark,
+            attempts: prev.attempts,
+            last_attempt_at: prev.last_attempt_at,
+          });
+        }
+        continue;
+      }
 
       // Percobaan ulang diberi jeda — bila pengecekan berjalan tiap menit
       // (tab admin terbuka), tanpa jeda ini kegagalan sementara langsung
@@ -760,6 +823,9 @@ export async function checkNewBlibliOrders(opts?: {
         awbNumber: awbDetail || first?.logistic?.awbNumber,
         cashlessHandover: first?.flag?.cashlessHandover,
         sellerDeliveryType: first?.sellerDeliveryType,
+        packageCreated: first?.flag?.packageCreated === true,
+        // Item aktif saja — Create Package V1 menolak item batal.
+        orderItemIds: aktif.map((d) => d.item.order.itemId),
       };
 
       if (execCheck.ok) {
@@ -773,9 +839,10 @@ export async function checkNewBlibliOrders(opts?: {
           );
           continue;
         }
+        const pkgFinal = official.packageId ?? p.packageId;
         const prep = await prepareBlibliExec(
           {
-            package_id: p.packageId,
+            package_id: pkgFinal,
             order_item_ids: items.map((x) => x.order.itemId),
             store_name: BLIBLI_STORE_NAME,
             customer_name: detItems[0]?.customerName ?? "",
@@ -791,10 +858,10 @@ export async function checkNewBlibliOrders(opts?: {
             await markSeen(d.item.order.itemId, "eksekusi:menunggu");
           }
           sent.push(
-            `${BLIBLI_STORE_NAME} ${p.packageId} → menunggu persetujuan Aneka`,
+            `${BLIBLI_STORE_NAME} ${pkgFinal} → menunggu persetujuan Aneka`,
           );
         } else {
-          errors.push(`${BLIBLI_STORE_NAME}: ${p.packageId}: ${prep.detail}`);
+          errors.push(`${BLIBLI_STORE_NAME}: ${pkgFinal}: ${prep.detail}`);
           await recordBlibliOrderFailure(
             itemId,
             env.storeCode,
@@ -815,8 +882,9 @@ export async function checkNewBlibliOrders(opts?: {
         );
         continue;
       }
+      const pkgFinal = official.packageId ?? p.packageId;
 
-      const result = await sendBlibliResiPdf(p.packageId, {
+      const result = await sendBlibliResiPdf(pkgFinal, {
         pdf: official.pdf,
         label: resiDocsLabel(official),
       });
@@ -824,14 +892,14 @@ export async function checkNewBlibliOrders(opts?: {
         for (const d of detItems) {
           await markSeen(d.item.order.itemId, result);
         }
-        sent.push(`${BLIBLI_STORE_NAME} ${p.packageId} → ${result}`);
+        sent.push(`${BLIBLI_STORE_NAME} ${pkgFinal} → ${result}`);
         // Jelaskan KENAPA tidak dieksekusi otomatis — jangan biarkan
         // pemilik mengira paket berjalan otomatis padahal manual.
         await sendOwnerNotice(
-          `Catatan paket ${p.packageId}: eksekusi otomatis TIDAK dijalankan — ${execCheck.detail}. Paket ini diproses manual.`,
+          `Catatan paket ${pkgFinal}: eksekusi otomatis TIDAK dijalankan — ${execCheck.detail}. Paket ini diproses manual.`,
         );
       } else {
-        errors.push(`${BLIBLI_STORE_NAME}: ${p.packageId}: ${result}`);
+        errors.push(`${BLIBLI_STORE_NAME}: ${pkgFinal}: ${result}`);
         await recordBlibliOrderFailure(itemId, env.storeCode, result);
       }
     }
