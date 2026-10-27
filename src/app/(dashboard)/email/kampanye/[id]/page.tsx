@@ -15,6 +15,7 @@ import {
 import { toWib } from "@/lib/format";
 import EmailSendButton from "@/components/email-send-button";
 import EmailFailedCleaner from "@/components/email-failed-cleaner";
+import EmailLoopToggle from "@/components/email-loop-toggle";
 
 export const dynamic = "force-dynamic";
 
@@ -157,6 +158,7 @@ export default async function EmailCampaignDetailPage({
           </strong>
           . Email tidak aktif yang terdeteksi bounce dikeluarkan otomatis —
           tanpa perlu tindakan apa pun.
+          <EmailLoopToggle campaignId={campaign.id} />
         </div>
       )}
 

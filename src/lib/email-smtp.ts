@@ -224,6 +224,20 @@ export function isFatalSmtpError(message: string): boolean {
   );
 }
 
+/** Galat kuota kirim harian penyedia (Gmail: "550-5.4.5 Daily user sending
+ *  limit exceeded") — bukan alamat penerima yang salah dan bukan kredensial.
+ *  Mesin kirim wajib menjeda kampanye sampai kuota reset, bukan menandai
+ *  item gagal permanen (dulu antrean ribuan alamat habis dibuang begini). */
+export function isDailyQuotaSmtpError(message: string): boolean {
+  const m = (message || "").toLowerCase();
+  return (
+    m.includes("5.4.5") ||
+    m.includes("daily user sending limit") ||
+    m.includes("sending limit exceeded") ||
+    m.includes("too many messages")
+  );
+}
+
 export type SendEmailResult = {
   ok: boolean;
   messageId?: string;

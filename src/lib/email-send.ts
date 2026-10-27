@@ -34,6 +34,7 @@ import {
 } from "@/lib/db";
 import {
   fillVars,
+  isDailyQuotaSmtpError,
   openPixelToken,
   sendEmailWithAccount,
   unsubscribeToken,
@@ -392,6 +393,7 @@ export async function runEmailCampaign(id: number): Promise<EmailRunResult> {
   let sentNow = 0;
   let failedNow = 0;
   let fatalError = "";
+  let providerQuota = false;
   let stop: "empty" | "budget" | "batch" | "daily" | "fatal" = "empty";
 
   outer: while (true) {
@@ -456,6 +458,14 @@ export async function runEmailCampaign(id: number): Promise<EmailRunResult> {
         sentNow++;
         batchSent++;
         if (Number.isFinite(dailyLeft)) dailyLeft--;
+      } else if (isDailyQuotaSmtpError(res.error ?? "")) {
+        // Kuota harian penyedia habis — bukan salah alamat. Jangan tandai
+        // gagal permanen; kembalikan item ini + sisanya ke antrean dan jeda
+        // sampai kuota reset (00:00 WIB), supaya antrean tidak dibuang.
+        await requeueEmailItems(items.slice(idx).map((it) => it.id));
+        providerQuota = true;
+        stop = "daily";
+        break outer;
       } else {
         await markEmailCampaignItem(
           item.id,
@@ -556,7 +566,7 @@ export async function runEmailCampaign(id: number): Promise<EmailRunResult> {
     });
   }
 
-  if (dailyLeft <= 0) {
+  if (dailyLeft <= 0 || providerQuota) {
     const resumeAt = nextMidnight();
     const waitSeconds = Math.max(
       60,
@@ -573,7 +583,9 @@ export async function runEmailCampaign(id: number): Promise<EmailRunResult> {
       return buildResult(id, { sentNow, failedNow, smtpAccount: smtpInfo });
     }
     return buildResult(id, {
-      notice: `Batas harian akun "${account.name}" (${account.daily_limit} email) tercapai. Pengiriman lanjut otomatis pukul 00:00 WIB.`,
+      notice: providerQuota
+        ? `Kuota kirim harian akun "${account.name}" habis menurut penyedia — pengiriman dilanjutkan otomatis pukul 00:00 WIB.`
+        : `Batas harian akun "${account.name}" (${account.daily_limit} email) tercapai. Pengiriman lanjut otomatis pukul 00:00 WIB.`,
       sentNow,
       failedNow,
       waitSeconds,

@@ -5785,6 +5785,19 @@ export async function resumeEmailCampaign(id: number): Promise<void> {
   });
 }
 
+/** Matikan/aktifkan loop harian kampanye yang sudah dibuat (0/1). Kontrol
+ *  ini dulu hanya ada di form buat kampanye — kampanye yang terlanjur loop
+ *  tidak bisa dihentikan dari UI selain jeda manual. */
+export async function setEmailCampaignRepeatDaily(
+  id: number,
+  value: 0 | 1,
+): Promise<void> {
+  await queryRun("UPDATE email_campaigns SET repeat_daily = ? WHERE id = ?", [
+    value,
+    id,
+  ]);
+}
+
 // Ambil-sekaligus-tandai item yang akan dikirim pada ronde ini (atomik,
 // pola claimPendingBroadcastItems) supaya dua ronde tidak kirim dobel.
 export async function claimPendingEmailItems(
