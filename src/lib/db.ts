@@ -2837,10 +2837,14 @@ export async function countAffiliateInvitesSentSince(
   return Number(row?.n ?? 0);
 }
 
-/** Open id kreator yang sudah pernah diundang (status sent) — untuk dedupe. */
+/** Open id kreator yang sudah punya undangan tertunda atau ditolak TikTok
+ *  (sent/conflict/invalid) — untuk dedupe. Hanya 'sent' dulu: kreator yang
+ *  konflik dicatat "failed" oleh versi worker lama sehingga terus diuji ulang
+ *  tiap hari dan menciptakan tembok kegagalan massal. Conflict/invalid tidak
+ *  akan bisa diundang lagi untuk produk mana pun — buang permanen. */
 export async function listInvitedCreatorOpenIds(): Promise<string[]> {
   const rows = await queryAll<{ creator_open_id: string }>(
-    "SELECT DISTINCT creator_open_id FROM affiliate_invites WHERE status = 'sent'",
+    "SELECT DISTINCT creator_open_id FROM affiliate_invites WHERE status IN ('sent','conflict','invalid')",
   );
   return rows.map((r) => r.creator_open_id);
 }
