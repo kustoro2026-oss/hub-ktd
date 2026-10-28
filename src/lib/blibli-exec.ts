@@ -30,8 +30,17 @@ import {
   anekaVariantSave,
   type AnekaSession,
 } from "@/lib/aneka-checkout";
+import {
+  ambilSaldoAuditAneka,
+  auditVarianAneka,
+  blockerSaldo,
+  ONGKOS_PACKING_AUDIT,
+  susunAudit,
+  type AuditBlocker,
+  type ExecAudit,
+} from "@/lib/aneka-audit";
 import { buildAnekaCartItems } from "@/lib/aneka-exec";
-import { blibliEnv, getBlibliOrderDetail } from "@/lib/blibli";
+import { blibliEnv, getBlibliOrderDetail, getBlibliShippingLabel } from "@/lib/blibli";
 import {
   appendBlibliOrderExecLog,
   claimBlibliOrderExecPrepared,
@@ -86,6 +95,10 @@ export type BlibliExecPayload = {
   label_pdf_base64: string;
   items: BlibliExecItem[];
   total_modal: number;
+  /** Hasil audit kesiapan (varian/label/saldo) — disimpan saat persiapan
+   *  dan diperbarui tombol Periksa Kesiapan; dipakai gerbang tombol
+   *  Setuju di halaman Eksekusi. */
+  audit?: ExecAudit;
 };
 
 /** "Rp18.450" → 18450. */
@@ -215,6 +228,44 @@ export async function prepareBlibliExec(
     total_modal: total,
   };
 
+  // AUDIT KESIAPAN: cocokkan varian + cek saldo + catat blocker label SEBELUM
+  // antrean disimpan — peristiwa 28 Okt 2026 (gagal varian di Blibli karena
+  // listing tanpa varian sementara produk Aneka punya 15 varian) tidak
+  // boleh terulang: masalah harus ketahuan di sini, bukan saat eksekusi.
+  // variantId hasil pencocokan disimpan ke payload supaya eksekusi melewati
+  // pencarian ulang.
+  const auditBlockers: AuditBlocker[] = [];
+  const va = await auditVarianAneka(
+    payload.items.map((it) => ({
+      aneka_product_id: it.aneka_product_id,
+      variant_hint: it.variant_name,
+      nama: it.item_name,
+      aneka_variant_id: it.aneka_variant_id,
+    })),
+  );
+  va.hasil.forEach((h, i) => {
+    if (h.variantId) payload.items[i].aneka_variant_id = h.variantId;
+  });
+  auditBlockers.push(...va.blockers);
+  if (!official?.pdf?.length) {
+    auditBlockers.push({
+      kode: "label",
+      teks: "Label resmi belum tersedia — Setuju dinonaktifkan sampai label terisi",
+    });
+  }
+  const saldoAudit = await ambilSaldoAuditAneka();
+  auditBlockers.push(
+    ...blockerSaldo({
+      saldo: saldoAudit.saldo,
+      segar: saldoAudit.segar,
+      kebutuhan: total + ONGKOS_PACKING_AUDIT,
+    }),
+  );
+  payload.audit = susunAudit({
+    blockers: auditBlockers,
+    saldo: saldoAudit.saldo,
+  });
+
   // Baris BARU disimpan lewat klaim atomik: dua ronde pengecekan yang
   // tumpang tindih (tab admin + ping eksternal + tick webhook berjalan
   // tanpa mutex lintas ronde) sama-sama bisa membaca "belum ada baris" lalu
@@ -250,13 +301,108 @@ export async function prepareBlibliExec(
         `- ${it.qty}x ${it.item_name}${it.variant_name ? ` (${it.variant_name})` : ""} (${fmtRp(it.subtotal)})`,
     )
     .join("\n");
+  const auditTeks =
+    payload.audit && payload.audit.blockers.length > 0
+      ? `\n\nPERHATIAN — audit kesiapan menemukan blocker (tombol Setuju dinonaktifkan sampai beres):\n${payload.audit.blockers.map((b) => `[${b.kode}] ${b.teks}`).join("\n")}`
+      : "";
   const notice = await sendExecNotice(
-    `Pesanan Blibli ${pkg.package_id} siap dieksekusi ke Aneka (${pkg.store_name}).\n${baris}\nTotal modal ${fmtRp(total)}. No resi ${official.tracking_number}.\nSetuju/batalkan: ${EKSEKUSI_URL}?order=${pkg.package_id}`,
+    `Pesanan Blibli ${pkg.package_id} siap dieksekusi ke Aneka (${pkg.store_name}).\n${baris}\nTotal modal ${fmtRp(total)}. No resi ${official.tracking_number}.\nSetuju/batalkan: ${EKSEKUSI_URL}?order=${pkg.package_id}${auditTeks}`,
   );
   if (!notice.startsWith("ok")) {
     return { ok: false, detail: `Tersimpan, tetapi notif WA gagal: ${notice}` };
   }
   return { ok: true, detail: "Menunggu persetujuan" };
+}
+
+/** PERIKSA KESIAPAN manual (tombol di halaman Eksekusi): jalankan ulang
+ *  audit penuh — varian Aneka, label resmi (diunduh ulang bila kosong/rusak),
+ *  saldo — lalu simpan hasilnya ke payload.audit. Blocker lama yang sudah
+ *  beres otomatis hilang karena audit dibangun dari nol. */
+export async function auditKesiapanBlibli(
+  packageId: string,
+): Promise<ExecAudit> {
+  const row = await getBlibliOrderExec(packageId);
+  if (!row) {
+    return susunAudit({
+      blockers: [{ kode: "varian", teks: "Antrean eksekusi tidak ditemukan" }],
+    });
+  }
+  let payload: BlibliExecPayload;
+  try {
+    payload = JSON.parse(row.payload) as BlibliExecPayload;
+  } catch {
+    return susunAudit({
+      blockers: [{ kode: "varian", teks: "Payload eksekusi rusak — perbaiki manual" }],
+    });
+  }
+  const blockers: AuditBlocker[] = [];
+
+  // Varian: cocokkan ulang semua item yang belum punya variant_id; hasil
+  // terpilih disimpan ke payload supaya eksekusi melewati pencarian ulang.
+  const va = await auditVarianAneka(
+    payload.items.map((it) => ({
+      aneka_product_id: it.aneka_product_id,
+      variant_hint: it.variant_name,
+      nama: it.item_name,
+      aneka_variant_id: it.aneka_variant_id,
+    })),
+  );
+  va.hasil.forEach((h, i) => {
+    if (h.variantId) payload.items[i].aneka_variant_id = h.variantId;
+  });
+  blockers.push(...va.blockers);
+
+  // Label: verifikasi PDF tersimpan valid; kalau kosong/rusak, usahakan
+  // unduh ulang lewat API Blibli (shippingLabel).
+  const labelValid = (() => {
+    if (!payload.label_pdf_base64) return false;
+    const buf = Buffer.from(payload.label_pdf_base64, "base64");
+    return (
+      buf.length >= 5 && buf.subarray(0, 5).toString("latin1") === "%PDF-"
+    );
+  })();
+  if (!labelValid) {
+    const lb = await getBlibliShippingLabel(packageId);
+    if (lb.ok) {
+      payload.label_pdf_base64 = lb.data.shippingLabel;
+    } else {
+      blockers.push({
+        kode: "label",
+        teks: `Label resmi belum tersedia (${lb.detail})`,
+      });
+    }
+  }
+
+  // Saldo: blocker hanya bila cache segar dan saldo kurang dari kebutuhan.
+  const saldoAudit = await ambilSaldoAuditAneka();
+  blockers.push(
+    ...blockerSaldo({
+      saldo: saldoAudit.saldo,
+      segar: saldoAudit.segar,
+      kebutuhan: payload.total_modal + ONGKOS_PACKING_AUDIT,
+    }),
+  );
+
+  const audit = susunAudit({ blockers, saldo: saldoAudit.saldo });
+  payload.audit = audit;
+  await saveBlibliOrderExec({
+    package_id: packageId,
+    status: row.status,
+    payload: JSON.stringify(payload),
+    aneka_payment_id: row.aneka_payment_id ?? "",
+    aneka_order_id: row.aneka_order_id ?? "",
+    detail: row.detail ?? "",
+    executed_at: row.executed_at ?? "",
+  });
+  await appendBlibliOrderExecLog(
+    packageId,
+    `[${Date.now()}] | audit | ${
+      audit.ok
+        ? "ok — semua siap"
+        : blockers.map((b) => `${b.kode}: ${b.teks}`).join(" | ")
+    }`,
+  );
+  return audit;
 }
 
 /** Batal (dari tombol Batalkan atau deteksi paket dibatalkan pembeli). */
@@ -655,6 +801,20 @@ export async function executeBlibliOrder(
     return {
       ok: false,
       detail: "Data eksekusi tidak lengkap — siapkan ulang paket ini",
+    };
+  }
+
+  // GERBANG AUDIT KESIAPAN: baris yang auditnya mencatat blocker (varian
+  // tidak cocok / label belum tersedia / saldo kurang) DITOLAK — peristiwa
+  // 28 Okt 2026 (gagal varian di Blibli) tidak boleh terulang lewat Setuju
+  // biasa. Force (bayar ulang setelah cek manual) tetap melewati gerbang
+  // ini karena tujuannya berbeda.
+  if (!opts.force && payload.audit && !payload.audit.ok) {
+    return {
+      ok: false,
+      detail: `Audit kesiapan menemukan blocker: ${payload.audit.blockers
+        .map((b) => `[${b.kode}] ${b.teks}`)
+        .join(" — ")}`,
     };
   }
 

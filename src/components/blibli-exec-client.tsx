@@ -22,6 +22,16 @@ export type ExecRow = {
   log: string;
   created_at: string;
   executed_at: string;
+  /** Hasil audit kesiapan terakhir (payload.audit) — gerbang tombol
+   *  Setuju: selama ada blocker (ok=false), Setuju dinonaktifkan. */
+  audit: {
+    at: number;
+    ok: boolean;
+    blockers: { kode: string; teks: string }[];
+    saldo?: number;
+  } | null;
+  /** true bila label PDF resmi sudah tersimpan di payload. */
+  label_siap: boolean;
 };
 
 const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
@@ -32,9 +42,60 @@ const STATUS_LABEL: Record<string, { text: string; cls: string }> = {
   gagal: { text: "Gagal — bisa dicoba lagi", cls: "bg-rose-100 text-rose-800" },
 };
 
+/** Chip hasil audit kesiapan (Varian/Label/Saldo) + rincian blocker.
+ *  Merah = blocker (menonaktifkan Setuju), hijau = lolos, kuning = belum
+ *  diperiksa/tidak diketahui (tidak memblokir). */
+function AuditBar({ row }: { row: ExecRow }) {
+  const a = row.audit;
+  const b = (kode: string) => a?.blockers.find((x) => x.kode === kode);
+  const chip = (cls: string, teks: string) => (
+    <span
+      className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${cls}`}
+    >
+      {teks}
+    </span>
+  );
+  return (
+    <div className="mt-2 space-y-1">
+      <div className="flex flex-wrap items-center gap-1.5">
+        {b("varian")
+          ? chip("bg-rose-100 text-rose-800", "Varian bermasalah")
+          : a
+            ? chip("bg-emerald-100 text-emerald-800", "Varian cocok")
+            : chip("bg-amber-100 text-amber-800", "Varian belum diaudit")}
+        {b("label")
+          ? chip("bg-rose-100 text-rose-800", "Label bermasalah")
+          : row.label_siap
+            ? chip("bg-emerald-100 text-emerald-800", "Label siap")
+            : chip("bg-amber-100 text-amber-800", "Label belum diisi")}
+        {b("saldo")
+          ? chip("bg-rose-100 text-rose-800", "Saldo kurang")
+          : a && typeof a.saldo === "number"
+            ? chip(
+                "bg-emerald-100 text-emerald-800",
+                `Saldo Rp${a.saldo.toLocaleString("id-ID")}`,
+              )
+            : chip("bg-amber-100 text-amber-800", "Saldo belum dicek")}
+      </div>
+      {a && a.blockers.length > 0 ? (
+        <ul className="space-y-0.5">
+          {a.blockers.map((x, i) => (
+            <li
+              key={i}
+              className="break-words text-xs leading-snug text-rose-700"
+            >
+              [{x.kode}] {x.teks}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function ExecActions({ row }: { row: ExecRow }) {
   const router = useRouter();
-  const [busy, setBusy] = useState<"" | "setuju" | "batalkan">("");
+  const [busy, setBusy] = useState<"" | "setuju" | "batalkan" | "audit">("");
   const [error, setError] = useState("");
 
   async function act(action: "setuju" | "batalkan", force = false) {
@@ -74,12 +135,51 @@ function ExecActions({ row }: { row: ExecRow }) {
     }
   }
 
+  async function audit() {
+    setBusy("audit");
+    setError("");
+    try {
+      const res = await fetch("/api/blibli/exec/audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ package_id: row.package_id }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        detail?: string;
+        error?: string;
+      };
+      if (data.ok) {
+        router.refresh();
+      } else {
+        setError(data.detail ?? data.error ?? `HTTP ${res.status}`);
+      }
+    } catch {
+      setError("tidak dapat menghubungi server");
+    } finally {
+      setBusy("");
+    }
+  }
+
+  // Gerbang audit: selama ada blocker kesiapan, Setuju nonaktif — kegagalan
+  // eksekusi (varian tidak cocok / label belum tersedia / saldo kurang)
+  // harus beres DULUAN, bukan ketahuan setelah saldo terpotong.
+  const terblokir = row.audit ? !row.audit.ok : false;
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       <button
         type="button"
-        onClick={() => act("setuju")}
+        onClick={audit}
         disabled={busy !== ""}
+        className="rounded-lg border border-sky-300 px-4 py-1.5 text-xs font-medium text-sky-800 transition hover:bg-sky-50 disabled:opacity-60"
+      >
+        {busy === "audit" ? "Memeriksa..." : "Periksa Kesiapan"}
+      </button>
+      <button
+        type="button"
+        onClick={() => act("setuju")}
+        disabled={busy !== "" || terblokir}
         className="rounded-lg bg-emerald-700 px-4 py-1.5 text-xs font-medium text-white transition hover:bg-emerald-800 disabled:opacity-60"
       >
         {busy === "setuju"
@@ -106,6 +206,12 @@ function ExecActions({ row }: { row: ExecRow }) {
       >
         {busy === "batalkan" ? "Membatalkan..." : "Batalkan"}
       </button>
+      {terblokir ? (
+        <p className="w-full break-words text-xs leading-snug text-rose-700">
+          Tombol Setuju dinonaktifkan karena audit kesiapan menemukan blocker
+          — bereskan masalah di atas, lalu tekan Periksa Kesiapan.
+        </p>
+      ) : null}
       {error ? (
         <p className="w-full break-words text-xs leading-snug text-rose-700">
           {error}
@@ -180,6 +286,8 @@ export default function BlibliExecClient({
               (termasuk ongkos pengemasan)
               {row.awb_number ? ` · No AWB: ${row.awb_number}` : ""}
             </p>
+
+            <AuditBar row={row} />
 
             {row.aneka_payment_id || row.aneka_order_id ? (
               <p className="mt-2 text-sm text-emerald-800">

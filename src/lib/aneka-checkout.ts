@@ -490,7 +490,10 @@ export async function anekaResolveVariant(
     return {
       ok: false,
       detail: `Produk ${productId} punya ${list.length} varian dan pesanan "${variantHint}" tidak bisa dicocokkan dengan pasti. Pilihan: ${list
-        .map((v) => `${v.id} = ${v.name ?? v.label ?? "?"} (stok ${v.stock ?? "?"})`)
+        .map(
+          (v) =>
+            `${v.id} = ${(teksVar(v) || "?").trim()} (stok ${v.stock ?? "?"})`,
+        )
         .join("; ")}`,
     };
   } catch (e) {
