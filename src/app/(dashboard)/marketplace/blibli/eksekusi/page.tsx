@@ -109,7 +109,17 @@ export default async function EksekusiBlibliPage({
       created_at: waktuWib(r.created_at),
       executed_at: waktuWib(r.executed_at),
       audit: payload?.audit ?? null,
-      label_siap: payload?.label_pdf_base64?.startsWith("%PDF-") ?? false,
+      // Label tersimpan sebagai base64 — valid bila decodenya diawali %PDF-.
+      label_siap: (() => {
+        const b = payload?.label_pdf_base64;
+        if (!b) return false;
+        try {
+          const buf = Buffer.from(b, "base64");
+          return buf.length >= 5 && buf.subarray(0, 5).toString("latin1") === "%PDF-";
+        } catch {
+          return false;
+        }
+      })(),
     };
   });
 
