@@ -598,7 +598,10 @@ async function createTargetCollaborationAdaptive(
  *  adaptif: TikTok TIDAK membuat kolaborasi bila ada masalah apa pun di
  *  batch (produk invalid ATAU pasangan kreator–produk yang sudah diundang).
  *  Buang penyebab yang dilaporkan (produk invalid, kreator konflik/open id
- *  invalid) lalu coba lagi dengan sisanya — maksimal beberapa ronde. */
+ *  invalid) lalu coba lagi dengan sisanya sampai chunk tuntas terurai —
+ *  TikTok membatasi daftar konflik yang dilaporkan (maks 100 pasangan),
+ *  jadi satu ronde hanya mengungkap sebagian kreator konflik dan ronde
+ *  harus diulang sampai tidak ada lagi yang bisa dibuang. */
 async function inviteWithProductRetry(
   ctx: AffiliateShopCtx,
   input: TargetCollaborationInput,
@@ -611,7 +614,10 @@ async function inviteWithProductRetry(
   // sebagai hasil sintetis di akhir supaya tidak diuji ulang tiap hari.
   const droppedConflicts = new Map<string, string[]>();
   const droppedInvalid: string[] = [];
-  for (let round = 0; round < 6; round += 1) {
+  // Tiap ronde yang tidak berhenti PASTI mengecilkan chunk kreator atau daftar
+  // produk (kondisi changed), jadi batas aman = jumlah kreator + jumlah produk.
+  const maxRounds = chunkIn.length + input.products.length;
+  for (let round = 0; round < maxRounds; round += 1) {
     results = await createTargetCollaborationAdaptive(ctx, {
       ...input,
       products,
@@ -660,9 +666,12 @@ async function inviteWithProductRetry(
     }
     if (!changed) break;
   }
-  // Bila akhirnya sukses, tambahkan hasil sintetis untuk kreator yang dibuang
-  // di ronde awal (belum tercakup hasil akhir) supaya jurnal lengkap.
-  if (results.some((r) => r.ok)) {
+  // Tambahkan hasil sintetis untuk kreator yang dibuang pada ronde awal
+  // (belum tercakup hasil akhir) supaya jurnal lengkap — BAIK saat ada sukses
+  // MAUPUN saat seluruh chunk akhirnya gagal. Tanpa ini, kreator konflik yang
+  // terungkap di ronde awal lolos dari jurnal dan diuji ulang tiap hari,
+  // membentuk tembok kegagalan massal.
+  {
     const finalConflicts = new Set(
       results.flatMap((r) => r.conflicts.map((c) => c.creatorOpenId)),
     );

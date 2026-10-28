@@ -45,7 +45,7 @@ type Candidate = { creatorOpenId: string; followerCount: number };
 
 export type AffiliateAutoResult = {
   ok: boolean;
-  skipped?: "disabled" | "cap" | "empty" | "ineligible";
+  skipped?: "disabled" | "cap" | "empty" | "ineligible" | "conflict";
   detail?: string;
   searched?: number;
   cached?: number;
@@ -308,16 +308,43 @@ export async function runAffiliateAutoCron(): Promise<AffiliateAutoResult> {
   if (!summary.ok) {
     return { ok: false, detail: summary.detail };
   }
-  const failedCount = summary.batches.filter((b) => !b.ok).length;
-  // Semua batch gagal = tidak ada satu pun undangan terkirim. Kembalikan
-  // ok:false supaya worker/route tahu ada masalah (bukan ok:true senyap).
-  if (failedCount > 0 && failedCount === summary.batches.length) {
-    const first = summary.batches.find((b) => !b.ok);
+  const failed = summary.batches.filter((b) => !b.ok);
+  // Gagal "keras": batch tanpa satu pun keterangan konflik/open id invalid —
+  // berarti error API, produk invalid, nama buruk, rate-limit, dll. Hanya ini
+  // yang layak dilaporkan sebagai kegagalan pekerjaan. Gagal "lunak" (TikTok
+  // menolak membuat kolaborasi semata karena kreator sudah diundang/open id
+  // invalid) bukan kesalahan job — kreatornya sudah dijurnal conflict/invalid.
+  const hardFailed = failed.filter(
+    (b) => b.conflicts.length === 0 && b.invalidOpenIds.length === 0,
+  );
+  if (failed.length > 0 && failed.length === summary.batches.length) {
+    if (hardFailed.length === 0) {
+      // Semua batch "gagal" hanya karena kreator sudah diundang sebelumnya —
+      // bukan kegagalan pekerjaan. Kembalikan ok:true supaya worker tidak
+      // mengirim notif WA false-alarm tiap hari (tembok konflik massal).
+      const skippedPairs = summary.batches.reduce(
+        (sum, b) => sum + b.conflicts.length + b.invalidOpenIds.length,
+        0,
+      );
+      return {
+        ok: true,
+        skipped: "conflict",
+        invited: 0,
+        batches_total: summary.batches.length,
+        batches_failed: failed.length,
+        candidates_checked: pool.length,
+        eligible: target.length,
+        sent_today: sentToday,
+        daily_cap: dailyCap,
+        detail: `Semua kandidat sudah diundang sebelumnya — ${skippedPairs} pasangan kreator–produk dilewati (conflict/open id invalid).`,
+      };
+    }
+    const first = hardFailed[0];
     return {
       ok: false,
       invited: 0,
       batches_total: summary.batches.length,
-      batches_failed: failedCount,
+      batches_failed: failed.length,
       candidates_checked: pool.length,
       eligible: target.length,
       sent_today: sentToday,
@@ -329,7 +356,7 @@ export async function runAffiliateAutoCron(): Promise<AffiliateAutoResult> {
     ok: true,
     invited: summary.invitedCount,
     batches_total: summary.batches.length,
-    batches_failed: failedCount,
+    batches_failed: failed.length,
     candidates_checked: pool.length,
     eligible: target.length,
     sent_today: sentToday,
