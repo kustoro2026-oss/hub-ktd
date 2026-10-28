@@ -74,6 +74,10 @@ export type BlibliExecItem = {
    *  Blibli — petunjuk utama mencocokkan varian Aneka (padanan sku_name
    *  TikTok). Untuk listing tanpa varian, ukuran/warna ada di catatan. */
   variant_name: string;
+  /** Kata kunci warna default SKU dari Pemetaan (warna_hint) — digabung
+   *  dengan variant_name saat mencocokkan varian Aneka, karena API Blibli
+   *  tidak memuat warna pilihan pembeli untuk listing satu varian. */
+  warna_hint: string;
   qty: number;
   aneka_product_id: string;
   aneka_variant_id: string;
@@ -150,6 +154,16 @@ export function mergeBlibliExecItems(items: BlibliExecItem[]): BlibliExecItem[] 
   return [...merged.values()];
 }
 
+/** Petunjuk varian lengkap = nama varian + catatan pembeli + warna default
+ *  SKU (warna_hint dari Pemetaan, bila diisi) — dipakai audit varian dan
+ *  pencocokan varian Aneka saat eksekusi. */
+function petunjukVarianBlibli(it: BlibliExecItem): string {
+  return [it.variant_name, it.warna_hint]
+    .map((s) => (s ?? "").trim())
+    .filter(Boolean)
+    .join(" | ");
+}
+
 /** Cek apakah SEMUA item paket sudah dipetakan ke Aneka (dan ada di katalog
  *  snapshot) — prasyarat eksekusi otomatis. Bila belum, paket tetap
  *  diproses jalur lama (kirim label ke WA). */
@@ -184,6 +198,7 @@ export async function checkBlibliExecutable(
       seller_sku: it.seller_sku,
       item_name: it.item_name,
       variant_name: it.variant_name,
+      warna_hint: map.warna_hint ?? "",
       qty: it.qty,
       aneka_product_id: map.aneka_product_id,
       aneka_variant_id: map.aneka_variant_id ?? "",
@@ -247,7 +262,7 @@ export async function prepareBlibliExec(
   const va = await auditVarianAneka(
     payload.items.map((it) => ({
       aneka_product_id: it.aneka_product_id,
-      variant_hint: it.variant_name,
+      variant_hint: petunjukVarianBlibli(it),
       nama: it.item_name,
       aneka_variant_id: it.aneka_variant_id,
     })),
@@ -351,7 +366,7 @@ export async function auditKesiapanBlibli(
   const va = await auditVarianAneka(
     payload.items.map((it) => ({
       aneka_product_id: it.aneka_product_id,
-      variant_hint: it.variant_name,
+      variant_hint: petunjukVarianBlibli(it),
       nama: it.item_name,
       aneka_variant_id: it.aneka_variant_id,
     })),
@@ -1129,12 +1144,12 @@ export async function executeBlibliOrder(
     const langkah = `varian:${it.aneka_product_id}`;
     await logStep(
       langkah,
-      `mencari varian untuk "${it.variant_name || it.item_name}"`,
+      `mencari varian untuk "${petunjukVarianBlibli(it) || it.item_name}"`,
     );
     const v = await anekaResolveVariant(
       login.session,
       it.aneka_product_id,
-      it.variant_name || it.item_name,
+      petunjukVarianBlibli(it) || it.item_name,
     );
     if (!v.ok) {
       await logStep(langkah, `GAGAL — ${v.detail}`);

@@ -38,6 +38,7 @@ export async function POST(request: Request) {
     seller_sku?: string;
     product_name?: string;
     aneka_product_id?: string;
+    warna_hint?: string;
   };
   const blibliSku = String(body.blibli_sku ?? "").trim();
   const anekaProductId = String(body.aneka_product_id ?? "").trim();
@@ -55,6 +56,7 @@ export async function POST(request: Request) {
       product_name: String(body.product_name ?? "").trim(),
       aneka_product_id: anekaProductId,
       aneka_product_name: aneka?.name ?? "",
+      warna_hint: String(body.warna_hint ?? "").trim(),
     });
     return Response.json({ ok: true });
   } catch (e) {

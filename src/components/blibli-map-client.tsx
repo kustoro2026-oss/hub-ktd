@@ -15,6 +15,7 @@ type MapRow = {
   aneka_product_id: string;
   aneka_variant_id: string;
   aneka_product_name: string;
+  warna_hint: string;
   enabled: number;
   updated_at: string;
 };
@@ -189,6 +190,8 @@ export default function BlibliMapClient({
   const [manualId, setManualId] = useState("");
   const [manualName, setManualName] = useState("");
   const [manualAneka, setManualAneka] = useState<CatalogHit | null>(null);
+  // Draf petunjuk warna per SKU (belum disimpan).
+  const [hintDraft, setHintDraft] = useState<Record<string, string>>({});
 
   const sync = useCallback(async () => {
     const r = await fetch("/api/blibli/map", { cache: "no-store" });
@@ -230,6 +233,44 @@ export default function BlibliMapClient({
       }
     },
     [sync],
+  );
+
+  const saveHint = useCallback(
+    async (blibliSku: string) => {
+      const map = mapsById[blibliSku];
+      if (!map) return;
+      const hint = (hintDraft[blibliSku] ?? map.warna_hint ?? "").trim();
+      setSaving(blibliSku);
+      setError("");
+      try {
+        const r = await fetch("/api/blibli/map", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            blibli_sku: blibliSku,
+            seller_sku: map.seller_sku,
+            product_name: map.product_name,
+            aneka_product_id: map.aneka_product_id,
+            warna_hint: hint,
+          }),
+        });
+        const data = (await r.json()) as { ok?: boolean; detail?: string };
+        if (!data.ok) setError(data.detail ?? "Gagal menyimpan warna.");
+        else {
+          setHintDraft((d) => {
+            const n = { ...d };
+            delete n[blibliSku];
+            return n;
+          });
+          await sync();
+        }
+      } catch {
+        setError("Gagal menyimpan warna (jaringan).");
+      } finally {
+        setSaving("");
+      }
+    },
+    [mapsById, hintDraft, sync],
   );
 
   const deleteMap = useCallback(
@@ -357,6 +398,14 @@ export default function BlibliMapClient({
             Blibli (<span className="font-mono">KTS-70007-XXXXX</span>) — satu
             baris menaungi semua varian (warna, ukuran, dll.). Varian yang
             dipesan pembeli dicocokkan otomatis saat eksekusi.
+          </li>
+          <li>
+            API Blibli tidak memuat warna pilihan pembeli untuk listing
+            tanpa varian. Untuk produk berwarna (sandal, baju, dll.), isi
+            kolom <span className="font-semibold">Warna</span> di baris
+            pemetaan (mis. <span className="font-mono">hitam</span>) — bot
+            akan memadukannya dengan catatan pembeli (ukuran) untuk memilih
+            varian Aneka yang tepat.
           </li>
           <li>
             Produk di bawah muncul otomatis dari pesanan 30 hari terakhir;
@@ -488,6 +537,36 @@ export default function BlibliMapClient({
                             </div>
                             <div className="mt-0.5 font-mono text-xs text-slate-400">
                               Aneka #{map.aneka_product_id}
+                              {map.warna_hint ? (
+                                <span className="ml-2 rounded bg-sky-100 px-1.5 py-0.5 text-[10px] font-semibold text-sky-700">
+                                  warna {map.warna_hint}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="mt-2 flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                value={
+                                  hintDraft[r.blibli_sku] ?? map.warna_hint ?? ""
+                                }
+                                onChange={(e) =>
+                                  setHintDraft((d) => ({
+                                    ...d,
+                                    [r.blibli_sku]: e.target.value,
+                                  }))
+                                }
+                                placeholder="Warna (mis. hitam)"
+                                title="Kata kunci warna default produk ini — dipadukan dengan catatan pembeli untuk mencocokkan varian Aneka"
+                                className="w-36 rounded-lg border border-slate-300 px-2 py-1 text-xs text-slate-700 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => saveHint(r.blibli_sku)}
+                                disabled={saving === r.blibli_sku}
+                                className="rounded-lg border border-slate-300 px-2 py-1 text-xs font-medium text-slate-600 hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-50"
+                              >
+                                {saving === r.blibli_sku ? "…" : "Simpan warna"}
+                              </button>
                             </div>
                           </div>
                         ) : (

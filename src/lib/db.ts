@@ -744,6 +744,7 @@ function migrateSqlite(db: DatabaseSync) {
       aneka_product_id TEXT NOT NULL DEFAULT '',
       aneka_variant_id TEXT NOT NULL DEFAULT '',
       aneka_product_name TEXT NOT NULL DEFAULT '',
+      warna_hint TEXT NOT NULL DEFAULT '',
       enabled INTEGER NOT NULL DEFAULT 1,
       updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
     );
@@ -1390,10 +1391,22 @@ function migrateSqlite(db: DatabaseSync) {
         aneka_product_id TEXT NOT NULL DEFAULT '',
         aneka_variant_id TEXT NOT NULL DEFAULT '',
         aneka_product_name TEXT NOT NULL DEFAULT '',
+        warna_hint TEXT NOT NULL DEFAULT '',
         enabled INTEGER NOT NULL DEFAULT 1,
         updated_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
       );
     `);
+  }
+
+  // Migrasi DB lama: kolom petunjuk warna default per SKU pemetaan Blibli
+  // (pemilik mengisi mis. "hitam" di Pemetaan untuk listing tanpa warna).
+  const bmapcols2 = db
+    .prepare("PRAGMA table_info(blibli_product_map)")
+    .all() as unknown as { name: string }[];
+  if (!bmapcols2.some((c) => c.name === "warna_hint")) {
+    db.exec(
+      "ALTER TABLE blibli_product_map ADD COLUMN warna_hint TEXT NOT NULL DEFAULT ''",
+    );
   }
 
   // Satu baris per marketplace — menyimpan waktu sweep retur global
@@ -1594,6 +1607,7 @@ async function migratePg(pool: Pool) {
       aneka_product_id TEXT NOT NULL DEFAULT '',
       aneka_variant_id TEXT NOT NULL DEFAULT '',
       aneka_product_name TEXT NOT NULL DEFAULT '',
+      warna_hint TEXT NOT NULL DEFAULT '',
       enabled INTEGER NOT NULL DEFAULT 1,
       updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
     );
@@ -2126,11 +2140,18 @@ CREATE TABLE IF NOT EXISTS worker_heartbeat (
         aneka_product_id TEXT NOT NULL DEFAULT '',
         aneka_variant_id TEXT NOT NULL DEFAULT '',
         aneka_product_name TEXT NOT NULL DEFAULT '',
+        warna_hint TEXT NOT NULL DEFAULT '',
         enabled INTEGER NOT NULL DEFAULT 1,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
       );
     `);
   }
+
+  // Migrasi DB lama: kolom petunjuk warna default per SKU pemetaan Blibli
+  // (dipakai mencocokkan varian Aneka saat listing tidak memuat warna).
+  await pool.query(
+    "ALTER TABLE blibli_product_map ADD COLUMN IF NOT EXISTS warna_hint TEXT NOT NULL DEFAULT ''",
+  );
 
   // Migrasi DB lama: kolom shop_cipher untuk panggilan API pesanan.
   await pool.query(
@@ -3664,6 +3685,10 @@ export type BlibliProductMap = {
   aneka_product_id: string;
   aneka_variant_id: string;
   aneka_product_name: string;
+  /** Kata kunci warna default SKU (diisi pemilik di Pemetaan, mis. "hitam")
+   *  — petunjuk tambahan saat mencocokkan varian Aneka untuk listing
+   *  Blibli yang tidak memuat warna pilihan pembeli. */
+  warna_hint: string;
   enabled: number;
   updated_at: string;
 };
@@ -3698,22 +3723,25 @@ export async function saveBlibliProductMap(m: {
   aneka_product_id: string;
   aneka_variant_id?: string;
   aneka_product_name?: string;
+  warna_hint?: string;
   enabled?: number;
 }): Promise<void> {
   const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
   const sql =
     dbMode() === "pg"
-      ? `INSERT INTO blibli_product_map (blibli_sku, seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      ? `INSERT INTO blibli_product_map (blibli_sku, seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, warna_hint, enabled, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (blibli_sku) DO UPDATE SET seller_sku = EXCLUDED.seller_sku, product_name = EXCLUDED.product_name,
            aneka_product_id = EXCLUDED.aneka_product_id,
            aneka_variant_id = EXCLUDED.aneka_variant_id, aneka_product_name = EXCLUDED.aneka_product_name,
+           warna_hint = EXCLUDED.warna_hint,
            enabled = EXCLUDED.enabled, updated_at = EXCLUDED.updated_at`
-      : `INSERT INTO blibli_product_map (blibli_sku, seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, enabled, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      : `INSERT INTO blibli_product_map (blibli_sku, seller_sku, product_name, aneka_product_id, aneka_variant_id, aneka_product_name, warna_hint, enabled, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
          ON CONFLICT (blibli_sku) DO UPDATE SET seller_sku = excluded.seller_sku, product_name = excluded.product_name,
            aneka_product_id = excluded.aneka_product_id,
            aneka_variant_id = excluded.aneka_variant_id, aneka_product_name = excluded.aneka_product_name,
+           warna_hint = excluded.warna_hint,
            enabled = excluded.enabled, updated_at = excluded.updated_at`;
   await queryRun(sql, [
     m.blibli_sku,
@@ -3722,6 +3750,7 @@ export async function saveBlibliProductMap(m: {
     m.aneka_product_id,
     m.aneka_variant_id ?? "",
     m.aneka_product_name ?? "",
+    m.warna_hint ?? "",
     m.enabled ?? 1,
     nowUtc,
   ]);
