@@ -725,6 +725,10 @@ export async function checkNewBlibliOrders(opts?: {
       type DetItem = {
         item: BlibliOrderItem;
         variantName: string;
+        /** Catatan produk dari detail order item (product.notes) — sering
+         *  dipakai pembeli menitip ukuran/warna (mis. "ukuran 40") untuk
+         *  listing tanpa varian; bahan pelengkap variantName. */
+        notes: string;
         qty: number;
         cancelled: boolean;
         customerName: string;
@@ -750,6 +754,7 @@ export async function checkNewBlibliOrders(opts?: {
         detItems.push({
           item: x,
           variantName: String(d.data.product?.variantName ?? ""),
+          notes: String(d.data.product?.notes ?? "").trim(),
           qty: Number(d.data.quantity) > 0 ? Number(d.data.quantity) : 0,
           cancelled: st === "X" || /cancel/i.test(st),
           customerName: String(d.data.recipient?.name ?? x.order.customerFullName ?? ""),
@@ -802,7 +807,12 @@ export async function checkNewBlibliOrders(opts?: {
         blibli_sku: blibliProductSku(d.blibliSku || d.item.product.sellerSku),
         seller_sku: d.item.product.sellerSku,
         item_name: d.item.product.itemName,
-        variant_name: d.variantName,
+        // Petunjuk varian = variantName + catatan pembeli. Untuk listing
+        // tanpa varian variantName = nama produk (tanpa warna/ukuran) dan
+        // ukuran/warna sering hanya ada di notes — 28 Okt 2026: "ukuran 40".
+        variant_name: [d.variantName, d.notes]
+          .filter((s) => s.trim() !== "")
+          .join(" | "),
         qty: d.qty,
       }));
       const execCheck = adaBatal

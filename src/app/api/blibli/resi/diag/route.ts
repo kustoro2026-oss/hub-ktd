@@ -69,7 +69,14 @@ async function detToSource(
       ),
       seller_sku: String(d.data.product?.sellerSku ?? fallbackSellerSku),
       item_name: d.data.product?.name || fallbackName,
-      variant_name: String(d.data.product?.variantName ?? ""),
+      // Petunjuk varian = variantName + catatan pembeli (sama dengan
+      // blibli-resi.ts — ukuran/warna sering hanya ada di notes).
+      variant_name: [
+        String(d.data.product?.variantName ?? ""),
+        String(d.data.product?.notes ?? "").trim(),
+      ]
+        .filter((s) => s !== "")
+        .join(" | "),
       qty: Number(d.data.quantity) > 0 ? Number(d.data.quantity) : 0,
     },
     status: st,

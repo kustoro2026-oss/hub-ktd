@@ -17,7 +17,9 @@
 // Perbedaan dengan TikTok: kunci antrean = packageId (satu paket = satu
 // label = satu slot resi Aneka); kunci pemetaan = productSku blibliSku
 // (tingkat produk seperti product_id TikTok — satu baris menaungi semua
-// varian); petunjuk varian = product.variantName dari detail order item.
+// varian); petunjuk varian = product.variantName + product.notes (catatan
+// pembeli, mis. "ukuran 40") dari detail order item — untuk listing tanpa
+// varian, ukuran/warna sering hanya ada di notes.
 import { findAnekaCatalogById } from "@/lib/aneka-map";
 import {
   anekaCheckoutToken,
@@ -62,8 +64,9 @@ export type BlibliExecItem = {
   /** Seller SKU baris mass-upload (tampilan/identifikasi saja). */
   seller_sku: string;
   item_name: string;
-  /** Nama varian dari detail order item Blibli (padanan sku_name TikTok —
-   *  petunjuk utama mencocokkan varian Aneka). */
+  /** Nama varian + catatan pembeli (product.notes) dari detail order item
+   *  Blibli — petunjuk utama mencocokkan varian Aneka (padanan sku_name
+   *  TikTok). Untuk listing tanpa varian, ukuran/warna ada di catatan. */
   variant_name: string;
   qty: number;
   aneka_product_id: string;

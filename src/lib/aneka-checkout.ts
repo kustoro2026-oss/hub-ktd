@@ -289,19 +289,24 @@ function variantScore(
   return score;
 }
 
-/** Ukuran numerik dari teks (mis. "100 ml" → {num:100, unit:"ml"}). */
+/** Ukuran numerik dari teks (mis. "100 ml" → {num:100, unit:"ml"}).
+ *  Ambil angka TERAKHIR — nama produk sering memuat angka yang bukan ukuran
+ *  (mis. "S 06" pada sandal), sedangkan ukuran/warna pembeli biasanya
+ *  disebut belakangan (mis. "... S 06 ... ukuran 40" → 40, bukan 6). */
 function extractSize(
   text: string,
 ): { num: number; unit: string | null } | null {
-  const m =
-    /(\d+(?:[.,]\d+)?)\s*(ml|milliliter|mililiter|liter|lt|l|kg|kilogram|gram|gr|g)?\b/i.exec(
-      text,
-    );
-  if (!m) return null;
-  return {
-    num: parseFloat(m[1].replace(",", ".")),
-    unit: m[2] ? m[2].toLowerCase() : null,
-  };
+  const re =
+    /(\d+(?:[.,]\d+)?)\s*(ml|milliliter|mililiter|liter|lt|l|kg|kilogram|gram|gr|g)?\b/gi;
+  let m: RegExpExecArray | null;
+  let last: { num: number; unit: string | null } | null = null;
+  while ((m = re.exec(text)) !== null) {
+    last = {
+      num: parseFloat(m[1].replace(",", ".")),
+      unit: m[2] ? m[2].toLowerCase() : null,
+    };
+  }
+  return last;
 }
 
 /** Bandingkan ukuran petunjuk vs varian (ml-normalisasi bila bersatuan). */
@@ -487,11 +492,16 @@ export async function anekaResolveVariant(
       const v = list.sort((a, b) => Number(a.id) - Number(b.id))[0];
       return { ok: true, variantId: String(v.id), label: v.label ?? v.name };
     }
+    // Gagal pasti: daftar pilihan diurutkan kandidat paling cocok dulu
+    // (skor tertinggi) supaya baris ukuran/warna yang relevan terbaca dulu.
+    const kandidat = list
+      .map((v) => ({ v, score: variantScore(v, tokens) }))
+      .sort((a, b) => b.score - a.score || Number(a.v.id) - Number(b.v.id));
     return {
       ok: false,
-      detail: `Produk ${productId} punya ${list.length} varian dan pesanan "${variantHint}" tidak bisa dicocokkan dengan pasti. Pilihan: ${list
+      detail: `Produk ${productId} punya ${list.length} varian dan pesanan "${variantHint}" tidak bisa dicocokkan dengan pasti. Pilihan: ${kandidat
         .map(
-          (v) =>
+          ({ v }) =>
             `${v.id} = ${(teksVar(v) || "?").trim()} (stok ${v.stock ?? "?"})`,
         )
         .join("; ")}`,
