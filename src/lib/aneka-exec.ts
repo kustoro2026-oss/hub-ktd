@@ -18,7 +18,11 @@ import {
   anekaCheckoutToken,
   anekaCreatePayment,
   anekaFindOrderByPayment,
+  anekaFormatRp,
+  anekaKeranjangCheck,
   anekaLogin,
+  anekaNamaCocok,
+  anekaNamaMuatDiHtml,
   anekaPaymentEvidence,
   anekaProcessPayment,
   anekaResolveVariant,
@@ -37,11 +41,13 @@ import {
 } from "@/lib/aneka-audit";
 import {
   appendTiktokOrderExecLog,
+  claimAnekaAkun,
   claimTiktokOrderExecPrepared,
   claimTiktokOrderExecRunning,
   getAnekaProductMap,
   getTiktokOrderExec,
   listTiktokShopTokens,
+  releaseAnekaAkun,
   saveTiktokOrderExec,
   setTiktokOrderExecPayment,
   updateTiktokOrderExecPayloadIfUnchanged,
@@ -639,20 +645,33 @@ type BuktiTerbayar = {
   keterangan: string;
 };
 
-/** Cari bukti pesanan ini sudah pernah dibayar di Aneka — kandidat
- *  payment_id (kolom + log) diperiksa lewat halaman finish (kode ORDER
- *  numerik yang memuat payment_id), lalu payment_id/nomor resi discan di
- *  daftar /payment-history beberapa halaman pertama. Resi unik per pesanan
- *  TikTok — penanda paling andal bahwa pesanan ini sudah dibelikan. */
+/** Cari bukti pesanan ini SUDAH terbayar di Aneka — dan terbayar untuk ISI
+ *  pesanan INI, bukan sekadar payment dengan id sama. Peristiwa 28 Okt 2026:
+ *  payment 243290 (berisi produk TikTok) ikut di-claim sebagai bukti
+ *  pembayaran paket Blibli karena kode ORDER memuat payment_id — padahal
+ *  isinya berbeda. Sejak itu bukti wajib lolos verifikasi ISI: semua nama
+ *  produk harapan muncul di halaman finish (token ≥60%) ATAU total rupiahnya
+ *  cocok. Resi unik per pesanan — penanda paling andal, tetap dipakai. */
 async function cariBuktiTerbayar(
   session: AnekaSession,
   anekaPaymentId: string,
   log: string,
   resi: string,
+  harapan: string[],
+  totalHarapan: number,
+  catat?: (teks: string) => void,
 ): Promise<BuktiTerbayar | null> {
   const kandidat = new Set<string>();
   if (anekaPaymentId) kandidat.add(anekaPaymentId);
   for (const m of log.matchAll(/payment_id (\d+)/g)) kandidat.add(m[1]);
+
+  const isiOke = (html: string): boolean => {
+    const namaOke =
+      harapan.length > 0 && harapan.every((h) => anekaNamaMuatDiHtml(h, html));
+    const totalOke =
+      totalHarapan > 0 && html.includes(anekaFormatRp(totalHarapan));
+    return namaOke || totalOke;
+  };
 
   for (const id of kandidat) {
     const found = await anekaFindOrderByPayment(session, id);
@@ -661,24 +680,16 @@ async function cariBuktiTerbayar(
       found.orderCode &&
       new RegExp(`ORDER-${id}-\\d{6,}`).test(found.orderCode)
     ) {
-      return {
-        paymentId: id,
-        orderCode: found.orderCode,
-        keterangan: `kode pesanan ${found.orderCode} memuat payment ${id}`,
-      };
-    }
-  }
-  for (const id of kandidat) {
-    // "Terdaftar di riwayat" BUKAN bukti bayar sejak 2026-10 — payment
-    // Pending (belum dibayar) juga tampil di /payment-history. Bukti (b)
-    // hanya sah bila status barisnya non-Pending.
-    const ev = await anekaPaymentEvidence(session, id);
-    if (ev.found && !ev.pending) {
-      return {
-        paymentId: id,
-        orderCode: "",
-        keterangan: `payment ${id} terdaftar di riwayat pembayaran (status ${ev.status || "non-pending"})`,
-      };
+      if (isiOke(found.html)) {
+        return {
+          paymentId: id,
+          orderCode: found.orderCode,
+          keterangan: `kode pesanan ${found.orderCode} memuat payment ${id} dan isinya cocok dengan pesanan ini`,
+        };
+      }
+      catat?.(
+        `payment ${id} punya kode ORDER ${found.orderCode} tetapi ISINYA bukan pesanan ini — dilewati`,
+      );
     }
   }
   if (resi) {
@@ -694,6 +705,25 @@ async function cariBuktiTerbayar(
   return null;
 }
 
+/** Nama produk harapan + total rupiah dari payload tersimpan — bahan
+ *  verifikasi ISI bukti pembayaran (halaman finish Aneka). */
+function harapanDariPayload(payloadStr: string): {
+  nama: string[];
+  total: number;
+} {
+  try {
+    const p = JSON.parse(payloadStr) as AnekaExecPayload;
+    return {
+      nama: (p.items ?? [])
+        .map((it) => (it.aneka_product_name || it.product_name).trim())
+        .filter(Boolean),
+      total: p.total_modal + ONGKOS_PACKING_AUDIT,
+    };
+  } catch {
+    return { nama: [], total: 0 };
+  }
+}
+
 /** Tandai baris selesai dari bukti pembayaran sebelumnya (tanpa membayar
  *  ulang) + kabari WA. */
 async function pulihkanSelesai(
@@ -701,6 +731,7 @@ async function pulihkanSelesai(
   payload: string,
   bukti: BuktiTerbayar,
 ): Promise<{ ok: boolean; detail: string }> {
+  await releaseAnekaAkun(`tiktok:${orderId}`);
   const nowUtc = new Date().toISOString().slice(0, 19).replace("T", " ");
   await saveTiktokOrderExec({
     order_id: orderId,
@@ -737,6 +768,7 @@ async function blokirCekManual(
   log: string,
   detail: string,
 ): Promise<{ ok: false; detail: string }> {
+  await releaseAnekaAkun(`tiktok:${orderId}`);
   const cd = infoCooldownBayar(log);
   const tunggu =
     cd && Date.now() - cd.ms < COOLDOWN_PAY_MS
@@ -803,11 +835,15 @@ export async function executeAnekaOrder(
           `percobaan sebelumnya sampai langkah pembayaran, tetapi login Aneka untuk verifikasi gagal (${login.detail})`,
         );
       }
+      const hp = harapanDariPayload(row.payload);
       const bukti = await cariBuktiTerbayar(
         login.session,
         row.aneka_payment_id,
         row.log,
         resiDariPayload(row.payload),
+        hp.nama,
+        hp.total,
+        (t) => appendTiktokOrderExecLog(orderId, `${new Date().toISOString().slice(0, 19).replace("T", " ")} | anti-dobel | ${t}`),
       );
       if (bukti) return pulihkanSelesai(orderId, row.payload, bukti);
       return blokirCekManual(
@@ -869,7 +905,10 @@ export async function executeAnekaOrder(
     };
   }
 
+  const akunPemilik = `tiktok:${orderId}`;
+
   const gagal = async (detail: string) => {
+    await releaseAnekaAkun(akunPemilik);
     await saveTiktokOrderExec({
       order_id: orderId,
       status: "gagal",
@@ -909,6 +948,24 @@ export async function executeAnekaOrder(
 
   await logStep("mulai", "rantai checkout Aneka dijalankan");
 
+  // KUNCI AKUN GLOBAL: satu akun Aneka = satu rantai checkout pada satu
+  // waktu — payment/create Aneka MEMANFAATKAN ULANG payment terbuka akun
+  // (terbukti 28 Okt 2026: eksekusi Blibli dan TikTok berbagi payment
+  // 243290 dan berakhir dengan pembayaran yang salah di-claim). Kunci ini
+  // menyelaraskan eksekusi lintas marketplace supaya rantai checkout tidak
+  // pernah tumpang tindih.
+  const akunClaimed = await claimAnekaAkun(akunPemilik);
+  if (!akunClaimed) {
+    await logStep(
+      "kunci-akun",
+      "GAGAL — akun Aneka sedang dipakai eksekusi lain",
+    );
+    return gagal(
+      "Akun Aneka sedang dipakai eksekusi lain — tunggu sebentar lalu coba lagi",
+    );
+  }
+  await logStep("kunci-akun", "akun Aneka dikunci untuk rantai ini");
+
   // 2. Pastikan pesanan TikTok masih aktif (belum dibatalkan pembeli)
   //    SEBELUM memindahkan saldo — mencegah bayar pesanan yang batal.
   const aktif = await tiktokOrderStillActive(orderId);
@@ -925,6 +982,7 @@ export async function executeAnekaOrder(
     await sendExecNotice(
       `Eksekusi Aneka DIBATALKAN untuk pesanan TikTok ${orderId}: ${aktif.detail}`,
     );
+    await releaseAnekaAkun(akunPemilik);
     return { ok: false, detail: aktif.detail };
   }
   await logStep("cek-pesanan", `pesanan masih aktif (status ${aktif.detail})`);
@@ -977,11 +1035,15 @@ export async function executeAnekaOrder(
         }
       } else {
         login = { ok: true as const, session: loginG.session };
+        const hp = harapanDariPayload(row.payload);
         const bukti = await cariBuktiTerbayar(
           loginG.session,
           row.aneka_payment_id,
           row.log,
           payload.tracking_number,
+          hp.nama,
+          hp.total,
+          (t) => logStep("anti-dobel", t),
         );
         if (bukti) {
           await logStep(
@@ -1036,6 +1098,42 @@ export async function executeAnekaOrder(
   // coba ulang (jangan sampai jejak pembayaran hilang seperti kejadian
   // pembayaran dobel).
   await setTiktokOrderExecPayment(orderId, pay.paymentId);
+
+  // PENGAMAN KERANJANG (lapis 2): payment/create bisa saja mengembalikan
+  // payment lama yang masih berisi barang eksekusi lain (Aneka memakai
+  // ulang payment terbuka). Keranjang wajib kosong ATAU hanya berisi barang
+  // pesanan ini dari percobaan sebelumnya — bila ada nama produk asing,
+  // jangan menumpang: hentikan.
+  const keranjang = await anekaKeranjangCheck(login.session, pay.paymentId);
+  if (!keranjang.ok) {
+    await logStep("cek-keranjang", `GAGAL — ${keranjang.detail}`);
+    return gagal(
+      `Keranjang payment ${pay.paymentId} tidak terbaca (${keranjang.detail}) — coba lagi`,
+    );
+  }
+  const namaHarapan = payload.items
+    .map((it) => (it.aneka_product_name || it.product_name).trim())
+    .filter(Boolean);
+  const asing = keranjang.nama.filter(
+    (n) => !namaHarapan.some((h) => anekaNamaCocok(n, h)),
+  );
+  if (asing.length > 0) {
+    await logStep(
+      "cek-keranjang",
+      `DITOLAK — payment ${pay.paymentId} berisi barang eksekusi lain: ${asing
+        .slice(0, 3)
+        .join("; ")}`,
+    );
+    return gagal(
+      `Payment ${pay.paymentId} adalah payment lama yang masih berisi barang pesanan lain (${asing[0]}) — periksa https://anekadropship.id/payment-history lalu coba lagi`,
+    );
+  }
+  await logStep(
+    "cek-keranjang",
+    keranjang.jumlah > 0
+      ? `payment ${pay.paymentId} sudah berisi barang pesanan ini (percobaan sebelumnya) — lanjut`
+      : `payment ${pay.paymentId} kosong — lanjut`,
+  );
 
   // 1b. Tentukan varian produk ber-varian yang belum dipetakan manual
   //     (data varian diambil dari halaman produk Aneka; nama varian pesanan
@@ -1148,6 +1246,7 @@ export async function executeAnekaOrder(
     "notif",
     notif.startsWith("ok") ? `WA terkirim — ${notif}` : `WA GAGAL — ${notif}`,
   );
+  await releaseAnekaAkun(akunPemilik);
   return {
     ok: true,
     detail: `Selesai — ID pembayaran Aneka: ${pay.paymentId}${anekaId ? ` (${anekaId})` : ""}`,

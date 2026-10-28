@@ -795,6 +795,12 @@ function migrateSqlite(db: DatabaseSync) {
       executed_at TEXT NOT NULL DEFAULT ''
     );
 
+    CREATE TABLE IF NOT EXISTS aneka_akun_claim (
+      kunci TEXT PRIMARY KEY,
+      pemilik TEXT NOT NULL DEFAULT '',
+      sampai INTEGER NOT NULL DEFAULT 0
+    );
+
     CREATE TABLE IF NOT EXISTS aturan_harga (
       id TEXT PRIMARY KEY,
       marketplace TEXT NOT NULL DEFAULT '',
@@ -1637,6 +1643,12 @@ async function migratePg(pool: Pool) {
       log TEXT NOT NULL DEFAULT '',
       created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       executed_at TEXT NOT NULL DEFAULT ''
+    );
+
+    CREATE TABLE IF NOT EXISTS aneka_akun_claim (
+      kunci TEXT PRIMARY KEY,
+      pemilik TEXT NOT NULL DEFAULT '',
+      sampai BIGINT NOT NULL DEFAULT 0
     );
 
     CREATE TABLE IF NOT EXISTS aturan_harga (
@@ -3948,6 +3960,44 @@ export async function claimBlibliOrderExecPrepared(
     [packageId, storeCode, payload],
   );
   return !!r;
+}
+
+// ---------- Kunci global akun Aneka (satu rantai checkout pada satu waktu) ----------
+
+/** Klaim kunci akun Aneka (kunci 'aneka-utama') untuk satu rantai checkout.
+ *  Berhasil bila kunci bebas/kedaluwarsa ATAU sudah dipegang pemilik yang
+ *  sama (coba ulang rantai yang sama). Aneka MEMANFAATKAN ULANG payment
+ *  terbuka akun — dua rantai berjalan bersamaan bisa berbagi payment_id
+ *  (peristiwa 28 Okt 2026: Blibli & TikTok sama-sama dapat payment 243290) —
+ *  kunci ini menyelaraskan eksekusi lintas marketplace. TTL panjang agar
+ *  rantai yang lambat tidak kedaluwarsa di tengah jalan; release dini
+ *  tetap dilakukan lewat releaseAnekaAkun bila rantai selesai/gagal. */
+export async function claimAnekaAkun(
+  pemilik: string,
+  ttlMs = 15 * 60 * 1000,
+): Promise<boolean> {
+  const now = Date.now();
+  const sampai = now + ttlMs;
+  const r = await queryOne<{ pemilik: string }>(
+    `INSERT INTO aneka_akun_claim (kunci, pemilik, sampai)
+     VALUES ('aneka-utama', ?, ?)
+     ON CONFLICT (kunci) DO UPDATE
+       SET pemilik = EXCLUDED.pemilik, sampai = EXCLUDED.sampai
+       WHERE aneka_akun_claim.sampai < ? OR aneka_akun_claim.pemilik = EXCLUDED.pemilik
+     RETURNING pemilik`,
+    [pemilik, sampai, now],
+  );
+  return r?.pemilik === pemilik;
+}
+
+/** Lepas kunci akun Aneka — hanya bila masih dipegang pemilik yang sama
+ *  (kunci milik rantai lain tidak boleh diambil alih). */
+export async function releaseAnekaAkun(pemilik: string): Promise<void> {
+  await queryRun(
+    `UPDATE aneka_akun_claim SET sampai = 0
+     WHERE kunci = 'aneka-utama' AND pemilik = ?`,
+    [pemilik],
+  );
 }
 
 // ---------- Riwayat resi pesanan Lazada (deteksi pesanan baru) ----------

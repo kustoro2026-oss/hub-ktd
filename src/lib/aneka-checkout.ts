@@ -676,11 +676,18 @@ export async function anekaProcessPayment(
  * (lama) atau ORDER-XXXX alfanumerik (baru) — diambil dari halaman bila
  * tampil. Fallback: bila halaman detail tidak membuahkan hasil, pola
  * lama ORDER-{payment_id}-{ts} dicari di /riwayat-pemesanan.
+ *
+ * html = isi halaman finish (untuk verifikasi ISI bukti — peristiwa
+ * 28 Okt 2026: payment 243290 berisi produk TikTok dipakai menandai paket
+ * Blibli selesai karena verifikasi hanya melihat kode ORDER yang memuat
+ * payment_id, tanpa mengecek produk di dalamnya).
  */
 export async function anekaFindOrderByPayment(
   s: AnekaSession,
   paymentId: string,
-): Promise<{ ok: true; orderCode: string } | { ok: false; detail: string }> {
+): Promise<
+  { ok: true; orderCode: string; html: string } | { ok: false; detail: string }
+> {
   try {
     const res = await fetchRetry(
       s.cookie,
@@ -690,7 +697,7 @@ export async function anekaFindOrderByPayment(
     const html = await res.text();
     if (res.status === 200) {
       const m = /ORDER-(?:\d{4,}-\d{6,}|[A-Z0-9]{6,})/.exec(html);
-      return { ok: true, orderCode: m?.[0] ?? "" };
+      return { ok: true, orderCode: m?.[0] ?? "", html };
     }
     const old = await fetchRetry(
       s.cookie,
@@ -699,11 +706,112 @@ export async function anekaFindOrderByPayment(
     );
     const oldHtml = await old.text();
     const m2 = new RegExp(`ORDER-${paymentId}-\\d{6,}`).exec(oldHtml);
-    return { ok: true, orderCode: m2?.[0] ?? "" };
+    return { ok: true, orderCode: m2?.[0] ?? "", html: oldHtml };
   } catch (e) {
     return {
       ok: false,
       detail: `Gagal membaca riwayat: ${e instanceof Error ? e.message : "kesalahan tidak dikenal"}`,
+    };
+  }
+}
+
+/** Decode entitas HTML (&amp; &lt; &gt; &quot; &#039;/&#0?39;) — nama
+ *  produk di halaman Aneka disimpan ter-encode, harus dinormalisasi
+ *  sebelum dibandingkan dengan nama dari katalog/DB. */
+export function anekaDecodeHtml(s: string): string {
+  return s
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#0?39;/g, "'");
+}
+
+/** Cocokkan dua nama produk dengan normalisasi longgar: sama persis, salah
+ *  satu memuat yang lain (minimal 10 karakter supaya kata pendek generik
+ *  tidak tertabrak), atau ≥60% token ≥4 karakter cocok — halaman Aneka
+ *  sering memotong nama panjang dengan ellipsis ("…") sehingga containment
+ *  saja bisa meleset. */
+export function anekaNamaCocok(teksA: string, teksB: string): boolean {
+  const n = (x: string) =>
+    anekaDecodeHtml(x).toLowerCase().replace(/\s+/g, " ").trim();
+  const a = n(teksA);
+  const b = n(teksB);
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (a.length >= 10 && b.length >= 10 && (a.includes(b) || b.includes(a))) {
+    return true;
+  }
+  const toks = (x: string) =>
+    x.split(/[^a-z0-9]+/).filter((t) => t.length >= 4);
+  const ta = toks(a);
+  const tb = toks(b);
+  const src = ta.length <= tb.length ? ta : tb;
+  const dst = ta.length <= tb.length ? tb : ta;
+  if (!src.length) return false;
+  let hit = 0;
+  for (const t of src) if (dst.includes(t)) hit++;
+  return hit >= Math.ceil(src.length * 0.6);
+}
+
+/** Apakah nama produk (harapan) muncul di isi halaman HTML Aneka meski
+ *  ter-encode dan/atau terpotong ellipsis? Minimal 60% token ≥4 karakter
+ *  nama harus muncul di teks halaman (nama kosong → false). */
+export function anekaNamaMuatDiHtml(harapan: string, html: string): boolean {
+  const h = (harapan || "").trim();
+  if (!h) return false;
+  const toks = anekaDecodeHtml(h)
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .filter((t) => t.length >= 4);
+  if (!toks.length) return false;
+  const hay = anekaDecodeHtml(html).toLowerCase();
+  let hit = 0;
+  for (const t of toks) if (hay.includes(t)) hit++;
+  return hit >= Math.ceil(toks.length * 0.6);
+}
+
+/** Format rupiah gaya Aneka (tanpa spasi/desimal): 61500 → "Rp61.500" —
+ *  untuk mencocokkan total pembayaran di halaman finish. */
+export function anekaFormatRp(n: number): string {
+  return "Rp" + Math.round(n).toLocaleString("id-ID").replace(/\s/g, ".");
+}
+
+/** Isi keranjang payment (halaman /checkout-barang/{payment_id}): jumlah
+ *  slot resi + nama-nama produk yang tampil. Payment dibuat Aneka dengan
+ *  MEMANFAATKAN ULANG payment terbuka akun (terbukti 28 Okt 2026: dua
+ *  eksekusi berbeda dapat payment_id yang sama) — sebelum menambah barang,
+ *  keranjang wajib diperiksa supaya rantai tidak menumpang payment milik
+ *  eksekusi lain. */
+export async function anekaKeranjangCheck(
+  s: AnekaSession,
+  paymentId: string,
+): Promise<
+  { ok: true; jumlah: number; nama: string[] } | { ok: false; detail: string }
+> {
+  try {
+    const res = await fetchRetry(
+      s.cookie,
+      `${BASE}/checkout-barang/${paymentId}`,
+      { redirect: "manual" },
+    );
+    const html = await res.text();
+    const jumlah = (html.match(/name="item_resi\[(\d+)\]"/g) ?? []).length;
+    const nama: string[] = [];
+    for (const m of html.matchAll(/<td[^>]*>([^<]{4,200})<\/td>/g)) {
+      const t = anekaDecodeHtml(m[1]).replace(/\s+/g, " ").trim();
+      if (!t) continue;
+      // Buang sel yang jelas bukan nama produk (rupiah, angka, status).
+      if (/^Rp[\d.]+$/.test(t)) continue;
+      if (/^\d+$/.test(t)) continue;
+      if (/^(DIKIRIM|DIPROSES|PENDING|SUKSES|SELESAI)$/i.test(t)) continue;
+      nama.push(t);
+    }
+    return { ok: true, jumlah, nama };
+  } catch (e) {
+    return {
+      ok: false,
+      detail: `Gagal membaca keranjang: ${e instanceof Error ? e.message : "kesalahan tidak dikenal"}`,
     };
   }
 }
