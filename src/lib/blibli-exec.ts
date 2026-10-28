@@ -78,6 +78,10 @@ export type BlibliExecItem = {
    *  dengan variant_name saat mencocokkan varian Aneka, karena API Blibli
    *  tidak memuat warna pilihan pembeli untuk listing satu varian. */
   warna_hint: string;
+  /** Label varian Aneka terpilih hasil audit (nama + warna + ukuran) —
+   *  ditampilkan di notif WA & halaman Eksekusi supaya pemilik bisa
+   *  memeriksa sebelum menekan Setuju. */
+  aneka_variant_label?: string;
   qty: number;
   aneka_product_id: string;
   aneka_variant_id: string;
@@ -154,14 +158,34 @@ export function mergeBlibliExecItems(items: BlibliExecItem[]): BlibliExecItem[] 
   return [...merged.values()];
 }
 
+/** Kata warna (ID/EN) untuk penjaga konflik dengan warna_hint. */
+const WARNA_KONFLIK = [
+  "merah", "hitam", "putih", "biru", "hijau", "kuning", "ungu", "orange",
+  "oranye", "pink", "abu", "coklat", "cokelat", "cream", "krem", "mocca",
+  "beige", "gold", "silver", "red", "black", "white", "blue", "green",
+  "yellow", "purple", "gray", "grey", "brown", "lilac", "mint", "peach",
+  "navy", "maroon", "tosca",
+];
+
 /** Petunjuk varian lengkap = nama varian + catatan pembeli + warna default
  *  SKU (warna_hint dari Pemetaan, bila diisi) — dipakai audit varian dan
- *  pencocokan varian Aneka saat eksekusi. */
+ *  pencocokan varian Aneka saat eksekusi. Bila catatan pembeli menyebut
+ *  warna yang BEDA dari warna_hint, warna_hint diabaikan — pembeli yang
+ *  menang, bukan tebakan default (mencegah salah beli warna). */
 function petunjukVarianBlibli(it: BlibliExecItem): string {
-  return [it.variant_name, it.warna_hint]
-    .map((s) => (s ?? "").trim())
-    .filter(Boolean)
-    .join(" | ");
+  const hint = (it.warna_hint ?? "").trim();
+  const pembeli = (it.variant_name ?? "").trim();
+  if (!hint) return pembeli;
+  const warnaPembeli = WARNA_KONFLIK.filter((c) =>
+    new RegExp(`\\b${c}\\b`).test(pembeli.toLowerCase()),
+  );
+  if (
+    warnaPembeli.length > 0 &&
+    !warnaPembeli.some((c) => hint.toLowerCase().includes(c))
+  ) {
+    return pembeli; // konflik warna — abaikan warna_hint
+  }
+  return [pembeli, hint].filter(Boolean).join(" | ");
 }
 
 /** Cek apakah SEMUA item paket sudah dipetakan ke Aneka (dan ada di katalog
@@ -269,6 +293,7 @@ export async function prepareBlibliExec(
   );
   va.hasil.forEach((h, i) => {
     if (h.variantId) payload.items[i].aneka_variant_id = h.variantId;
+    if (h.label) payload.items[i].aneka_variant_label = h.label;
   });
   auditBlockers.push(...va.blockers);
   if (!official?.pdf?.length) {
@@ -322,7 +347,7 @@ export async function prepareBlibliExec(
   const baris = check.items
     .map(
       (it) =>
-        `- ${it.qty}x ${it.item_name}${it.variant_name ? ` (${it.variant_name})` : ""} (${fmtRp(it.subtotal)})`,
+        `- ${it.qty}x ${it.item_name}${it.variant_name ? ` (${it.variant_name})` : ""}${it.aneka_variant_label ? ` → ${it.aneka_variant_label}` : ""} (${fmtRp(it.subtotal)})`,
     )
     .join("\n");
   const auditTeks =
@@ -373,6 +398,7 @@ export async function auditKesiapanBlibli(
   );
   va.hasil.forEach((h, i) => {
     if (h.variantId) payload.items[i].aneka_variant_id = h.variantId;
+    if (h.label) payload.items[i].aneka_variant_label = h.label;
   });
   blockers.push(...va.blockers);
 

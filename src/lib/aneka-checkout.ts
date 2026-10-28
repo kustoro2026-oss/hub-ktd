@@ -474,6 +474,19 @@ export async function anekaResolveVariant(
     }
     const teksVar = (v: (typeof list)[number]) =>
       [v.name ?? "", v.label ?? "", v.size ?? ""].join(" ");
+    // Label lengkap untuk tampilan — sertakan warna & ukuran (kolom
+    // terpisah di data varian Aneka) supaya pemilik toko bisa memeriksa
+    // varian terpilih sebelum Setuju. Label Aneka kadang sudah memuat
+    // gabungan "nama / warna / ukuran" — jangan duplikasi.
+    const labelVar = (v: (typeof list)[number]) => {
+      const nama = (v.name ?? "").trim();
+      const lbl = (v.label ?? "").trim();
+      const base = lbl && lbl !== nama ? lbl : nama;
+      const extra = [v.color ?? "", v.size ?? ""]
+        .map((s) => s.trim())
+        .filter((s) => s !== "" && !base.toLowerCase().includes(s.toLowerCase()));
+      return [base, ...extra].join(" ");
+    };
     if (list.length === 1) {
       const v = list[0];
       const teks = teksVar(v);
@@ -504,7 +517,7 @@ export async function anekaResolveVariant(
           };
         }
       }
-      return { ok: true, variantId: String(v.id), label: v.label ?? v.name };
+      return { ok: true, variantId: String(v.id), label: labelVar(v) };
     }
     // Banyak varian → cocokkan token petunjuk terhadap teks tiap varian.
     const hint = normVar(variantHint);
@@ -514,7 +527,7 @@ export async function anekaResolveVariant(
     );
     if (exact.length === 1) {
       const v = exact[0];
-      return { ok: true, variantId: String(v.id), label: v.label ?? v.name };
+      return { ok: true, variantId: String(v.id), label: labelVar(v) };
     }
     const scored = list
       .map((v) => ({ v, score: variantScore(v, tokens) }))
@@ -522,14 +535,14 @@ export async function anekaResolveVariant(
       .sort((a, b) => b.score - a.score);
     if (scored.length === 1 || (scored.length > 1 && scored[0].score > scored[1].score)) {
       const v = scored[0].v;
-      return { ok: true, variantId: String(v.id), label: v.label ?? v.name };
+      return { ok: true, variantId: String(v.id), label: labelVar(v) };
     }
     // Fallback: bila petunjuk generik ("Default") dan varian hanya beda
     // kemasan (bubble wrap, paket bonus, dll), auto-pick varian pertama —
     // produk fisiknya sama, pembeli tidak perlu memilih.
     if (isGenericHint(variantHint) && isPackagingOnlyDifference(list)) {
       const v = list.sort((a, b) => Number(a.id) - Number(b.id))[0];
-      return { ok: true, variantId: String(v.id), label: v.label ?? v.name };
+      return { ok: true, variantId: String(v.id), label: labelVar(v) };
     }
     // Gagal pasti: daftar pilihan diurutkan kandidat paling cocok dulu
     // (skor tertinggi) supaya baris ukuran/warna yang relevan terbaca dulu.
@@ -541,7 +554,7 @@ export async function anekaResolveVariant(
       detail: `Produk ${productId} punya ${list.length} varian dan pesanan "${variantHint}" tidak bisa dicocokkan dengan pasti. Pilihan: ${kandidat
         .map(
           ({ v }) =>
-            `${v.id} = ${(teksVar(v) || "?").trim()} (stok ${v.stock ?? "?"})`,
+            `${v.id} = ${(labelVar(v) || "?").trim()} (stok ${v.stock ?? "?"})`,
         )
         .join("; ")}`,
     };

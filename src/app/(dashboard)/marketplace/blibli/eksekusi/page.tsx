@@ -74,6 +74,7 @@ export default async function EksekusiBlibliPage({
       qty: number;
       item_name?: string;
       variant_name?: string;
+      aneka_variant_label?: string;
       subtotal: number;
     }[];
   };
@@ -97,7 +98,7 @@ export default async function EksekusiBlibliPage({
       items: (payload?.items ?? []).map((it) => ({
         qty: it.qty,
         name: it.variant_name
-          ? `${it.item_name ?? ""} (${it.variant_name})`
+          ? `${it.item_name ?? ""} (${it.variant_name})${it.aneka_variant_label ? ` → ${it.aneka_variant_label}` : ""}`
           : it.item_name ?? "",
         subtotal: fmtRp(it.subtotal),
       })),
