@@ -78,8 +78,13 @@ export async function fetchRetry(
   let lastErr: unknown = null;
   for (let i = 0; i < attempts; i++) {
     try {
+      // Batas waktu per permintaan: koneksi yang menggantung (server
+      // menerima tetapi tidak pernah membalas) TANPA batas waktu akan
+      // menggantung sampai fungsi serverless dimatikan paksa — peristiwa
+      // 28 Okt 2026: eksekusi paket Blibli macet 10+ menit di login.
       return await fetch(url, {
         ...init,
+        signal: init.signal ?? AbortSignal.timeout(30_000),
         headers: {
           "User-Agent": UA,
           ...(cookie ? { Cookie: cookie } : {}),
@@ -87,7 +92,10 @@ export async function fetchRetry(
         },
       });
     } catch (e) {
-      lastErr = e;
+      lastErr =
+        e instanceof Error && e.name === "AbortError"
+          ? new Error("anekadropship.id tidak merespons (timeout)")
+          : e;
       if (i < attempts - 1) await sleep(1200 * (i + 1));
     }
   }
@@ -395,7 +403,7 @@ export async function anekaResolveVariant(
     }
     const html = await res.text();
     const re = new RegExp(
-      `&quot;id&quot;:${productId},[\\s\\S]{0,300}?&quot;has_variants&quot;:(true|false)[\\s\\S]{0,300}?&quot;variants&quot;:(\\[[^\\]]*\\])`,
+      `&quot;id&quot;:${productId},[\\s\\S]{0,300}?&quot;has_variants&quot;:(true|false)`,
     );
     const m = re.exec(html);
     if (!m) {
@@ -405,7 +413,38 @@ export async function anekaResolveVariant(
       };
     }
     if (m[1] !== "true") return { ok: true }; // produk tanpa varian (spt #57)
-    const json = m[2]
+    // Ekstrak array variants dengan pemindaian kedalaman kurung — nama
+    // varian bisa memuat tanda kurung (mis. "[BIOZARIA] Proca Sachet")
+    // yang memotong regex naif (\\[[^\\]]*\\]) dan membuat JSON gagal
+    // dibaca terus-menerus (28 Okt 2026: 8 produk selalu gagal audit).
+    const iVar = html.indexOf("&quot;variants&quot;:", m.index);
+    if (iVar < 0) {
+      return {
+        ok: false,
+        detail: `Data varian produk ${productId} tidak ditemukan di halaman produk`,
+      };
+    }
+    const bracketStart = html.indexOf("[", iVar);
+    if (bracketStart < 0) {
+      return { ok: false, detail: `Data varian produk ${productId} tidak bisa dibaca` };
+    }
+    let depth = 0;
+    let bracketEnd = -1;
+    for (let i = bracketStart; i < html.length; i++) {
+      if (html[i] === "[") depth++;
+      else if (html[i] === "]") {
+        depth--;
+        if (depth === 0) {
+          bracketEnd = i;
+          break;
+        }
+      }
+    }
+    if (bracketEnd < 0) {
+      return { ok: false, detail: `Data varian produk ${productId} tidak bisa dibaca` };
+    }
+    const json = html
+      .slice(bracketStart, bracketEnd + 1)
       .replace(/&quot;/g, '"')
       .replace(/&amp;/g, "&")
       .replace(/&#0?39;/g, "'")
