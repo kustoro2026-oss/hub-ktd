@@ -63,6 +63,13 @@ export default async function EksekusiTikTokPage({
     shop_name?: string;
     tracking_number?: string;
     total_modal?: number;
+    label_pdf_base64?: string;
+    audit?: {
+      at: number;
+      ok: boolean;
+      blockers: { kode: string; teks: string }[];
+      saldo?: number;
+    };
     items?: {
       qty: number;
       product_name?: string;
@@ -99,6 +106,10 @@ export default async function EksekusiTikTokPage({
       log: logWib(r.log),
       created_at: waktuWib(r.created_at),
       executed_at: waktuWib(r.executed_at),
+      audit: payload?.audit ?? null,
+      // Label PDF resmi valid ditandai awalan sihir "%PDF-" (dipakai
+      // aneka-exec.ts dan tiktok-label.ts).
+      label_siap: payload?.label_pdf_base64?.startsWith("%PDF-") ?? false,
     };
   });
 

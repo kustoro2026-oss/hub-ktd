@@ -221,50 +221,62 @@ async function arrangeShipment(
   const slots = await getPackageHandoverTimeSlots(cred, packageId);
   if (!slots.ok) return { ok: false, result: slots.detail };
 
+  // Alasan slot penjemputan tidak bisa dipakai — dipakai pada pesan
+  // kegagalan akhir bila drop-off juga gagal/tidak tersedia.
+  let pickupBuntu: string | null = null;
+
   if (slots.can_pickup) {
     const now = Math.floor(Date.now() / 1000);
     const slot = slots.pickup_slots
       .filter((s) => s.available && s.start_time >= now)
       .sort((a, b) => a.start_time - b.start_time)[0];
-    if (!slot) {
-      const next = slots.pickup_slots
-        .filter((s) => s.start_time >= now)
-        .sort((a, b) => a.start_time - b.start_time)[0];
+    if (slot) {
+      const ship = await shipPackage(cred, packageId, {
+        handover_method: "PICKUP",
+        pickup_slot: { start_time: slot.start_time, end_time: slot.end_time },
+      });
+      if (!ship.ok) return { ok: false, result: ship.detail };
+
+      const pkg = await getPackageDetail(cred, packageId);
+      const resi =
+        pkg.ok && pkg.tracking_number
+          ? ` · No resi ${pkg.tracking_number}`
+          : "";
       return {
-        ok: false,
-        result: next
-          ? `Tidak ada slot penjemputan tersedia saat ini — slot terdekat ${formatSlotWib(
-              next.start_time,
-              next.end_time,
-            )}`
-          : "Tidak ada slot penjemputan yang tersedia saat ini",
+        ok: true,
+        result: `Penjemputan dijadwalkan ${formatSlotWib(
+          slot.start_time,
+          slot.end_time,
+        )}${resi}`,
       };
     }
-    const ship = await shipPackage(cred, packageId, {
-      handover_method: "PICKUP",
-      pickup_slot: { start_time: slot.start_time, end_time: slot.end_time },
-    });
-    if (!ship.ok) return { ok: false, result: ship.detail };
-
-    const pkg = await getPackageDetail(cred, packageId);
-    const resi =
-      pkg.ok && pkg.tracking_number
-        ? ` · No resi ${pkg.tracking_number}`
-        : "";
-    return {
-      ok: true,
-      result: `Penjemputan dijadwalkan ${formatSlotWib(
-        slot.start_time,
-        slot.end_time,
-      )}${resi}`,
-    };
+    // Slot penjemputan TIDAK tersedia (penuh/belum rilis) — JANGAN menyerah
+    // di sini: jalur drop-off masih mungkin. Peristiwa 28 Okt 2026: order
+    // AWAITING_SHIPMENT gagal eksekusi karena slot penjemputan penuh padahal
+    // drop-off belum pernah dicoba.
+    const next = slots.pickup_slots
+      .filter((s) => s.start_time >= now)
+      .sort((a, b) => a.start_time - b.start_time)[0];
+    pickupBuntu = next
+      ? `Tidak ada slot penjemputan tersedia saat ini — slot terdekat ${formatSlotWib(
+          next.start_time,
+          next.end_time,
+        )}`
+      : "Tidak ada slot penjemputan yang tersedia saat ini";
   }
 
   if (slots.can_drop_off) {
     const ship = await shipPackage(cred, packageId, {
       handover_method: "DROP_OFF",
     });
-    if (!ship.ok) return { ok: false, result: ship.detail };
+    if (!ship.ok) {
+      return {
+        ok: false,
+        result: pickupBuntu
+          ? `${pickupBuntu} — dan drop-off gagal: ${ship.detail}`
+          : `Drop-off gagal: ${ship.detail}`,
+      };
+    }
     const link = slots.drop_off_point_url
       ? ` Lokasi drop-off: ${slots.drop_off_point_url}`
       : "";
@@ -276,7 +288,9 @@ async function arrangeShipment(
 
   return {
     ok: false,
-    result: "Paket ini tidak mendukung pickup maupun drop-off lewat API",
+    result:
+      pickupBuntu ??
+      "Paket ini tidak mendukung pickup maupun drop-off lewat API",
   };
 }
 
@@ -320,8 +334,14 @@ export async function getOfficialResiForCred(
     };
   }
   const after = await fetchOfficialResiPdf(cred, orderId);
-  if (!after.ok) return { ok: false, detail: after.detail };
-  return { ...after, arranged: true };
+  if (after.ok) return { ...after, arranged: true };
+  // TikTok butuh waktu menyiapkan label SETELAH pengiriman diatur — coba
+  // sekali lagi setelah jeda (peristiwa 28 Okt 2026: cetak manual di
+  // aplikasi langsung berhasil setelah atur pengiriman, API butuh propagasi).
+  await new Promise((r) => setTimeout(r, 15000));
+  const after2 = await fetchOfficialResiPdf(cred, orderId);
+  if (!after2.ok) return { ok: false, detail: after2.detail };
+  return { ...after2, arranged: true };
 }
 
 /** Ambil dokumen cetak resmi untuk satu pesanan (loop toko terotorisasi). */

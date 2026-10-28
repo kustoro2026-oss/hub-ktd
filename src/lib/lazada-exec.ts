@@ -35,6 +35,15 @@ import {
   anekaVariantSave,
   type AnekaSession,
 } from "@/lib/aneka-checkout";
+import {
+  ambilSaldoAuditAneka,
+  auditVarianAneka,
+  blockerSaldo,
+  ONGKOS_PACKING_AUDIT,
+  susunAudit,
+  type AuditBlocker,
+  type ExecAudit,
+} from "@/lib/aneka-audit";
 import { buildAnekaCartItems } from "@/lib/aneka-exec";
 import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import {
@@ -109,6 +118,10 @@ export type LazadaExecPayload = {
   fulfilled?: boolean;
   items: LazadaExecItem[];
   total_modal: number;
+  /** Hasil audit kesiapan (varian/label/saldo) — disimpan saat persiapan
+   *  dan diperbarui tombol Periksa Kesiapan; dipakai gerbang tombol
+   *  Setuju di halaman Eksekusi. */
+  audit?: ExecAudit;
 };
 
 /** "Rp18.450" → 18450. */
@@ -342,7 +355,11 @@ export function notifSiapEksekusiLazada(
     .join("\n");
   const total = payload.items.reduce((s, it) => s + it.subtotal, 0);
   const extra = catatan ? `\n${catatan}` : "";
-  return `Pesanan Lazada ${payload.order_id} siap dieksekusi ke Aneka (${payload.store_name}).\n${baris}\nTotal modal ${fmtRp(total)}. No resi ${payload.tracking_number}.${extra}\nSetuju/batalkan: ${EKSEKUSI_URL}?order=${payload.order_id}`;
+  const audit =
+    payload.audit && payload.audit.blockers.length > 0
+      ? `\n\nPERHATIAN — audit kesiapan menemukan blocker (tombol Setuju dinonaktifkan sampai beres):\n${payload.audit.blockers.map((b) => `[${b.kode}] ${b.teks}`).join("\n")}`
+      : "";
+  return `Pesanan Lazada ${payload.order_id} siap dieksekusi ke Aneka (${payload.store_name}).\n${baris}\nTotal modal ${fmtRp(total)}. No resi ${payload.tracking_number}.${extra}\nSetuju/batalkan: ${EKSEKUSI_URL}?order=${payload.order_id}${audit}`;
 }
 
 export async function prepareLazadaExec(
@@ -395,6 +412,39 @@ export async function prepareLazadaExec(
       // payload lama rusak — biarkan kosong.
     }
   }
+
+  // AUDIT KESIAPAN: cocokkan varian + cek saldo SEBELUM antrean disimpan —
+  // peristiwa 27 Okt 2026 (eksekusi gagal karena varian tidak bisa
+  // dicocokkan dengan pasti) tidak boleh terulang: masalah harus ketahuan
+  // di sini, bukan saat eksekusi. variantId terpilih disimpan ke payload
+  // supaya eksekusi melewati pencarian ulang. Label TIDAK diaudit di sini —
+  // autopack yang mengisinya berjalan SETELAH persiapan (dilakukan
+  // pemanggil), dan eksekusi menangani pemenuhan sendiri.
+  const auditBlockers: AuditBlocker[] = [];
+  const va = await auditVarianAneka(
+    payload.items.map((it) => ({
+      aneka_product_id: it.aneka_product_id,
+      variant_hint: it.variant_name || it.item_name,
+      nama: it.item_name,
+      aneka_variant_id: it.aneka_variant_id,
+    })),
+  );
+  va.hasil.forEach((h, i) => {
+    if (h.variantId) payload.items[i].aneka_variant_id = h.variantId;
+  });
+  auditBlockers.push(...va.blockers);
+  const saldoAudit = await ambilSaldoAuditAneka();
+  auditBlockers.push(
+    ...blockerSaldo({
+      saldo: saldoAudit.saldo,
+      segar: saldoAudit.segar,
+      kebutuhan: total + ONGKOS_PACKING_AUDIT,
+    }),
+  );
+  payload.audit = susunAudit({
+    blockers: auditBlockers,
+    saldo: saldoAudit.saldo,
+  });
 
   // Baris BARU disimpan lewat klaim atomik: dua ronde pengecekan yang
   // tumpang tindih (tab admin + ping eksternal + tick webhook berjalan
@@ -540,6 +590,104 @@ export async function autoPackLazadaOrder(
     detail: label ? sumber : "pack + rts berhasil, label diurus saat eksekusi",
     tracking,
   };
+}
+
+/** PERIKSA KESIAPAN manual (tombol di halaman Eksekusi): jalankan ulang
+ *  audit penuh — varian Aneka, label (autopack diusahakan ulang untuk baris
+ *  "menunggu" yang labelnya kosong), saldo — lalu simpan hasilnya ke
+ *  payload.audit. Blocker lama yang sudah beres otomatis hilang karena
+ *  audit dibangun dari nol. Label TIDAK jadi blocker keras di Lazada:
+ *  eksekusi menangani pemenuhan (pack → rts → label) sendiri dengan
+ *  cadangan resi PDF, jadi memblokir Setuju gara-gara label malah salah
+ *  alamat (peristiwa gagal Lazada 27 Okt 2026 adalah varian, bukan label). */
+export async function auditKesiapanLazada(
+  orderId: string,
+): Promise<ExecAudit> {
+  const row = await getLazadaOrderExec(orderId);
+  if (!row) {
+    return susunAudit({
+      blockers: [{ kode: "varian", teks: "Antrean eksekusi tidak ditemukan" }],
+    });
+  }
+  let payload: LazadaExecPayload;
+  try {
+    payload = JSON.parse(row.payload) as LazadaExecPayload;
+  } catch {
+    return susunAudit({
+      blockers: [{ kode: "varian", teks: "Payload eksekusi rusak — perbaiki manual" }],
+    });
+  }
+  const blockers: AuditBlocker[] = [];
+
+  // Varian: cocokkan ulang semua item yang belum punya variant_id; hasil
+  // terpilih disimpan ke payload supaya eksekusi melewati pencarian ulang.
+  const va = await auditVarianAneka(
+    payload.items.map((it) => ({
+      aneka_product_id: it.aneka_product_id,
+      variant_hint: it.variant_name || it.item_name,
+      nama: it.item_name,
+      aneka_variant_id: it.aneka_variant_id,
+    })),
+  );
+  va.hasil.forEach((h, i) => {
+    if (h.variantId) payload.items[i].aneka_variant_id = h.variantId;
+  });
+  blockers.push(...va.blockers);
+
+  // Label: kalau kosong/rusak dan baris masih "menunggu", usahakan autopack
+  // ulang (idempoten — pemenuhan + label). Hasilnya hanya dicatat, tidak
+  // memblokir: eksekusi mengurus pemenuhan sendiri.
+  const labelValid = (() => {
+    if (!payload.label_pdf_base64) return false;
+    const buf = Buffer.from(payload.label_pdf_base64, "base64");
+    return (
+      buf.length >= 5 && buf.subarray(0, 5).toString("latin1") === "%PDF-"
+    );
+  })();
+  if (!labelValid && row.status === "menunggu") {
+    const pack = await autoPackLazadaOrder(orderId);
+    // autopack menimpa payload — baca ulang yang terbaru sebelum audit
+    // disimpan supaya varian terpilih di atas tidak hilang.
+    if (pack.ok) {
+      const fresh = await getLazadaOrderExec(orderId);
+      if (fresh) {
+        try {
+          payload = JSON.parse(fresh.payload) as LazadaExecPayload;
+          // Payload segar hasil autopack belum membawa varian terpilih
+          // audit di atas (autopack menimpa payload dari DB) — terapkan
+          // ulang supaya eksekusi melewati pencarian varian.
+          va.hasil.forEach((h, i) => {
+            if (h.variantId) payload.items[i].aneka_variant_id = h.variantId;
+          });
+        } catch {
+          // biarkan payload lama.
+        }
+      }
+    }
+  }
+
+  // Saldo: blocker hanya bila cache segar dan saldo kurang dari kebutuhan.
+  const saldoAudit = await ambilSaldoAuditAneka();
+  blockers.push(
+    ...blockerSaldo({
+      saldo: saldoAudit.saldo,
+      segar: saldoAudit.segar,
+      kebutuhan: payload.total_modal + ONGKOS_PACKING_AUDIT,
+    }),
+  );
+
+  const audit = susunAudit({ blockers, saldo: saldoAudit.saldo });
+  payload.audit = audit;
+  await updateLazadaOrderExecPayload(orderId, JSON.stringify(payload));
+  await appendLazadaOrderExecLog(
+    orderId,
+    `[${Date.now()}] | audit | ${
+      audit.ok
+        ? "ok — semua siap"
+        : blockers.map((b) => `${b.kode}: ${b.teks}`).join(" | ")
+    }`,
+  );
+  return audit;
 }
 
 /** Batal (dari tombol Batalkan atau deteksi pesanan dibatalkan pembeli). */
@@ -929,6 +1077,19 @@ export async function executeLazadaOrder(
     return {
       ok: false,
       detail: "Data eksekusi tidak lengkap — siapkan ulang pesanan ini",
+    };
+  }
+
+  // GERBANG AUDIT KESIAPAN: baris yang auditnya mencatat blocker (varian
+  // tidak cocok / saldo kurang) DITOLAK — peristiwa 27 Okt 2026 (gagal
+  // varian) tidak boleh terulang lewat Setuju biasa. Force (bayar ulang
+  // setelah cek manual) tetap melewati gerbang ini karena tujuannya berbeda.
+  if (!opts.force && payload.audit && !payload.audit.ok) {
+    return {
+      ok: false,
+      detail: `Audit kesiapan menemukan blocker: ${payload.audit.blockers
+        .map((b) => `[${b.kode}] ${b.teks}`)
+        .join(" — ")}`,
     };
   }
 

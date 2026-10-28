@@ -32,6 +32,7 @@ import {
   listTiktokShopTokens,
   markTiktokOrderSeen,
   recordTiktokOrderFailure,
+  saveTiktokOrderExec,
   setResiCheckState,
   updateTiktokOrderExecPayloadIfUnchanged,
   workerHeartbeatFresh,
@@ -230,17 +231,30 @@ async function sendOwnerNotice(msg: string): Promise<string> {
  *  tersedia atau sampai antrean dieksekusi/disetujui. */
 const ISILABEL_RETRY_MS = 30 * 60 * 1000;
 
-/** Isi label resmi ke baris eksekusi "menunggu" bila labelnya belum sempat
- *  terisi saat persiapan (mis. slot penjemputan TikTok penuh). Dipanggil
- *  tiap ronde pengecekan — antrean eksekusi TIDAK lagi tertahan oleh label:
- *  pemilik tetap menerima notif Setuju, label menyusul begitu tersedia.
- *  Idempoten: baris yang labelnya sudah terisi dilewati. */
+/** Tautan halaman eksekusi TikTok (dipakai notif WA pemilik toko). */
+const EKSEKUSI_URL =
+  "https://admin.kustoro2026.com/marketplace/tiktok/eksekusi";
+
+/** Isi label resmi ke baris eksekusi "menunggu" (atau "gagal" yang
+ *  penyebabnya HANYA label) bila labelnya belum sempat terisi saat
+ *  persiapan (mis. slot penjemputan TikTok penuh). Dipanggil tiap ronde
+ *  pengecekan — antrean eksekusi TIDAK lagi tertahan oleh label: pemilik
+ *  tetap menerima notif Setuju, label menyusul begitu tersedia.
+ *  Idempoten: baris yang labelnya sudah terisi dilewati. Baris "gagal"
+ *  yang labelnya berhasil diisi dikembalikan ke "menunggu" + dikabari WA
+ *  (peristiwa 28 Okt 2026: eksekusi gagal karena label belum bisa dicetak
+ *  sebelum pengiriman diatur — begitu label tersedia, pemilik harus bisa
+ *  langsung menekan Setuju tanpa menunggu manual). */
 async function isiLabelEksekusi(
   cred: { cipher: string; access_token: string },
   orderId: string,
 ): Promise<void> {
   const row = await getTiktokOrderExec(orderId);
-  if (!row || row.status !== "menunggu") return;
+  if (!row) return;
+  const labelBuntu =
+    row.status === "gagal" &&
+    (row.detail ?? "").startsWith("label resmi belum tersedia");
+  if (row.status !== "menunggu" && !labelBuntu) return;
   let payload: AnekaExecPayload;
   try {
     payload = JSON.parse(row.payload) as AnekaExecPayload;
@@ -266,6 +280,16 @@ async function isiLabelEksekusi(
   if (official.ok) {
     payload.tracking_number = official.tracking_number;
     payload.label_pdf_base64 = official.pdf.toString("base64");
+    // Label kini tersedia — bersihkan blocker label dari audit kesiapan
+    // (bila ada) supaya tombol Setuju di halaman Eksekusi aktif kembali
+    // tanpa perlu Periksa Kesiapan manual.
+    if (payload.audit) {
+      payload.audit.blockers = payload.audit.blockers.filter(
+        (b) => b.kode !== "label",
+      );
+      payload.audit.ok = payload.audit.blockers.length === 0;
+      payload.audit.at = Date.now();
+    }
     // CAS: hanya ronde yang benar-benar menimpa payload kosong yang boleh
     // mengirim notif ulang — dua ronde tumpang tindih sama-sama melihat
     // label kosong dan sama-sama lolos gerbang jejak log, sehingga tanpa
@@ -276,13 +300,34 @@ async function isiLabelEksekusi(
       JSON.stringify(payload),
     );
     if (menang) {
-      // Label baru terisi — kirim ulang notif Setuju dengan format lengkap
-      // (termasuk nomor resi) supaya pesan terbaru sama seperti pesanan yang
-      // labelnya tersedia sejak persiapan.
-      const notice = await sendOwnerNotice(notifSiapEksekusiTikTok(payload));
-      stempel += ` | notif ulang: ${
-        notice.startsWith("ok") ? "ok" : `GAGAL — ${notice}`
-      }`;
+      // Baris "gagal" yang buntunya hanya label dikembalikan ke
+      // "menunggu" supaya tombol Setuju bisa dipakai lagi.
+      if (labelBuntu) {
+        await saveTiktokOrderExec({
+          order_id: orderId,
+          shop_id: row.shop_id,
+          status: "menunggu",
+          payload: JSON.stringify(payload),
+          aneka_payment_id: row.aneka_payment_id ?? "",
+          aneka_order_id: row.aneka_order_id ?? "",
+          detail: "",
+          executed_at: "",
+        });
+        const notice = await sendOwnerNotice(
+          `Label resmi pesanan TikTok ${orderId} sudah tersedia (resi ${payload.tracking_number}) — antrean dikembalikan ke menunggu. Tekan Setuju: ${EKSEKUSI_URL}?order=${orderId}`,
+        );
+        stempel += ` | baris gagal→menunggu | notif: ${
+          notice.startsWith("ok") ? "ok" : `GAGAL — ${notice}`
+        }`;
+      } else {
+        // Label baru terisi — kirim ulang notif Setuju dengan format
+        // lengkap (termasuk nomor resi) supaya pesan terbaru sama seperti
+        // pesanan yang labelnya tersedia sejak persiapan.
+        const notice = await sendOwnerNotice(notifSiapEksekusiTikTok(payload));
+        stempel += ` | notif ulang: ${
+          notice.startsWith("ok") ? "ok" : `GAGAL — ${notice}`
+        }`;
+      }
     } else {
       stempel += " | label sudah diisi ronde lain — notif ulang dilewati";
     }

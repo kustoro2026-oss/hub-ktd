@@ -27,6 +27,15 @@ import {
   type AnekaSession,
 } from "@/lib/aneka-checkout";
 import {
+  ambilSaldoAuditAneka,
+  auditVarianAneka,
+  blockerSaldo,
+  ONGKOS_PACKING_AUDIT,
+  susunAudit,
+  type AuditBlocker,
+  type ExecAudit,
+} from "@/lib/aneka-audit";
+import {
   appendTiktokOrderExecLog,
   claimTiktokOrderExecPrepared,
   claimTiktokOrderExecRunning,
@@ -35,6 +44,7 @@ import {
   listTiktokShopTokens,
   saveTiktokOrderExec,
   setTiktokOrderExecPayment,
+  updateTiktokOrderExecPayloadIfUnchanged,
 } from "@/lib/db";
 import { getTiktokOrderDetail, type TiktokOrderSummary } from "@/lib/tiktok";
 import { prepareShop } from "@/lib/tiktok-orders";
@@ -69,6 +79,10 @@ export type AnekaExecPayload = {
   label_pdf_base64: string;
   items: AnekaExecItem[];
   total_modal: number;
+  /** Hasil audit kesiapan (varian/label/saldo) — disimpan saat persiapan
+   *  dan diperbarui tombol Periksa Kesiapan; dipakai gerbang tombol
+   *  Setuju di halaman Eksekusi. */
+  audit?: ExecAudit;
 };
 
 /** Dokumen resi resmi hasil cetak (struktur minimal dari tiktok-resi). */
@@ -193,7 +207,11 @@ export function notifSiapEksekusiTikTok(payload: AnekaExecPayload): string {
   const resi = payload.tracking_number
     ? ` No resi ${payload.tracking_number}.`
     : " Label resi belum tersedia — akan diisi otomatis sebelum pembayaran.";
-  return `Pesanan TikTok ${payload.order_id} siap dieksekusi ke Aneka (${payload.shop_name}).\n${baris}\nTotal modal ${fmtRp(payload.total_modal)}.${resi}\nSetuju/batalkan: ${EKSEKUSI_URL}?order=${payload.order_id}`;
+  const audit =
+    payload.audit && payload.audit.blockers.length > 0
+      ? `\n\nPERHATIAN — audit kesiapan menemukan blocker (tombol Setuju dinonaktifkan sampai beres):\n${payload.audit.blockers.map((b) => `[${b.kode}] ${b.teks}`).join("\n")}`
+      : "";
+  return `Pesanan TikTok ${payload.order_id} siap dieksekusi ke Aneka (${payload.shop_name}).\n${baris}\nTotal modal ${fmtRp(payload.total_modal)}.${resi}\nSetuju/batalkan: ${EKSEKUSI_URL}?order=${payload.order_id}${audit}`;
 }
 
 /** PERSIAPAN: simpan label resmi + rincian produk sebagai antrean eksekusi
@@ -225,6 +243,45 @@ export async function prepareAnekaExec(
     items: check.items,
     total_modal: total,
   };
+
+  // AUDIT KESIAPAN: cocokkan varian + cek saldo + catat blocker label (bila
+  // label resmi belum tersedia) SEBELUM antrean disimpan — peristiwa 27-28
+  // Okt 2026 (gagal varian di Lazada, gagal label di TikTok) tidak boleh
+  // terulang: masalah harus ketahuan di sini, bukan saat eksekusi.
+  // variantId hasil pencocokan disimpan ke payload supaya eksekusi melewati
+  // pencarian ulang. Blocker label nanti dibersihkan isiLabelEksekusi
+  // begitu label berhasil diisi.
+  const auditBlockers: AuditBlocker[] = [];
+  const va = await auditVarianAneka(
+    payload.items.map((it) => ({
+      aneka_product_id: it.aneka_product_id,
+      variant_hint: it.sku_name,
+      nama: it.product_name,
+      aneka_variant_id: it.aneka_variant_id,
+    })),
+  );
+  va.hasil.forEach((h, i) => {
+    if (h.variantId) payload.items[i].aneka_variant_id = h.variantId;
+  });
+  auditBlockers.push(...va.blockers);
+  if (!official) {
+    auditBlockers.push({
+      kode: "label",
+      teks: "Label resmi belum tersedia — akan diisi otomatis, Setuju dinonaktifkan sampai label terisi",
+    });
+  }
+  const saldoAudit = await ambilSaldoAuditAneka();
+  auditBlockers.push(
+    ...blockerSaldo({
+      saldo: saldoAudit.saldo,
+      segar: saldoAudit.segar,
+      kebutuhan: total + ONGKOS_PACKING_AUDIT,
+    }),
+  );
+  payload.audit = susunAudit({
+    blockers: auditBlockers,
+    saldo: saldoAudit.saldo,
+  });
 
   // Baris BARU disimpan lewat klaim atomik: dua ronde pengecekan yang
   // tumpang tindih (tab admin + ping Actions + tick webhook berjalan tanpa
@@ -260,6 +317,98 @@ export async function prepareAnekaExec(
     return { ok: false, detail: `Tersimpan, tetapi notif WA gagal: ${notice}` };
   }
   return { ok: true, detail: "Menunggu persetujuan" };
+}
+
+/** PERIKSA KESIAPAN manual (tombol di halaman Eksekusi): jalankan ulang
+ *  audit penuh — varian Aneka, label resmi (diisi ulang bila kosong/rusak),
+ *  saldo — lalu simpan hasilnya ke payload.audit. Blocker lama yang sudah
+ *  beres otomatis hilang karena audit dibangun dari nol. Label dipakai
+ *  sebagai blocker KERAS: eksekusi TikTok memang gagal pasti bila label
+ *  belum bisa diambil (peristiwa 28 Okt 2026). */
+export async function auditKesiapanTiktok(
+  orderId: string,
+): Promise<ExecAudit> {
+  const row = await getTiktokOrderExec(orderId);
+  if (!row) {
+    return susunAudit({
+      blockers: [{ kode: "varian", teks: "Antrean eksekusi tidak ditemukan" }],
+    });
+  }
+  let payload: AnekaExecPayload;
+  try {
+    payload = JSON.parse(row.payload) as AnekaExecPayload;
+  } catch {
+    return susunAudit({
+      blockers: [{ kode: "varian", teks: "Payload eksekusi rusak — perbaiki manual" }],
+    });
+  }
+  const blockers: AuditBlocker[] = [];
+
+  // Varian: cocokkan ulang semua item yang belum punya variant_id; hasil
+  // terpilih disimpan ke payload supaya eksekusi melewati pencarian ulang.
+  const va = await auditVarianAneka(
+    payload.items.map((it) => ({
+      aneka_product_id: it.aneka_product_id,
+      variant_hint: it.sku_name,
+      nama: it.product_name,
+      aneka_variant_id: it.aneka_variant_id,
+    })),
+  );
+  va.hasil.forEach((h, i) => {
+    if (h.variantId) payload.items[i].aneka_variant_id = h.variantId;
+  });
+  blockers.push(...va.blockers);
+
+  // Label: verifikasi PDF tersimpan valid; kalau kosong/rusak, usahakan
+  // ambil ulang (termasuk atur pengiriman bila belum diatur).
+  const labelValid = (() => {
+    if (!payload.label_pdf_base64) return false;
+    const buf = Buffer.from(payload.label_pdf_base64, "base64");
+    return (
+      buf.length >= 5 && buf.subarray(0, 5).toString("latin1") === "%PDF-"
+    );
+  })();
+  if (!labelValid) {
+    const official = await getOfficialResiForOrder(orderId);
+    if (official.ok) {
+      payload.tracking_number = official.tracking_number;
+      payload.label_pdf_base64 = official.pdf.toString("base64");
+    } else {
+      blockers.push({
+        kode: "label",
+        teks: `Label resmi belum tersedia (${official.detail})`,
+      });
+    }
+  }
+
+  // Saldo: blocker hanya bila cache segar dan saldo kurang dari kebutuhan.
+  const saldoAudit = await ambilSaldoAuditAneka();
+  blockers.push(
+    ...blockerSaldo({
+      saldo: saldoAudit.saldo,
+      segar: saldoAudit.segar,
+      kebutuhan: payload.total_modal + ONGKOS_PACKING_AUDIT,
+    }),
+  );
+
+  const audit = susunAudit({ blockers, saldo: saldoAudit.saldo });
+  payload.audit = audit;
+  // CAS — jangan menimpa payload yang diubah ronde lain (mis. isi-label
+  // yang baru saja mengisi label kosong).
+  await updateTiktokOrderExecPayloadIfUnchanged(
+    orderId,
+    row.payload,
+    JSON.stringify(payload),
+  );
+  await appendTiktokOrderExecLog(
+    orderId,
+    `[${Date.now()}] | audit | ${
+      audit.ok
+        ? "ok — semua siap"
+        : blockers.map((b) => `${b.kode}: ${b.teks}`).join(" | ")
+    }`,
+  );
+  return audit;
 }
 
 /** Batal (dari tombol Batalkan atau deteksi pesanan dibatalkan TikTok). */
@@ -688,6 +837,20 @@ export async function executeAnekaOrder(
   }
   if (!payload.items?.length) {
     return { ok: false, detail: "Data eksekusi tidak lengkap — siapkan ulang pesanan ini" };
+  }
+
+  // GERBANG AUDIT KESIAPAN: baris yang auditnya mencatat blocker (varian
+  // tidak cocok / label belum tersedia / saldo kurang) DITOLAK — peristiwa
+  // 27-28 Okt 2026 (gagal varian di Lazada, gagal label di TikTok) tidak
+  // boleh terulang lewat Setuju biasa. Force (bayar ulang setelah cek
+  // manual) tetap melewati gerbang ini karena tujuannya berbeda.
+  if (!opts.force && payload.audit && !payload.audit.ok) {
+    return {
+      ok: false,
+      detail: `Audit kesiapan menemukan blocker: ${payload.audit.blockers
+        .map((b) => `[${b.kode}] ${b.teks}`)
+        .join(" — ")}`,
+    };
   }
 
   // MASA TUNGGU ANTI-DOBEL: pembayaran ulang PAKSA (opts.force) ditolak bila
