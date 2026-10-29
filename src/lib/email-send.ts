@@ -27,6 +27,7 @@ import {
   requeueStaleQueuedEmailItems,
   resetEmailCampaignForLoop,
   resetEmailContactBounceStrikes,
+  setEmailCampaignTemplateRound,
   updateEmailCampaignRun,
   updateEmailCampaignRunIfActive,
   workerHeartbeatFresh,
@@ -155,6 +156,39 @@ function emptyProgress() {
   return { total: 0, sent: 0, failed: 0, pending: 0, queued: 0, remaining: 0 };
 }
 
+/** Rotasi template putaran berikutnya: kampanye dengan daftar rotasi
+ *  (template_rotation JSON) berganti template & subjek setiap kali satu
+ *  siklus selesai; setelah template terakhir kembali ke awal. Template yang
+ *  sudah dihapus dilewati supaya rotasi tidak tersendat. */
+async function applyTemplateRotation(campaign: EmailCampaign): Promise<void> {
+  let ids: number[] = [];
+  try {
+    const arr = JSON.parse(campaign.template_rotation || "[]");
+    if (Array.isArray(arr)) {
+      ids = arr
+        .map((v) => Number(v))
+        .filter((n) => Number.isInteger(n) && n > 0);
+    }
+  } catch {
+    ids = [];
+  }
+  if (ids.length < 2) return;
+  const nextRound = Number(campaign.round_number || 0) + 1;
+  const startIdx = (nextRound - 1) % ids.length;
+  for (let k = 0; k < ids.length; k++) {
+    const tplId = ids[(startIdx + k) % ids.length];
+    const tpl = await getEmailTemplate(tplId);
+    if (!tpl) continue; // template terhapus — coba id berikutnya
+    await setEmailCampaignTemplateRound(
+      campaign.id,
+      tpl.id,
+      tpl.subject,
+      nextRound,
+    );
+    return;
+  }
+}
+
 /** Susun hasil ronde dari kondisi kampanye terkini. */
 async function buildResult(
   campaignId: number,
@@ -211,6 +245,7 @@ export async function runEmailCampaign(id: number): Promise<EmailRunResult> {
         campaign.group_id,
         campaign.smtp_account_id,
       );
+      await applyTemplateRotation(campaign);
       const resumeAt = nextRepeatStartUtc(repeatStartHourOf(campaign));
       const scheduled = await updateEmailCampaignRunIfActive(id, {
         status: "paused",
@@ -510,6 +545,7 @@ export async function runEmailCampaign(id: number): Promise<EmailRunResult> {
         campaign.group_id,
         campaign.smtp_account_id,
       );
+      await applyTemplateRotation(campaign);
       const resumeAt = nextRepeatStartUtc(repeatStartHourOf(campaign));
       const scheduled = await updateEmailCampaignRunIfActive(id, {
         ...base,

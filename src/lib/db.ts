@@ -99,6 +99,8 @@ export type EmailCampaign = {
   batch_sent: number;
   repeat_daily: number; // 1 = kirim ulang dari awal tiap hari (loop)
   repeat_start_hour: number; // jam WIB mulai siklus berikutnya (0-23)
+  template_rotation: string; // JSON daftar id template untuk rotasi putaran
+  round_number: number; // nomor putaran berjalan (1 = pertama)
   started_at: string;
   total: number;
   sent: number;
@@ -1202,6 +1204,21 @@ function migrateSqlite(db: DatabaseSync) {
     )`,
   );
 
+  // Migrasi email marketing 5: rotasi template per putaran loop — supaya
+  // penerima tidak menerima email yang sama terus tiap siklus.
+  const emCampCols3 = db
+    .prepare("PRAGMA table_info(email_campaigns)")
+    .all() as { name: string }[];
+  const rotAdd: [string, string][] = [
+    ["template_rotation", "TEXT NOT NULL DEFAULT ''"],
+    ["round_number", "INTEGER NOT NULL DEFAULT 0"],
+  ];
+  for (const [col, def] of rotAdd) {
+    if (!emCampCols3.some((c) => c.name === col)) {
+      db.exec(`ALTER TABLE email_campaigns ADD COLUMN ${col} ${def}`);
+    }
+  }
+
   // Akun SMTP pertama diisi dari pengaturan Gmail lama bila ada — supaya
   // kredensial yang sudah tersimpan langsung tampil di halaman SMTP baru.
   const accSeed = db
@@ -2059,6 +2076,15 @@ CREATE TABLE IF NOT EXISTS worker_heartbeat (
       reason TEXT NOT NULL DEFAULT '',
       deleted_at TEXT NOT NULL DEFAULT ''
     )`,
+  );
+
+  // Migrasi email marketing 5: rotasi template per putaran loop — supaya
+  // penerima tidak menerima email yang sama terus tiap siklus.
+  await pool.query(
+    "ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS template_rotation TEXT NOT NULL DEFAULT ''",
+  );
+  await pool.query(
+    "ALTER TABLE email_campaigns ADD COLUMN IF NOT EXISTS round_number INTEGER NOT NULL DEFAULT 0",
   );
 
   // Akun SMTP pertama diisi dari pengaturan Gmail lama bila ada.
@@ -5879,6 +5905,19 @@ export async function updateEmailCampaignRun(
     ...keys.map((k) => patch[k] ?? ""),
     id,
   ]);
+}
+
+/** Ganti template + subjek kampanye untuk putaran berikutnya (rotasi). */
+export async function setEmailCampaignTemplateRound(
+  id: number,
+  templateId: number,
+  subject: string,
+  roundNumber: number,
+): Promise<void> {
+  await queryRun(
+    "UPDATE email_campaigns SET template_id = ?, subject = ?, round_number = ? WHERE id = ?",
+    [templateId, subject, roundNumber, id],
+  );
 }
 
 /** Sama seperti updateEmailCampaignRun, tetapi tidak menimpa jeda manual /
