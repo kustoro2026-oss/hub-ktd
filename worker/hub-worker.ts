@@ -153,7 +153,16 @@ async function runDaily(d: Date): Promise<void> {
     lastDaily.add(key);
     log(`jadwal harian: ${job.name}`);
     try {
-      const res = (await job.run()) as { ok?: boolean; detail?: string } | undefined;
+      const res = (await job.run()) as
+        | {
+            ok?: boolean;
+            detail?: string;
+            skipped?: string;
+            invited?: number;
+            sent_today?: number;
+            daily_cap?: number;
+          }
+        | undefined;
       if (res && res.ok === false) {
         // Gagal senyap dulu tidak pernah sampai ke pemilik — kirim notif WA
         // supaya masalah terlihat tanpa harus membuka log VPS.
@@ -164,6 +173,12 @@ async function runDaily(d: Date): Promise<void> {
         );
       } else {
         log(`jadwal harian selesai: ${job.name}`);
+        // Ringkasan sukses undangan kreator ke pemilik — pemilik sempat
+        // mengira kampanye tidak berjalan karena tanpa notif harian.
+        if (job.name.startsWith("affiliate-auto")) {
+          const msg = ringkasanAffiliate(res);
+          if (msg) await sendOwnerNotice(msg);
+        }
       }
     } catch (e) {
       log(
@@ -172,6 +187,37 @@ async function runDaily(d: Date): Promise<void> {
         }`,
       );
     }
+  }
+}
+
+/** Susun pesan WA ringkasan undangan afiliasi; kosong bila tak perlu kirim. */
+function ringkasanAffiliate(res: {
+  ok?: boolean;
+  detail?: string;
+  skipped?: string;
+  invited?: number;
+  sent_today?: number;
+  daily_cap?: number;
+} | undefined): string {
+  if (!res) return "";
+  const total = res.sent_today ?? 0;
+  const cap = res.daily_cap ?? 0;
+  if ((res.invited ?? 0) > 0) {
+    return `[KTD Hub] Undang kreator afiliasi: ${res.invited} undangan terkirim (total hari ini ${total}${cap ? `/${cap}` : ""}).`;
+  }
+  switch (res.skipped) {
+    case "cap":
+      return `[KTD Hub] Cap undang kreator hari ini tercapai: ${total}${cap ? `/${cap}` : ""}.`;
+    case "empty":
+      return "[KTD Hub] Undang kreator: kolam kandidat kosong — belum ada kreator baru yang lolos pencarian.";
+    case "conflict":
+      return "[KTD Hub] Undang kreator: semua kandidat sudah pernah diundang sebelumnya.";
+    case "ineligible":
+      return "[KTD Hub] Undang kreator: tidak ada kandidat lolos cek eligibilitas TikTok.";
+    case "disabled":
+      return "";
+    default:
+      return "";
   }
 }
 
