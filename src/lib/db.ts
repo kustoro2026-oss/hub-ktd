@@ -1191,6 +1191,17 @@ function migrateSqlite(db: DatabaseSync) {
     }
   }
 
+  // Audit penghapusan email tidak aktif (bounce) — dasar rekap WA harian
+  // supaya pemilik tahu berapa alamat yang dibuang tiap hari.
+  db.exec(
+    `CREATE TABLE IF NOT EXISTS email_bounce_audit (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      email TEXT NOT NULL,
+      reason TEXT NOT NULL DEFAULT '',
+      deleted_at TEXT NOT NULL DEFAULT ''
+    )`,
+  );
+
   // Akun SMTP pertama diisi dari pengaturan Gmail lama bila ada — supaya
   // kredensial yang sudah tersimpan langsung tampil di halaman SMTP baru.
   const accSeed = db
@@ -2037,6 +2048,17 @@ CREATE TABLE IF NOT EXISTS worker_heartbeat (
   );
   await pool.query(
     "ALTER TABLE email_smtp_accounts ADD COLUMN IF NOT EXISTS imap_secure INTEGER NOT NULL DEFAULT 1",
+  );
+
+  // Audit penghapusan email tidak aktif (bounce) — dasar rekap WA harian
+  // supaya pemilik tahu berapa alamat yang dibuang tiap hari.
+  await pool.query(
+    `CREATE TABLE IF NOT EXISTS email_bounce_audit (
+      id SERIAL PRIMARY KEY,
+      email TEXT NOT NULL,
+      reason TEXT NOT NULL DEFAULT '',
+      deleted_at TEXT NOT NULL DEFAULT ''
+    )`,
   );
 
   // Akun SMTP pertama diisi dari pengaturan Gmail lama bila ada.
@@ -5223,20 +5245,24 @@ export async function deleteEmailContacts(ids: number[]): Promise<number> {
  *  kontak yang benar-benar terhapus. */
 export async function deleteEmailContactsByEmails(
   emails: string[],
+  reason = "",
 ): Promise<number> {
   const clean = [
     ...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean)),
   ];
   if (clean.length === 0) return 0;
   let deleted = 0;
+  const auditRows: { email: string }[] = [];
+  const stamp = utcStamp();
   for (let i = 0; i < clean.length; i += 400) {
     const chunk = clean.slice(i, i + 400);
     const ph = chunk.map(() => "?").join(", ");
-    const rows = await queryAll<{ id: number }>(
-      `DELETE FROM email_contacts WHERE email IN (${ph}) RETURNING id`,
+    const rows = await queryAll<{ id: number; email: string }>(
+      `DELETE FROM email_contacts WHERE email IN (${ph}) RETURNING id, email`,
       chunk,
     );
     const ids = rows.map((r) => Number(r.id)).filter((n) => n > 0);
+    auditRows.push(...rows.filter((r) => Number(r.id) > 0));
     if (ids.length > 0) {
       for (let j = 0; j < ids.length; j += 400) {
         const idChunk = ids.slice(j, j + 400);
@@ -5252,6 +5278,15 @@ export async function deleteEmailContactsByEmails(
       }
       deleted += ids.length;
     }
+  }
+  // Catat yang benar-benar terhapus agar bisa direkap (berapa/hari).
+  for (let i = 0; i < auditRows.length; i += 400) {
+    const chunk = auditRows.slice(i, i + 400);
+    const vals = chunk.map(() => "(?, ?, ?)").join(", ");
+    await queryRun(
+      `INSERT INTO email_bounce_audit (email, reason, deleted_at) VALUES ${vals}`,
+      chunk.flatMap((r) => [r.email, reason, stamp]),
+    );
   }
   return deleted;
 }
@@ -5649,6 +5684,31 @@ export async function countEmailsSentTodayByAccount(
   return map[accountId] ?? 0;
 }
 
+/** Statistik kiriman hari ini (WIB) lintas kampanye — untuk rekap WA. */
+export async function emailItemsDayStats(
+  sinceIso: string,
+): Promise<{ sent: number; failed: number }> {
+  const row = await queryOne<{ sent: string | number; failed: string | number }>(
+    `SELECT
+       SUM(CASE WHEN status IN ('sent', 'delivered', 'opened', 'clicked') THEN 1 ELSE 0 END) AS sent,
+       SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS failed
+     FROM email_campaign_items WHERE sent_at != '' AND sent_at >= ?`,
+    [sinceIso],
+  );
+  return { sent: Number(row?.sent ?? 0), failed: Number(row?.failed ?? 0) };
+}
+
+/** Jumlah email tidak aktif yang dihapus sejak stempel tertentu. */
+export async function countEmailBounceDeletionsSince(
+  sinceIso: string,
+): Promise<number> {
+  const row = await queryOne<{ n: string | number }>(
+    "SELECT COUNT(*) AS n FROM email_bounce_audit WHERE deleted_at >= ?",
+    [sinceIso],
+  );
+  return Number(row?.n ?? 0);
+}
+
 // ---------- Template email ----------
 
 export async function listEmailTemplates(): Promise<EmailTemplate[]> {
@@ -5731,7 +5791,7 @@ function utcStamp(at: Date = new Date()): string {
 /** Awal hari kalender WIB (UTC+7, tanpa DST) sebagai stempel UTC — batas
  *  hitung kuota harian per akun. Disamakan dengan waktu lanjut mesin kirim
  *  supaya reset kuota selalu pukul 00:00 WIB, bukan tengah malam UTC. */
-function startOfTodayStamp(): string {
+export function startOfTodayStamp(): string {
   const WIB_OFFSET_MS = 7 * 60 * 60 * 1000;
   const nowWib = Date.now() + WIB_OFFSET_MS;
   const startOfDayWib = Math.floor(nowWib / 86_400_000) * 86_400_000;

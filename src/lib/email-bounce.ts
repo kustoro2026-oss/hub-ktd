@@ -188,13 +188,13 @@ async function scanAccount(
         const hard = isHardBounce(text);
         for (const addr of recipients) {
           if (hard) {
-            const deleted = await deleteEmailContactsByEmails([addr]);
+            const deleted = await deleteEmailContactsByEmails([addr], "hard bounce");
             if (deleted > 0) summary.hardDeleted++;
           } else if (isSoftBounce(text)) {
             const strikes = await incrementEmailContactBounceStrike(addr);
             if (strikes === 0) continue; // tidak ada di kontak
             if (strikes >= SOFT_BOUNCE_DELETE_AT) {
-              const deleted = await deleteEmailContactsByEmails([addr]);
+              const deleted = await deleteEmailContactsByEmails([addr], "soft bounce 3x");
               if (deleted > 0) summary.softDeleted++;
             } else {
               summary.softStrikes++;

@@ -11,7 +11,7 @@
 //  - Jadwal harian (meniru vercel.json):
 //      01:00  ops health        01:30  affiliate auto
 //      02:00  ops backup (Min)  07:30  affiliate auto
-//      23:00  snapshot keuangan
+//      22:30  rekap email WA    23:00  snapshot keuangan
 import { checkNewTiktokOrders } from "../src/lib/tiktok-resi";
 import { checkNewBlibliOrders } from "../src/lib/blibli-resi";
 import { checkNewLazadaOrders } from "../src/lib/lazada-resi";
@@ -22,7 +22,12 @@ import { cekOrderSelesaiSemuaChannel } from "../src/lib/stok-sync";
 import { runOpsHealthCheck, runOpsWeeklyBackup } from "../src/lib/ops";
 import { runAffiliateAutoCron } from "../src/lib/affiliate-auto";
 import { ambilSnapshotAneka } from "../src/lib/keuangan";
-import { workerHeartbeatSet } from "../src/lib/db";
+import {
+  countEmailBounceDeletionsSince,
+  emailItemsDayStats,
+  startOfTodayStamp,
+  workerHeartbeatSet,
+} from "../src/lib/db";
 import { sendOwnerNotice } from "../src/lib/wa";
 
 function wib(): string {
@@ -64,7 +69,21 @@ const FIVE_MIN_JOBS: {
   {
     name: "email",
     heartbeat: "sched:email",
-    run: () => runDueScheduledEmailCampaigns(),
+    run: async () => {
+      const res = await runDueScheduledEmailCampaigns();
+      for (const r of res.results) {
+        if (!r.ok) {
+          // Galat fatal (SMTP/akun) harus sampai ke pemilik segera — tanpa
+          // ini kampanye bisa diam-diam berhenti berhari-hari.
+          await sendOwnerNotice(
+            `[KTD Hub] Kampanye email #${r.id} dijeda karena galat: ${r.error ?? "tidak diketahui"}. Periksa akun SMTP di KTD Hub.`,
+          );
+        } else if ((r.notice ?? "").includes("Siklus selesai")) {
+          await kirimRekapEmail("ronde");
+        }
+      }
+      return res;
+    },
   },
   {
     name: "bounce-email",
@@ -127,6 +146,12 @@ const DAILY_JOBS: {
     run: () => runAffiliateAutoCron(),
   },
   {
+    name: "email-rekap",
+    h: 15,
+    m: 30,
+    run: () => kirimRekapEmail("harian"),
+  },
+  {
     name: "keuangan",
     h: 23,
     m: 0,
@@ -187,6 +212,25 @@ async function runDaily(d: Date): Promise<void> {
         }`,
       );
     }
+  }
+}
+
+/** Kirim rekap email ke pemilik: terkirim/gagal hari ini (WIB) + jumlah
+ *  email tidak aktif yang dihapus pemindai bounce. Dipakai saat ronde
+ *  kampanye selesai dan sebagai rekap harian 22:30 WIB. */
+async function kirimRekapEmail(kind: "ronde" | "harian"): Promise<void> {
+  try {
+    const since = startOfTodayStamp();
+    const [stat, dihapus] = await Promise.all([
+      emailItemsDayStats(since),
+      countEmailBounceDeletionsSince(since),
+    ]);
+    const judul = kind === "ronde" ? "Ronde email selesai" : "Rekap email harian";
+    await sendOwnerNotice(
+      `[KTD Hub] ${judul}: ${stat.sent} terkirim, ${stat.failed} gagal, ${dihapus} email dihapus (tidak aktif/bounce).`,
+    );
+  } catch (e) {
+    log(`rekap email GAGAL: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 

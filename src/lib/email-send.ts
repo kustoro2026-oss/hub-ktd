@@ -640,18 +640,18 @@ export async function runDueScheduledEmailCampaigns(opts?: {
   skipIfWorkerFresh?: boolean;
 }): Promise<{
   started: number;
-  results: { id: number; ok: boolean; error?: string }[];
+  results: { id: number; ok: boolean; error?: string; notice?: string }[];
 }> {
   if (opts?.skipIfWorkerFresh && (await workerHeartbeatFresh("sched:email"))) {
     return { started: 0, results: [] };
   }
   const due = await listDueScheduledEmailCampaigns();
-  const results: { id: number; ok: boolean; error?: string }[] = [];
+  const results: { id: number; ok: boolean; error?: string; notice?: string }[] = [];
   const deadline = Date.now() + 40_000;
   for (const c of due) {
     if (Date.now() >= deadline) break;
     const res = await runEmailCampaign(c.id);
-    results.push({ id: c.id, ok: res.ok, error: res.error });
+    results.push({ id: c.id, ok: res.ok, error: res.error, notice: res.notice });
   }
   return { started: results.length, results };
 }
