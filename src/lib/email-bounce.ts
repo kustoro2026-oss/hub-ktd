@@ -215,12 +215,23 @@ async function scanAccount(
       );
       if (ndrUids.length === 0) return undefined;
 
-      for await (const msg of client.fetch(
-        { uid: ndrUids.join(",") },
-        { source: true, envelope: true },
-        { uid: true },
-      )) {
+      for (const uid of ndrUids) {
         if (Date.now() > budget.deadline) break;
+        // Satu FETCH per pesan (bukan 50 sekaligus). FETCH borongan membuat
+        // LOGOUT menunggu seluruh aliran data selesai, sehingga rute web
+        // Vercel mati di batas 60 detik (504). Per pesan, aliran hanya satu
+        // pesan dan batas waktu bisa dihargai di antara pesan.
+        let msg: Awaited<ReturnType<typeof client.fetchOne>>;
+        try {
+          msg = await client.fetchOne(
+            String(uid),
+            { source: true, envelope: true },
+            { uid: true },
+          );
+        } catch {
+          continue;
+        }
+        if (!msg) continue;
         // Verifikasi amplop — SEARCH bisa memuat positif-palsu (mis. subject
         // mirip NDR). Pesan non-NDR tidak disentuh status terbacanya.
         const from = msg.envelope?.from?.[0]?.address ?? "";
@@ -296,7 +307,7 @@ export async function runEmailBounceScan(): Promise<EmailBounceScanResult> {
     errors: [],
   };
   if (accounts.length === 0) return summary;
-  const deadline = Date.now() + 55_000;
+  const deadline = Date.now() + 45_000;
   for (const account of accounts) {
     if (Date.now() > deadline) {
       summary.errors.push("Batas waktu ronde tercapai — lanjut ronde berikut.");
