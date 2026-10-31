@@ -88,7 +88,16 @@ const FIVE_MIN_JOBS: {
   {
     name: "bounce-email",
     heartbeat: "bounce:email",
-    run: () => runEmailBounceScan(),
+    run: async () => {
+      const res = await runEmailBounceScan();
+      log(
+        `bounce-email: ${res.scanned} NDR dipindai, ${res.hardDeleted} hard + ${res.softDeleted} soft dihapus, ${res.softStrikes} strike` +
+          (res.errors.length > 0 ? ` — KENDALA: ${res.errors.join("; ")}` : ""),
+      );
+      lastBounceErrors = res.errors;
+      if (res.errors.length > 0) await alertBounceErrors(res);
+      return res;
+    },
   },
   {
     name: "stok-sync",
@@ -215,6 +224,24 @@ async function runDaily(d: Date): Promise<void> {
   }
 }
 
+// Kendala pemindai bounce terakhir — diselipkan ke rekap harian dan
+// memicu alarm WA. Sebelumnya kegagalan IMAP dibungkam total: pemindai
+// bisa mati berhari-hari tanpa diketahui pemilik.
+let lastBounceErrors: string[] = [];
+let lastBounceAlertAt = 0;
+const BOUNCE_ALERT_COOLDOWN_MS = 6 * 3600_000; // maksimal 1 alarm per 6 jam
+
+async function alertBounceErrors(res: { errors: string[] }): Promise<void> {
+  const now = Date.now();
+  if (now - lastBounceAlertAt < BOUNCE_ALERT_COOLDOWN_MS) return;
+  lastBounceAlertAt = now;
+  await sendOwnerNotice(
+    `[KTD Hub] Pemindai bounce email bermasalah: ${res.errors
+      .slice(0, 2)
+      .join("; ")}. Email tidak aktif tidak akan terhapus otomatis sampai kendala ini beres.`,
+  );
+}
+
 /** Kirim rekap email ke pemilik: terkirim/gagal hari ini (WIB) + jumlah
  *  email tidak aktif yang dihapus pemindai bounce. Dipakai saat ronde
  *  kampanye selesai dan sebagai rekap harian 22:30 WIB. */
@@ -226,8 +253,12 @@ async function kirimRekapEmail(kind: "ronde" | "harian"): Promise<void> {
       countEmailBounceDeletionsSince(since),
     ]);
     const judul = kind === "ronde" ? "Ronde email selesai" : "Rekap email harian";
+    const kendala =
+      lastBounceErrors.length > 0
+        ? ` Kendala pemindai bounce: ${lastBounceErrors.slice(0, 2).join("; ")}`
+        : "";
     await sendOwnerNotice(
-      `[KTD Hub] ${judul}: ${stat.sent} terkirim, ${stat.failed} gagal, ${dihapus} email dihapus (tidak aktif/bounce).`,
+      `[KTD Hub] ${judul}: ${stat.sent} terkirim, ${stat.failed} gagal, ${dihapus} email dihapus (tidak aktif/bounce).${kendala}`,
     );
   } catch (e) {
     log(`rekap email GAGAL: ${e instanceof Error ? e.message : String(e)}`);

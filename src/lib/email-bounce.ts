@@ -38,6 +38,69 @@ export type EmailBounceScanResult = {
 
 const EMAIL_FIND = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
 
+/** Cari UID pesan NDR (belum dibaca) via SEARCH.
+ *
+ *  imapflow 2.x TIDAK lagi memperlakukan string seperti "UNSEEN" sebagai
+ *  query pencarian — string dikirim mentah sebagai sequence set, dan Gmail
+ *  menolaknya dengan BAD "Invalid sequence set value". Karena itu pencarian
+ *  dilakukan eksplisit lewat client.search():
+ *  - Jalur cepat Gmail (X-GM-EXT-1): satu query X-GM-RAW is:unread + OR
+ *    dari pengirim/subject NDR.
+ *  - Jalur standar (server lain): UNSEEN + OR dari pengirim/subject NDR. */
+async function searchNdrUids(client: ImapFlow): Promise<number[]> {
+  if (client.capabilities.has("X-GM-EXT-1")) {
+    const q = [
+      "from:mailer-daemon",
+      "from:postmaster",
+      "from:mail-delivery-subsystem",
+      'subject:"Delivery Status Notification"',
+      'subject:"Undelivered Mail Returned"',
+      'subject:"Delivery incomplete"',
+      'subject:"Delivery failed"',
+      'subject:"failure notice"',
+      'subject:"Returned to sender"',
+    ].join(" OR ");
+    try {
+      const uids = await client.search(
+        { gmraw: `is:unread (${q})` },
+        { uid: true },
+      );
+      if (Array.isArray(uids)) return uids;
+    } catch {
+      // server menolak raw — lanjut ke jalur standar di bawah
+    }
+  }
+  const uids = await client.search(
+    {
+      seen: false,
+      or: [
+        { from: "mailer-daemon" },
+        { from: "postmaster" },
+        { subject: "delivery status notification" },
+        { subject: "undelivered mail returned" },
+        { subject: "delivery incomplete" },
+      ],
+    },
+    { uid: true },
+  );
+  return Array.isArray(uids) ? uids : [];
+}
+
+/** Tandai pesan terbaca via STORE. Di imapflow 2.x mengubah `msg.flags`
+ *  (Set lokal) tidak mengirim perintah apa pun ke server — wajib memakai
+ *  messageFlagsAdd supaya NDR tidak dipindai ulang tiap ronde. */
+async function markSeen(
+  client: ImapFlow,
+  msg: { uid?: number },
+): Promise<void> {
+  if (msg.uid === undefined) return;
+  try {
+    await client.messageFlagsAdd({ uid: String(msg.uid) }, ["\\Seen"]);
+  } catch {
+    // abaikan — akan dicoba ronde berikutnya
+  }
+}
+
 /** Penanda NDR dari Gmail / mailer-daemon umum. */
 function isNdrSender(address: string): boolean {
   const a = (address || "").toLowerCase();
@@ -149,25 +212,25 @@ async function scanAccount(
     await client.connect();
     const lock = await client.getMailboxLock("INBOX");
     try {
-      // Amplop dulu (murah) → filter NDR → ambil sumber hanya yang cocok.
-      const candidates: { uid: number }[] = [];
-      for await (const msg of client.fetch("UNSEEN", { envelope: true }, { uid: true })) {
-        const from = msg.envelope?.from?.[0]?.address ?? "";
-        const subject = msg.envelope?.subject ?? "";
-        if (isNdrSender(from) || isNdrSubject(subject)) {
-          candidates.push({ uid: msg.uid });
-          if (candidates.length >= MAX_NDR_PER_ACCOUNT) break;
-        }
-      }
-      if (candidates.length === 0) return undefined;
+      // Cari UID kandidat NDR via SEARCH (imapflow 2.x menolak "UNSEEN"
+      // sebagai range fetch) → ambil amplop+sumber hanya yang cocok.
+      const ndrUids = (await searchNdrUids(client)).slice(
+        0,
+        MAX_NDR_PER_ACCOUNT,
+      );
+      if (ndrUids.length === 0) return undefined;
 
-      const uids = candidates.map((c) => c.uid);
       for await (const msg of client.fetch(
-        { uid: uids.join(",") },
+        { uid: ndrUids.join(",") },
         { source: true, envelope: true },
         { uid: true },
       )) {
         if (Date.now() > budget.deadline) break;
+        // Verifikasi amplop — SEARCH bisa memuat positif-palsu (mis. subject
+        // mirip NDR). Pesan non-NDR tidak disentuh status terbacanya.
+        const from = msg.envelope?.from?.[0]?.address ?? "";
+        const subject = msg.envelope?.subject ?? "";
+        if (!isNdrSender(from) && !isNdrSubject(subject)) continue;
         const source = String(msg.source ?? "");
         const text = source.replace(/=\r?\n/g, "").replace(/=3D/g, "=");
         const recipients = await knownRecipients(
@@ -177,11 +240,7 @@ async function scanAccount(
         if (recipients.length === 0) {
           // NDR bukan milik kampanye kita — tetap tandai terbaca supaya
           // tidak dipindai ulang tiap ronde.
-          try {
-            await msg.flags?.add("\\Seen");
-          } catch {
-            // abaikan — akan dicoba ronde berikutnya
-          }
+          await markSeen(client, msg);
           continue;
         }
         summary.scanned++;
@@ -201,11 +260,7 @@ async function scanAccount(
             }
           }
         }
-        try {
-          await msg.flags?.add("\\Seen");
-        } catch {
-          // abaikan — akan dicoba ronde berikutnya
-        }
+        await markSeen(client, msg);
       }
     } finally {
       lock.release();
