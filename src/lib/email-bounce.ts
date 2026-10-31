@@ -16,7 +16,7 @@
 import { ImapFlow } from "imapflow";
 import {
   deleteEmailContactsByEmails,
-  incrementEmailContactBounceStrike,
+  incrementEmailContactBounceStrikes,
   listEmailContactsByEmails,
   listEmailSmtpAccounts,
 } from "@/lib/db";
@@ -239,20 +239,28 @@ async function scanAccount(
           continue;
         }
         summary.scanned++;
-        const hard = isHardBounce(text);
-        for (const addr of recipients) {
-          if (hard) {
-            const deleted = await deleteEmailContactsByEmails([addr], "hard bounce");
-            if (deleted > 0) summary.hardDeleted++;
-          } else if (isSoftBounce(text)) {
-            const strikes = await incrementEmailContactBounceStrike(addr);
-            if (strikes === 0) continue; // tidak ada di kontak
-            if (strikes >= SOFT_BOUNCE_DELETE_AT) {
-              const deleted = await deleteEmailContactsByEmails([addr], "soft bounce 3x");
-              if (deleted > 0) summary.softDeleted++;
-            } else {
-              summary.softStrikes++;
-            }
+        // Borongan per pesan: satu operasi basis data untuk SEMUA alamat
+        // (dulu satu kueri per alamat — dengan 12 alamat/NDR dan 50 NDR
+        // bisa menembus batas 60 detik rute web Vercel).
+        if (isHardBounce(text)) {
+          const deleted = await deleteEmailContactsByEmails(
+            recipients,
+            "hard bounce",
+          );
+          summary.hardDeleted += deleted;
+        } else if (isSoftBounce(text)) {
+          const strikes = await incrementEmailContactBounceStrikes(recipients);
+          const dead: string[] = [];
+          for (const addr of recipients) {
+            if (Date.now() > budget.deadline) break;
+            const n = strikes.get(addr.toLowerCase()) ?? 0;
+            if (n === 0) continue; // tidak ada di kontak
+            if (n >= SOFT_BOUNCE_DELETE_AT) dead.push(addr);
+            else summary.softStrikes++;
+          }
+          if (dead.length > 0) {
+            const deleted = await deleteEmailContactsByEmails(dead, "soft bounce 3x");
+            summary.softDeleted += deleted;
           }
         }
         await markSeen(client, msg);

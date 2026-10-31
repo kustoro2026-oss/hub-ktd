@@ -5353,6 +5353,37 @@ export async function incrementEmailContactBounceStrike(
   return Number(row?.bounce_strikes ?? 0);
 }
 
+/** Versi borongan dari incrementEmailContactBounceStrike — satu UPDATE
+ *  untuk banyak alamat, mengembalikan peta email → cacahan setelah naik.
+ *  Dipakai pemindai bounce supaya tidak satu kueri per alamat (NDR bisa
+ *  memuat banyak alamat dan rute web Vercel dibatasi ~60 detik). */
+export async function incrementEmailContactBounceStrikes(
+  emails: string[],
+): Promise<Map<string, number>> {
+  const out = new Map<string, number>();
+  const clean = [
+    ...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean)),
+  ];
+  if (clean.length === 0) return out;
+  for (let i = 0; i < clean.length; i += 200) {
+    const chunk = clean.slice(i, i + 200);
+    const ph = chunk.map(() => "?").join(", ");
+    const rows = await queryAll<
+      { email: string; bounce_strikes: string | number }
+    >(
+      `UPDATE email_contacts SET bounce_strikes = bounce_strikes + 1 WHERE email IN (${ph}) RETURNING email, bounce_strikes`,
+      chunk,
+    );
+    for (const r of rows) {
+      out.set(
+        String(r.email).toLowerCase(),
+        Number(r.bounce_strikes ?? 0),
+      );
+    }
+  }
+  return out;
+}
+
 /** Kiriman sukses membuktikan alamat hidup — cacahan soft-bounce direset. */
 export async function resetEmailContactBounceStrikes(
   contactId: number,
