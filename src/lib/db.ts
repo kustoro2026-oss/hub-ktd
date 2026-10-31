@@ -5130,6 +5130,29 @@ export async function getEmailContactByEmail(
   );
 }
 
+/** Alamat dari daftar yang benar-benar ada di tabel kontak — versi borongan
+ *  untuk pemindai bounce, supaya tidak satu kueri per alamat (bisa 12 kueri
+ *  per NDR dan membuat pemindaian menembus batas 60 detik rute Vercel). */
+export async function listEmailContactsByEmails(
+  emails: string[],
+): Promise<string[]> {
+  const clean = [
+    ...new Set(emails.map((e) => e.trim().toLowerCase()).filter(Boolean)),
+  ];
+  if (clean.length === 0) return [];
+  const out: string[] = [];
+  for (let i = 0; i < clean.length; i += 200) {
+    const chunk = clean.slice(i, i + 200);
+    const ph = chunk.map(() => "?").join(", ");
+    const rows = await queryAll<{ email: string }>(
+      `SELECT email FROM email_contacts WHERE email IN (${ph})`,
+      chunk,
+    );
+    out.push(...rows.map((r) => String(r.email).toLowerCase()));
+  }
+  return out;
+}
+
 export type EmailContactSaveResult = {
   contact: EmailContact;
   created: boolean;

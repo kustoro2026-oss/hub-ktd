@@ -16,8 +16,8 @@
 import { ImapFlow } from "imapflow";
 import {
   deleteEmailContactsByEmails,
-  getEmailContactByEmail,
   incrementEmailContactBounceStrike,
+  listEmailContactsByEmails,
   listEmailSmtpAccounts,
 } from "@/lib/db";
 
@@ -172,14 +172,9 @@ async function knownRecipients(
     if (found.has(addr)) continue;
     found.add(addr);
   }
-  const known: string[] = [];
-  for (const addr of found) {
-    const contact = await getEmailContactByEmail(addr);
-    if (contact) known.push(addr);
-    // Amankan waktu: maksimal 12 kandidat per pesan.
-    if (known.length >= 12) break;
-  }
-  return known;
+  // Satu kueri borongan untuk semua kandidat (dulu satu kueri per alamat).
+  const known = await listEmailContactsByEmails([...found]);
+  return known.slice(0, 12);
 }
 
 /** Pindai INBOX satu akun SMTP untuk NDR. Mengembalikan ringkasan. */
